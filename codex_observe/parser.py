@@ -156,23 +156,53 @@ def usage_from_payload(payload: dict[str, Any]) -> dict[str, int] | None:
 
 
 def parse_tool_call(payload: dict[str, Any]) -> dict[str, Any] | None:
-    if payload.get("type") != "function_call":
-        return None
-    args_raw = payload.get("arguments") or "{}"
-    args = {}
-    try:
-        args = json.loads(args_raw) if isinstance(args_raw, str) else (args_raw or {})
-    except json.JSONDecodeError:
-        args = {"_raw": args_raw}
-    return {
-        "call_id": payload.get("call_id") or payload.get("id"),
-        "tool_name": payload.get("name"),
-        "arguments_json": json_dumps(args),
-        "command": args.get("command") if isinstance(args, dict) else None,
-        "workdir": args.get("workdir") if isinstance(args, dict) else None,
-        "timeout_ms": args.get("timeout_ms") if isinstance(args, dict) else None,
-        "turn_id": get_turn_id(payload),
-    }
+    """Normalize the several tool-call shapes Codex emits into one row."""
+    ptype = payload.get("type")
+
+    if ptype == "function_call":
+        args_raw = payload.get("arguments") or "{}"
+        args = {}
+        try:
+            args = json.loads(args_raw) if isinstance(args_raw, str) else (args_raw or {})
+        except json.JSONDecodeError:
+            args = {"_raw": args_raw}
+        return {
+            "call_id": payload.get("call_id") or payload.get("id"),
+            "tool_name": payload.get("name"),
+            "arguments_json": json_dumps(args),
+            "command": args.get("command") if isinstance(args, dict) else None,
+            "workdir": args.get("workdir") if isinstance(args, dict) else None,
+            "timeout_ms": args.get("timeout_ms") if isinstance(args, dict) else None,
+            "turn_id": get_turn_id(payload),
+        }
+
+    if ptype == "custom_tool_call":
+        name = payload.get("name") or payload.get("tool_name") or "custom_tool"
+        inp = payload.get("input") or payload.get("arguments") or payload.get("content") or ""
+        args = {"input": inp}
+        return {
+            "call_id": payload.get("call_id") or payload.get("id"),
+            "tool_name": name,
+            "arguments_json": json_dumps(args),
+            "command": inp if isinstance(inp, str) else None,
+            "workdir": None,
+            "timeout_ms": None,
+            "turn_id": get_turn_id(payload),
+        }
+
+    if ptype == "tool_search_call":
+        args = {k: payload.get(k) for k in ["query", "queries", "pattern"] if k in payload}
+        return {
+            "call_id": payload.get("call_id") or payload.get("id"),
+            "tool_name": payload.get("name") or "tool_search",
+            "arguments_json": json_dumps(args),
+            "command": args.get("query") or args.get("pattern"),
+            "workdir": None,
+            "timeout_ms": None,
+            "turn_id": get_turn_id(payload),
+        }
+
+    return None
 
 
 def prompt_blocks_for_message(text: str) -> list[tuple[str, str]]:
@@ -337,9 +367,9 @@ class CodexIngestor:
                         """INSERT OR REPLACE INTO tool_calls(call_id,thread_id,turn_id,timestamp,tool_name,arguments_json,command,workdir,timeout_ms,output,success,duration_ms,output_chars) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                         (call["call_id"], thread_id, call.get("turn_id"), ts, sqlite_scalar(call.get("tool_name")), sqlite_scalar(call.get("arguments_json")), sqlite_scalar(call.get("command")), sqlite_scalar(call.get("workdir")), sqlite_scalar(call.get("timeout_ms")), None, None, None, None),
                     )
-                elif payload.get("type") == "function_call_output":
-                    cid = payload.get("call_id")
-                    out = payload.get("output") or ""
+                elif payload.get("type") in {"function_call_output", "custom_tool_call_output", "tool_search_output"}:
+                    cid = payload.get("call_id") or payload.get("id")
+                    out = payload.get("output") or payload.get("content") or payload.get("result") or ""
                     out_text = sqlite_scalar(out)
                     self.conn.execute(
                         "UPDATE tool_calls SET output=?, output_chars=? WHERE call_id=? AND thread_id=?",
