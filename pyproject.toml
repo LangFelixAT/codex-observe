@@ -1,16 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "codex-observe"
-version = "0.1.0"
-description = "Offline observability dashboard for OpenAI Codex JSONL session logs"
-readme = "README.md"
+version = "0.3.0"
+description = "Offline observability dashboard for Codex JSONL session logs"
 requires-python = ">=3.10"
 dependencies = [
-  "streamlit>=1.35",
   "pandas>=2.0",
+  "streamlit>=1.35",
 ]
 
 [project.scripts]
 codex-observe = "codex_observe.cli:main"
 
 [tool.setuptools.packages.find]
+where = ["."]
 include = ["codex_observe*"]
