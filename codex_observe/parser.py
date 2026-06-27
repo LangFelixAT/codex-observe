@@ -269,16 +269,35 @@ class CodexIngestor:
         self.conn.commit()
         return result
 
+    def _delete_thread_rows(self, thread_id: str) -> None:
+        for table in ["events", "usage_snapshots", "tool_calls", "messages", "prompt_blocks"]:
+            self.conn.execute(f"DELETE FROM {table} WHERE thread_id=?", (thread_id,))
+        self.conn.execute("DELETE FROM threads WHERE thread_id=?", (thread_id,))
+
     def ingest_file(self, path: Path) -> IngestResult:
         result = IngestResult(files_seen=1)
         path = path.resolve()
+        path_key = str(path)
         stat = path.stat()
         digest = sha256_file(path)
-        existing = self.conn.execute("SELECT path, thread_id FROM files WHERE sha256=?", (digest,)).fetchone()
-        if existing and existing["path"] != str(path):
+        path_row = self.conn.execute("SELECT path, sha256, thread_id, is_duplicate, duplicate_of FROM files WHERE path=?", (path_key,)).fetchone()
+        canonical = self.conn.execute(
+            "SELECT path, thread_id FROM files WHERE sha256=? AND path<>? AND is_duplicate=0 ORDER BY path LIMIT 1",
+            (digest, path_key),
+        ).fetchone()
+        if canonical:
+            if path_row and path_row["thread_id"] and path_row["thread_id"] != canonical["thread_id"]:
+                self._delete_thread_rows(path_row["thread_id"])
             self.conn.execute(
                 "INSERT OR REPLACE INTO files(path,sha256,size_bytes,mtime,imported_at,thread_id,is_duplicate,duplicate_of) VALUES(?,?,?,?,?,?,1,?)",
-                (str(path), digest, stat.st_size, stat.st_mtime, utc_now(), existing["thread_id"], existing["path"]),
+                (path_key, digest, stat.st_size, stat.st_mtime, utc_now(), canonical["thread_id"], canonical["path"]),
+            )
+            result.duplicate_files = 1
+            return result
+        if path_row and path_row["is_duplicate"] and path_row["sha256"] == digest:
+            self.conn.execute(
+                "UPDATE files SET size_bytes=?, mtime=?, imported_at=? WHERE path=?",
+                (stat.st_size, stat.st_mtime, utc_now(), path_key),
             )
             result.duplicate_files = 1
             return result
@@ -303,6 +322,9 @@ class CodexIngestor:
         turn_ids = set()
         tool_count = 0
 
+        if path_row and path_row["thread_id"] and path_row["thread_id"] != thread_id:
+            self._delete_thread_rows(path_row["thread_id"])
+
         self.conn.execute(
             """INSERT OR REPLACE INTO threads(
                 thread_id,session_id,parent_thread_id,file_path,thread_source,source_kind,agent_role,agent_nickname,cwd,cli_version,model_provider,base_instruction_chars,created_at,first_seen,last_seen,event_count
@@ -322,7 +344,6 @@ class CodexIngestor:
         for table in ["events", "usage_snapshots", "tool_calls", "messages", "prompt_blocks"]:
             self.conn.execute(f"DELETE FROM {table} WHERE thread_id=?", (thread_id,))
 
-        pending_calls: dict[str, dict[str, Any]] = {}
         for idx, obj, raw in rows:
             typ = obj.get("type")
             payload = obj.get("payload") or {}
@@ -362,18 +383,21 @@ class CodexIngestor:
                 call = parse_tool_call(payload)
                 if call and call.get("call_id"):
                     tool_count += 1
-                    pending_calls[call["call_id"]] = call
                     self.conn.execute(
                         """INSERT OR REPLACE INTO tool_calls(call_id,thread_id,turn_id,timestamp,tool_name,arguments_json,command,workdir,timeout_ms,output,success,duration_ms,output_chars) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                         (call["call_id"], thread_id, call.get("turn_id"), ts, sqlite_scalar(call.get("tool_name")), sqlite_scalar(call.get("arguments_json")), sqlite_scalar(call.get("command")), sqlite_scalar(call.get("workdir")), sqlite_scalar(call.get("timeout_ms")), None, None, None, None),
                     )
                 elif payload.get("type") in {"function_call_output", "custom_tool_call_output", "tool_search_output"}:
                     cid = payload.get("call_id") or payload.get("id")
-                    out = payload.get("output") or payload.get("content") or payload.get("result") or ""
+                    out = ""
+                    for key in ("output", "content", "result"):
+                        if key in payload:
+                            out = payload[key]
+                            break
                     out_text = sqlite_scalar(out)
                     self.conn.execute(
                         "UPDATE tool_calls SET output=?, output_chars=? WHERE call_id=? AND thread_id=?",
-                        (out_text, len(str(out_text or "")), cid, thread_id),
+                        (out_text, len(str(out_text if out_text is not None else "")), cid, thread_id),
                     )
                 elif payload.get("type") == "patch_apply_end":
                     cid = payload.get("call_id")
@@ -381,7 +405,7 @@ class CodexIngestor:
                     out_text = sqlite_scalar(out)
                     self.conn.execute(
                         "UPDATE tool_calls SET output=?, output_chars=?, success=? WHERE call_id=? AND thread_id=?",
-                        (out_text, len(str(out_text or "")), 1 if payload.get("success") else 0, cid, thread_id),
+                        (out_text, len(str(out_text if out_text is not None else "")), 1 if payload.get("success") else 0, cid, thread_id),
                     )
 
         self.conn.execute("UPDATE threads SET turn_count=?, tool_call_count=? WHERE thread_id=?", (len(turn_ids), tool_count, thread_id))
@@ -419,3 +443,5 @@ def ingest(sessions_path: str, db_path: str) -> IngestResult:
         return ing.ingest_paths([Path(sessions_path).expanduser()])
     finally:
         ing.close()
+
+

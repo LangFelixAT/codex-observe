@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -45,13 +44,15 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
     app_path = Path(__file__).with_name("dashboard.py")
-    cmd = [sys.executable, "-m", "streamlit", "run", str(app_path), "--", "--db", args.db]
+    cmd = [sys.executable, "-m", "streamlit", "run", str(app_path)]
     if args.host:
         cmd.extend(["--server.address", args.host])
     if args.port:
         cmd.extend(["--server.port", str(args.port)])
+    cmd.extend(["--", "--db", args.db])
     return subprocess.call(cmd)
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
