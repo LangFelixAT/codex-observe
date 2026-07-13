@@ -80,6 +80,7 @@ def test_pr_template_requires_issue_verification_visual_evidence_and_privacy_rev
         "## Visual QA evidence",
         "Agent detail selector exercised",
         "metric card evidence",
+        "operator-briefing evidence",
         ".artifacts/demo/codex_observe_demo.sqlite",
         "Aggregate report artifacts",
         "Public evidence bundle",
@@ -143,6 +144,7 @@ def test_current_state_handoff_covers_gates_evidence_and_remaining_blocker() -> 
         "python scripts/visual_qa.py",
         "python scripts/visual_qa.py --verify-manifest .artifacts/visual/visual-qa-manifest.json",
         "metric card evidence",
+        "operator-briefing evidence",
         "saved manifest schema/contract",
         "codex-observe evidence-bundle",
         "codex-observe.evidence-bundle.v1",
@@ -245,6 +247,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
     for tour_item in [
         "codex-observe tour",
         "codex-observe demo --serve --host 127.0.0.1 --port 8501",
+        "Overview operator briefing",
         "Overview triage card",
         "codex-observe doctor --db .artifacts/demo/codex_observe_demo.sqlite --json",
         "codex-observe sessions --db .artifacts/demo/codex_observe_demo.sqlite --json",
@@ -314,6 +317,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
     assert "visual QA manifest" in release
     assert "schema/contract evidence" in release
     assert "metric cards" in release
+    assert "operator briefing" in release
     assert "required_commands" in release
     assert "structured `next_commands`" in release
     assert "docs/CURRENT.md" in release

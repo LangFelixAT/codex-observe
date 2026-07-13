@@ -75,7 +75,7 @@ For UI-facing changes, run visual QA:
 python scripts/visual_qa.py
 ```
 
-The visual QA script starts Streamlit, clicks Overview, Agent detail, Timeline & jumps, Tools, Duplication, and Raw tables, exercises the Agent detail selector, and writes desktop/narrow screenshots and a validated path-safe visual QA manifest with tab coverage, selector exercise, screenshot metadata, layout review, sidebar risk labels, expected high-risk default metric card evidence, and success-target evidence to `.artifacts/visual/`. Recheck saved evidence and referenced screenshot files with `python scripts/visual_qa.py --verify-manifest .artifacts/visual/visual-qa-manifest.json`.
+The visual QA script starts Streamlit, clicks Overview, Agent detail, Timeline & jumps, Tools, Duplication, and Raw tables, exercises the Agent detail selector, and writes desktop/narrow screenshots and a validated path-safe visual QA manifest with tab coverage, selector exercise, screenshot metadata, layout review, sidebar risk labels, expected high-risk default metric card evidence, operator-briefing evidence, and success-target evidence to `.artifacts/visual/`. Recheck saved evidence and referenced screenshot files with `python scripts/visual_qa.py --verify-manifest .artifacts/visual/visual-qa-manifest.json`.
 
 ## Parser changes
 

@@ -9,7 +9,7 @@ Codex Observe is currently a local-first workbench for understanding Codex sessi
 The current core loop is printed by `codex-observe tour`; `codex-observe tour --json` exposes the same synthetic-data commands as a schema-versioned automation contract. The loop is:
 
 1. `codex-observe demo --serve --host 127.0.0.1 --port 8501`; `codex-observe demo --sessions .artifacts/demo/sessions --keep-sessions --json` exposes schema-versioned creation status while keeping synthetic sessions for ingest-contract checks
-2. Inspect Overview triage, diagnostics, cost-share metric cards, Agent detail, Timeline & jumps, Tools, Duplication, and Raw tables.
+2. Inspect the Overview operator briefing, triage, diagnostics, cost-share metric cards, Agent detail, Timeline & jumps, Tools, Duplication, and Raw tables.
 3. Run `codex-observe doctor --db .artifacts/demo/codex_observe_demo.sqlite --json` to verify aggregate database health, `schema_version`, and structured `next_commands`; missing, empty, invalid, and unreadable database recovery hints are copy-pasteable and preserve the same `--db` path.
 4. Use risk-aware `codex-observe sessions --json` to pick the highest-risk run through the `schema_version`-marked `status`, structured `recommended_session`, `recommendation_detail`, and `next_commands`, even when a newer low-risk follow-up exists, then export `.artifacts/demo/run-report.md` and `.artifacts/demo/run-report.json` with quick-read, aggregate triage assessment, cost-profile, ranked opportunity stack, next-run success target, diagnostics, structured next-action, and playbook evidence.
 5. Compare report JSON files into `.artifacts/demo/run-comparison.md` and `.artifacts/demo/run-comparison.json` with triage-risk movement, opportunity-change movement, metric deltas, structured recommendation targets, and priority-preserving next-step recommendations for persisted diagnostics.
@@ -34,7 +34,7 @@ codex-observe evidence-bundle --out .artifacts/public-evidence
 codex-observe audit --json
 ```
 
-The visual QA manifest records desktop and narrow screenshots, exercised tabs, Agent detail selector exercise, sidebar risk labels, metric card evidence, success-target evidence, screenshot metadata, and layout review; the final audit verifies the saved manifest schema/contract, referenced screenshots, layout review, sidebar risk labels, high-risk metric evidence, success-target evidence, and generated public evidence bundle artifacts.
+The visual QA manifest records desktop and narrow screenshots, exercised tabs, Agent detail selector exercise, sidebar risk labels, metric card evidence, operator-briefing evidence, success-target evidence, screenshot metadata, and layout review; the final audit verifies the saved manifest schema/contract, referenced screenshots, layout review, sidebar risk labels, high-risk metric evidence, operator-briefing evidence, success-target evidence, and generated public evidence bundle artifacts.
 
 ## Tracking State
 

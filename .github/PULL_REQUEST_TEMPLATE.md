@@ -35,7 +35,7 @@
 - Database source: `.artifacts/demo/codex_observe_demo.sqlite` or another explicitly synthetic/redacted database
 - Desktop screenshot:
 - Narrow screenshot:
-- Visual QA manifest: schema-versioned, path-safe `.artifacts/visual/visual-qa-manifest.json` with validated manifest evidence, referenced screenshot files, layout review, sidebar risk labels, and expected high-risk metric card evidence
+- Visual QA manifest: schema-versioned, path-safe `.artifacts/visual/visual-qa-manifest.json` with validated manifest evidence, referenced screenshot files, layout review, sidebar risk labels, expected high-risk metric card evidence, and operator-briefing evidence
 - Aggregate report artifacts: `.artifacts/demo/run-report.md`, `.artifacts/demo/run-report.json`, `.artifacts/demo/run-comparison.md`, `.artifacts/demo/run-comparison.json`; JSON artifacts and audit output include `schema_version`, opportunity stack, and opportunity-change evidence
 - Public evidence bundle: `.artifacts/public-evidence/README.md`, `.artifacts/public-evidence/evidence-bundle.json`, visual screenshots when included, and `codex-observe.evidence-bundle.v1` manifest evidence
 - Tabs exercised: Overview, Agent detail, Timeline & jumps, Tools, Duplication, Raw tables
