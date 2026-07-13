@@ -510,6 +510,16 @@ def test_public_evidence_bundle_artifact_failures_require_limitations(
     assert any("explicit human approval" in failure for failure in failures)
 
     loaded = json.loads((bundle / "evidence-bundle.json").read_text(encoding="utf-8"))
+    without_summary = dict(loaded)
+    without_summary.pop("review_summary")
+    (bundle / "evidence-bundle.json").write_text(
+        json.dumps(without_summary), encoding="utf-8"
+    )
+
+    failures = cli.public_evidence_bundle_artifact_failures(Path.cwd(), bundle)
+
+    assert "evidence bundle manifest missing review_summary" in failures
+
     loaded.pop("review_checklist")
     (bundle / "evidence-bundle.json").write_text(json.dumps(loaded), encoding="utf-8")
 
@@ -574,7 +584,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     )
     assert (
         checks["public evidence bundle artifacts"]["detail"]
-        == "manifest, reviewer README review checklist and reproduce-local commands, limitations doc, aggregate reports, and audit artifact verified"
+        == "manifest, reviewer README key findings, review checklist, and reproduce-local commands, limitations doc, aggregate reports, and audit artifact verified"
     )
     assert (
         "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, metric cards, dashboard quick reads, report and comparison downloads, comparison preview and deltas, operator briefing, and success target verified"
@@ -758,6 +768,15 @@ def test_public_evidence_bundle_writes_privacy_safe_manifest_and_artifacts(
         "private_log_required": False,
         "raw_content_included": False,
     }
+    summary = loaded["review_summary"]
+    summary_text = json.dumps(summary)
+    assert summary[0]["label"] == "Run triage"
+    assert "Top opportunity" in summary_text
+    assert "Next-run target" in summary_text
+    assert "Comparison verdict" in summary_text
+    assert "Audit status" in summary_text
+    assert "Largest thread drives the run" in summary_text
+    assert str(tmp_path) not in summary_text
     checklist = loaded["review_checklist"]
     checklist_text = json.dumps(checklist)
     assert checklist[0]["label"] == "Confirm the bundle boundary"
@@ -794,6 +813,12 @@ def test_public_evidence_bundle_writes_privacy_safe_manifest_and_artifacts(
     assert "LIMITATIONS.md" in readme
     assert "demo/run-report.md" in readme
     assert "audit/audit.json" in readme
+    assert "## Key Findings" in readme
+    assert "Run triage" in readme
+    assert "Top opportunity" in readme
+    assert "Next-run target" in readme
+    assert "Comparison verdict" in readme
+    assert "Audit status" in readme
     assert "## Review Checklist" in readme
     assert "Confirm the bundle boundary" in readme
     assert "Read the run outcome" in readme
@@ -848,6 +873,7 @@ def test_evidence_bundle_cli_json_and_text_outputs_are_actionable(
         assert payload["artifacts"]["bundle_readme"] == "README.md"
         assert payload["artifacts"]["limitations_markdown"] == "LIMITATIONS.md"
         assert payload["artifacts"]["report_markdown"] == "demo/run-report.md"
+        assert payload["review_summary"][0]["label"] == "Run triage"
         assert payload["review_checklist"][0]["label"] == "Confirm the bundle boundary"
         assert payload["next"].startswith("Start with README.md and LIMITATIONS.md")
         assert "visual QA screenshots" not in payload["next"]

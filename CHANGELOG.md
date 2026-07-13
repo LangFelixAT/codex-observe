@@ -21,6 +21,7 @@ The project follows semantic versioning once release distribution is decided.
 - Added follow-up command templates to aggregate comparison Markdown/JSON exports.
 - Added the comparison next validation command to the dashboard Overview quick-read card and visual/audit evidence.
 - Added a structured reviewer checklist to the public evidence bundle manifest, README, and audit validation.
+- Added reviewer key findings to the public evidence bundle manifest, README, and audit validation.
 
 ### Added
 

@@ -624,6 +624,20 @@ def public_evidence_bundle_artifact_failures(
     if not isinstance(artifacts, dict):
         return [*failures, "evidence bundle manifest missing artifacts"]
 
+    review_summary = manifest.get("review_summary")
+    if not isinstance(review_summary, list) or not review_summary:
+        failures.append("evidence bundle manifest missing review_summary")
+    else:
+        summary_text = json.dumps(review_summary)
+        for required in [
+            "Run triage",
+            "Top opportunity",
+            "Next-run target",
+            "Comparison verdict",
+            "Audit status",
+        ]:
+            if required not in summary_text:
+                failures.append(f"evidence bundle review_summary missing {required}")
     review_checklist = manifest.get("review_checklist")
     if not isinstance(review_checklist, list) or not review_checklist:
         failures.append("evidence bundle manifest missing review_checklist")
@@ -661,6 +675,12 @@ def public_evidence_bundle_artifact_failures(
         readme = readme_path.read_text(encoding="utf-8")
         for required in [
             "# Codex Observe Evidence Bundle",
+            "## Key Findings",
+            "Run triage",
+            "Top opportunity",
+            "Next-run target",
+            "Comparison verdict",
+            "Audit status",
             "## Review Checklist",
             "Confirm the bundle boundary",
             "Read the run outcome",
@@ -1845,7 +1865,7 @@ def release_audit_report(
         add(
             "public evidence bundle artifacts",
             not public_bundle_failures,
-            "manifest, reviewer README review checklist and reproduce-local commands, limitations doc, aggregate reports, and audit artifact verified"
+            "manifest, reviewer README key findings, review checklist, and reproduce-local commands, limitations doc, aggregate reports, and audit artifact verified"
             if not public_bundle_failures
             else "; ".join(public_bundle_failures[:3]),
         )
@@ -2432,6 +2452,68 @@ def write_json_artifact(path: Path, payload: dict[str, object]) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
 
+def evidence_bundle_review_summary(
+    report: dict[str, object],
+    comparison: dict[str, object],
+    audit_payload: dict[str, object],
+) -> list[dict[str, str]]:
+    triage = report.get("triage", {})
+    success_target = report.get("success_target", {})
+    opportunities = report.get("opportunities", [])
+    top_opportunity = (
+        opportunities[0] if isinstance(opportunities, list) and opportunities else {}
+    )
+    if not isinstance(top_opportunity, dict):
+        top_opportunity = {}
+    comparison_headline = comparison.get("headline", {})
+    if not isinstance(comparison_headline, dict):
+        comparison_headline = {}
+    opportunity_change = comparison.get("opportunity_change", {})
+    if not isinstance(opportunity_change, dict):
+        opportunity_change = {}
+    failed_checks = audit_payload.get("failed_checks", [])
+    failed_count = len(failed_checks) if isinstance(failed_checks, list) else 0
+    return [
+        {
+            "label": "Run triage",
+            "value": f"{triage.get('risk_level', 'unknown')} risk - {triage.get('primary_driver', 'No high-signal diagnostic')}",
+            "why_it_matters": str(
+                triage.get("next_action") or "Inspect the aggregate report."
+            ),
+        },
+        {
+            "label": "Top opportunity",
+            "value": f"{top_opportunity.get('Driver', 'No dominant opportunity')} - {top_opportunity.get('Scale', 'unknown scale')}",
+            "why_it_matters": str(
+                top_opportunity.get("Habit")
+                or "Use the opportunity stack to choose the next workflow habit."
+            ),
+        },
+        {
+            "label": "Next-run target",
+            "value": f"{success_target.get('metric', 'total_tokens')}: {success_target.get('current', 'unknown')} -> {success_target.get('target', 'unknown')}",
+            "why_it_matters": str(
+                success_target.get("verification")
+                or "Compare the next run against this target."
+            ),
+        },
+        {
+            "label": "Comparison verdict",
+            "value": f"{comparison.get('verdict', 'unknown')} - {comparison_headline.get('headline', 'No comparison headline available.')}",
+            "why_it_matters": str(
+                comparison.get("recommendation")
+                or opportunity_change.get("summary")
+                or "Inspect the comparison report."
+            ),
+        },
+        {
+            "label": "Audit status",
+            "value": f"{audit_payload.get('status', 'unknown')} with {failed_count} failed checks",
+            "why_it_matters": "The synthetic evidence bundle should be reproducible before it is attached or published.",
+        },
+    ]
+
+
 def evidence_bundle_review_checklist(
     artifacts: dict[str, object], visual_status: object
 ) -> list[dict[str, str]]:
@@ -2473,6 +2555,7 @@ def evidence_bundle_review_checklist(
 def evidence_bundle_readme(manifest: dict[str, object]) -> str:
     artifacts = manifest.get("artifacts", {})
     checks = manifest.get("checks", {})
+    review_summary = manifest.get("review_summary")
     review_checklist = manifest.get("review_checklist")
     lines = [
         "# Codex Observe Evidence Bundle",
@@ -2503,6 +2586,17 @@ def evidence_bundle_readme(manifest: dict[str, object]) -> str:
             joined = ", ".join(f"`{item}`" for item in screenshots)
             lines.append(f"- {joined}: Dashboard screenshots.")
 
+    if isinstance(review_summary, list) and review_summary:
+        lines.extend(["", "## Key Findings", ""])
+        for item in review_summary:
+            if not isinstance(item, dict):
+                continue
+            label = str(item.get("label") or "Finding")
+            value = str(item.get("value") or "unknown").rstrip(".")
+            why_it_matters = str(
+                item.get("why_it_matters") or "Review the related artifact."
+            ).rstrip(".")
+            lines.append(f"- {label}: {value}. {why_it_matters}.")
     if isinstance(review_checklist, list) and review_checklist:
         lines.extend(["", "## Review Checklist", ""])
         for item in review_checklist:
@@ -2690,6 +2784,7 @@ def public_evidence_bundle(
     status = (
         "ok" if audit_status == 0 and visual_status in {"ok", "skipped"} else "failed"
     )
+    review_summary = evidence_bundle_review_summary(report, comparison, audit_payload)
     review_checklist = evidence_bundle_review_checklist(artifacts, visual_status)
 
     next_step = "Start with README.md and LIMITATIONS.md, then review evidence-bundle.json, run-report.md, run-comparison.md, and audit.json before publishing or attaching artifacts."
@@ -2706,6 +2801,7 @@ def public_evidence_bundle(
         },
         "commands": commands,
         "artifacts": artifacts,
+        "review_summary": review_summary,
         "review_checklist": review_checklist,
         "checks": statuses,
         "next": next_step,
