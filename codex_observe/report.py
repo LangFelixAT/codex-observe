@@ -145,6 +145,7 @@ def session_summaries(db_path: str) -> list[dict[str, Any]]:
                 "largest_thread_share_pct": largest_thread_share_pct,
                 "repeated_prompt_share_pct": repeated_prompt_share_pct,
                 "uncached_input_share_pct": uncached_input_share_pct,
+                "largest_tool_output_chars": largest_tool_output_chars,
             }
         )
     return sort_session_summaries(summaries)
@@ -159,19 +160,24 @@ def session_report_hint(db_path: str, session_id: str | None = None) -> str:
 
 
 def session_recommended_action_lines(recommended: dict[str, Any]) -> list[str]:
-    drivers = [
+    share_drivers = [
         ("largest thread share", recommended.get("largest_thread_share_pct")),
         ("repeated prompt share", recommended.get("repeated_prompt_share_pct")),
         ("uncached input share", recommended.get("uncached_input_share_pct")),
     ]
     driver_parts = []
-    for label, value in drivers:
+    for label, value in share_drivers:
         try:
             numeric = float(value)
         except (TypeError, ValueError):
             continue
         if numeric > 0:
             driver_parts.append(f"{label}: {numeric:.1f}%")
+    tool_output_chars = _safe_int(recommended.get("largest_tool_output_chars"))
+    if tool_output_chars > 0:
+        driver_parts.append(
+            f"largest tool output: {fmt_short(tool_output_chars)} chars"
+        )
     return [
         "Recommended action:",
         f"- Export report for session: {recommended['session_id']}",

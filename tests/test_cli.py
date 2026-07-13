@@ -578,7 +578,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     assert report.with_name("run-comparison.json").exists()
     assert (
         checks["session listing"]["detail"]
-        == "2 sessions; triage risk, status, schema, text recommended action, recommendation detail, and next commands verified"
+        == "2 sessions; triage risk, status, schema, text recommended action, tool-output driver, recommendation detail, and next commands verified"
     )
     assert checks["aggregate report"]["ok"] is True
     assert "success target" in checks["aggregate report"]["detail"]
@@ -722,6 +722,7 @@ def test_public_tour_payload_is_private_log_free_and_points_to_visual_verificati
     assert any("success_target" in item for item in evidence)
     assert any("success target" in item for item in evidence)
     assert any("recommended-action block" in item for item in evidence)
+    assert any("largest tool output" in item for item in evidence)
     assert any("Recommended Action" in item for item in evidence)
     assert any("report terminal confirmation" in item for item in evidence)
     assert any("comparison terminal confirmation" in item for item in evidence)

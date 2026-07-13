@@ -100,7 +100,7 @@ To list reportable conversation IDs and aggregate triage risk without printing p
 codex-observe sessions --db ~/.codex-observe/codex_observe.sqlite
 ```
 
-If the database has conversations, codex-observe sessions shows each run's aggregate risk, prints a recommended-action block with the highest-risk session and top aggregate drivers, and prints the next report command for that session, using latest run as the tie-breaker. With `--json`, the payload includes `schema_version`, `status`, a structured `recommended_session`, `recommendation_detail`, and structured `next_commands` for automation; missing databases also return a machine-readable JSON recovery payload with the same exit code. If the database is valid but empty, it prints the next ingest or demo command instead of a blank table.
+If the database has conversations, codex-observe sessions shows each run's aggregate risk, prints a recommended-action block with the highest-risk session and top aggregate drivers, including largest tool output, and prints the next report command for that session, using latest run as the tie-breaker. With `--json`, the payload includes `schema_version`, `status`, a structured `recommended_session`, `recommendation_detail`, and structured `next_commands` for automation; missing databases also return a machine-readable JSON recovery payload with the same exit code. If the database is valid but empty, it prints the next ingest or demo command instead of a blank table.
 
 To export a shareable aggregate-only run report for the recommended highest-risk conversation:
 

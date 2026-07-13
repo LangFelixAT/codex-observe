@@ -287,6 +287,7 @@ def test_session_summaries_are_aggregate_only(tmp_path: Path) -> None:
             "largest_thread_share_pct": 57.7,
             "repeated_prompt_share_pct": 17.4,
             "uncached_input_share_pct": 39.5,
+            "largest_tool_output_chars": 3960,
         },
         {
             "session_id": "demo-session-focused-followup",
@@ -301,6 +302,7 @@ def test_session_summaries_are_aggregate_only(tmp_path: Path) -> None:
             "largest_thread_share_pct": 34.5,
             "repeated_prompt_share_pct": 0.0,
             "uncached_input_share_pct": 14.3,
+            "largest_tool_output_chars": 880,
         },
     ]
     assert (
@@ -313,7 +315,7 @@ def test_session_summaries_are_aggregate_only(tmp_path: Path) -> None:
     assert "Why: highest aggregate triage risk; latest run breaks ties" in lines
     assert "Risk: high" in lines
     assert (
-        "Top drivers: largest thread share: 57.7%; repeated prompt share: 17.4%; uncached input share: 39.5%"
+        "Top drivers: largest thread share: 57.7%; repeated prompt share: 17.4%; uncached input share: 39.5%; largest tool output: 4.0k chars"
         in lines
     )
     assert (
