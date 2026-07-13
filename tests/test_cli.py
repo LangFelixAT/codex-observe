@@ -524,6 +524,10 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     assert checks["issue templates"]["ok"] is True
     assert checks["tracking snapshot"]["ok"] is True
     assert (
+        checks["public tour JSON"]["detail"]
+        == "schema, privacy, database, evidence bundle, dashboard quick-read evidence, and next commands verified"
+    )
+    assert (
         checks["issue templates"]["detail"]
         == "issue templates require demoable evidence, visual QA, public-tour feedback, privacy review, and limitations checks"
     )

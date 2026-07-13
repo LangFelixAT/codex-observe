@@ -82,6 +82,14 @@ EXPECTED_VISUAL_QUICK_READ_EVIDENCE = [
     {"tab": "Duplication", "text": "Duplication quick read"},
     {"tab": "Raw tables", "text": "Data inventory"},
 ]
+EXPECTED_TOUR_QUICK_READ_TEXT = [
+    "Overview operator briefing",
+    "Agent detail thread brief",
+    "Timeline quick read",
+    "Tools quick read",
+    "Duplication quick read",
+    "Raw tables data inventory",
+]
 EXPECTED_VISUAL_VIEWPORTS = {
     "desktop": {"width": 1440, "height": 1000},
     "narrow": {"width": 390, "height": 900},
@@ -1724,13 +1732,17 @@ def release_audit_report(
         and any(
             "report and comparison download controls" in item for item in tour_evidence
         )
+        and all(
+            any(expected in item for item in tour_evidence)
+            for expected in EXPECTED_TOUR_QUICK_READ_TEXT
+        )
     )
     add(
         "public tour JSON",
         tour_ok,
-        "schema, privacy, database, evidence bundle, evidence, and next commands verified"
+        "schema, privacy, database, evidence bundle, dashboard quick-read evidence, and next commands verified"
         if tour_ok
-        else "tour JSON schema_version, privacy, database, evidence bundle, report/comparison-download evidence, feedback evidence, or next_commands missing",
+        else "tour JSON schema_version, privacy, database, evidence bundle, dashboard quick-read evidence, report/comparison-download evidence, feedback evidence, or next_commands missing",
     )
 
     ignore_failures = private_artifact_ignore_failures(root)

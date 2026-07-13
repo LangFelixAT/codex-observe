@@ -14,6 +14,7 @@ The project follows semantic versioning once release distribution is decided.
 - Added a Raw tables data inventory that summarizes parsed table counts before showing row-level evidence.
 - Updated the public tour to point reviewers at the dashboard quick-read surfaces now covered by visual QA.
 - Strengthened visual QA manifests and release audit checks to require structured dashboard quick-read evidence.
+- Strengthened release audit checks for public tour dashboard quick-read guidance.
 
 ### Added
 

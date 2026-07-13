@@ -348,7 +348,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
     assert "missing/empty database onboarding states" in release
     assert "metric cards" in release
     assert (
-        "public tour JSON evidence including report/comparison-download evidence"
+        "public tour JSON evidence including dashboard quick-read guidance and report/comparison-download evidence"
         in release
     )
     assert "operator briefing" in release
