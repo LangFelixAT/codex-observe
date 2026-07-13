@@ -214,6 +214,10 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         "ruff format --check",
         "pytest -q",
         "python scripts/visual_qa.py",
+        "## Traceability cadence",
+        "small, reviewable checkpoints",
+        "git status --short --branch",
+        "push the branch",
         "codex-observe sessions --db .artifacts/demo/codex_observe_demo.sqlite --json",
         "aggregate triage risk",
         "aggregate triage risk",
@@ -315,6 +319,8 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
     assert "docs/CURRENT.md" in release
     assert "remaining HITL blocker" in release
     assert "docs/LIMITATIONS.md" in release
+    assert "release branch is pushed to `origin`" in release
+    assert "git status --short --branch" in release
     for required_distribution_item in [
         "codex-observe evidence-bundle --out .artifacts/public-evidence",
         "codex-observe audit --json",
