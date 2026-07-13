@@ -28,26 +28,37 @@ def test_evidence_bundle_check_verifies_manifest_readme_and_skipped_visual(
     bundle = tmp_path / "bundle"
     bundle.mkdir()
     (bundle / "evidence-bundle.json").write_text(
-        '{"schema_version":"codex-observe.evidence-bundle.v1","artifacts":{"bundle_readme":"README.md","limitations_markdown":"LIMITATIONS.md"}}',
+        '{"schema_version":"codex-observe.evidence-bundle.v1","artifacts":{"bundle_readme":"README.md","limitations_markdown":"LIMITATIONS.md","feedback_runbook":"PUBLIC_TOUR_FEEDBACK.md"},"review_summary":[{"label":"Run triage","value":"high risk"}],"review_checklist":[{"label":"Confirm the bundle boundary","look_for":"Synthetic-only scope"}]}',
         encoding="utf-8",
     )
     (bundle / "README.md").write_text(
-        "# Codex Observe Evidence Bundle\nprivate Codex logs\n", encoding="utf-8"
+        "# Codex Observe Evidence Bundle\nprivate Codex logs\n## Key Findings\n## Review Checklist\nPUBLIC_TOUR_FEEDBACK.md\n",
+        encoding="utf-8",
     )
     (bundle / "LIMITATIONS.md").write_text(
         "# Limitations and Next Work\napproval-gated\n", encoding="utf-8"
     )
 
+    (bundle / "PUBLIC_TOUR_FEEDBACK.md").write_text(
+        "# Public Tour Feedback Runbook\n", encoding="utf-8"
+    )
     check = clean_install_smoke.evidence_bundle_check(bundle)
 
     assert "codex-observe.evidence-bundle.v1" in check
     assert "README.md" in check
     assert "LIMITATIONS.md" in check
     assert "limitations_markdown" in check
+    assert "feedback_runbook" in check
+    assert "review_summary" in check
+    assert "review_checklist" in check
     assert "visual_manifest" in check
     assert "# Codex Observe Evidence Bundle" in check
     assert "private Codex logs" in check
+    assert "## Key Findings" in check
+    assert "## Review Checklist" in check
+    assert "PUBLIC_TOUR_FEEDBACK.md" in check
     assert "approval-gated" in check
+    assert "Public Tour Feedback Runbook" in check
 
 
 def test_smoke_commands_verify_console_script_demo_audit_bundle_and_imports(
