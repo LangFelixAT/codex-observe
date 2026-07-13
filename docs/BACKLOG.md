@@ -134,7 +134,7 @@ Acceptance criteria:
 - [x] The manifest records artifact paths, check status, privacy metadata, and `codex-observe.evidence-bundle.v1` schema version.
 - [x] `--skip-visual` supports faster local and test runs while the default path collects visual QA evidence.
 - [x] Text and JSON CLI output point reviewers at the generated evidence.
-- [x] The generated bundle README gives reviewers a privacy-safe key findings, review checklist, and key artifact paths and sharing cautions.
+- [x] The generated bundle README gives reviewers a privacy-safe README and terminal key findings, review checklist, and key artifact paths and sharing cautions.
 - [x] The bundle includes `LIMITATIONS.md` so known boundaries, approval-gated work, and next-work sources travel with reviewer evidence.
 - [x] Tests cover the manifest contract, artifact creation, and actionable CLI output.
 

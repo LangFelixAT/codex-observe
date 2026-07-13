@@ -2813,6 +2813,7 @@ def public_evidence_bundle(
 
 def evidence_bundle_lines(output_dir: str, manifest: dict[str, object]) -> list[str]:
     artifacts = manifest.get("artifacts", {})
+    review_summary = manifest.get("review_summary")
     lines = [
         f"Evidence bundle: {Path(output_dir).expanduser()}",
         f"Status: {manifest.get('status', 'unknown')}",
@@ -2824,6 +2825,14 @@ def evidence_bundle_lines(output_dir: str, manifest: dict[str, object]) -> list[
                 lines.append(f"- {key}: {', '.join(str(item) for item in value)}")
             else:
                 lines.append(f"- {key}: {value}")
+    if isinstance(review_summary, list) and review_summary:
+        lines.append("Key findings:")
+        for item in review_summary:
+            if not isinstance(item, dict):
+                continue
+            label = str(item.get("label") or "Finding")
+            value = str(item.get("value") or "unknown")
+            lines.append(f"- {label}: {value}")
     lines.append(f"Next: {manifest.get('next', 'Review the bundle artifacts.')}")
     return lines
 

@@ -891,4 +891,9 @@ def test_evidence_bundle_cli_json_and_text_outputs_are_actionable(
     assert "bundle_readme: README.md" in captured.out
     assert "limitations_markdown: LIMITATIONS.md" in captured.out
     assert "report_markdown: demo/run-report.md" in captured.out
+    assert "Key findings:" in captured.out
+    assert "Run triage: high risk - Largest thread drives the run" in captured.out
+    assert "Top opportunity: Largest thread - 33.2k tokens" in captured.out
+    assert "Next-run target: largest_thread_share_pct" in captured.out
+    assert "Audit status: ok with 0 failed checks" in captured.out
     assert "audit_json: audit/audit.json" in captured.out
