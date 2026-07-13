@@ -14,6 +14,7 @@ from codex_observe.report import (
     compare_reports,
     default_report_session,
     report_follow_up_commands,
+    report_review_path,
     comparison_json,
     comparison_markdown,
     load_report_json,
@@ -102,6 +103,18 @@ def test_build_report_returns_privacy_safe_diagnostics_and_playbook(
         f"codex-observe report --db {db} --session-id <next-session-id> --format json --out next-run-report.json",
         "codex-observe compare --before-report run-report.json --after-report next-run-report.json --out run-comparison.md",
     ]
+    assert [step["label"] for step in report["review_path"]] == [
+        "Save this report JSON",
+        "Apply the recommended habit",
+        "Export the next run",
+        "Compare the workflow change",
+    ]
+    assert report["review_path"][0]["command"] == (
+        f"codex-observe report --db {db} --session-id demo-session-cost-review --format json --out run-report.json"
+    )
+    assert report["review_path"][-1]["command"] == (
+        "codex-observe compare --before-report run-report.json --after-report next-run-report.json --out run-comparison.md"
+    )
     assert "no command captured" in serialized
     for private in PRIVATE_DEMO_STRINGS:
         assert private not in serialized
@@ -143,6 +156,12 @@ def test_report_markdown_and_json_are_shareable_without_private_content(
     assert "Target: below 50.0%" in markdown
     assert "## Next Run Playbook" in markdown
     assert "Impact: Targets the largest total-token driver." in markdown
+    assert "## Review Path" in markdown
+    assert "Save this report JSON" in markdown
+    assert (
+        "Success check: JSON includes schema_version, success_target, next_action_detail, and review_path."
+        in markdown
+    )
     assert "## Follow-up Commands" in markdown
     assert f"codex-observe sessions --db {db} --json" in markdown
     assert (
@@ -164,6 +183,10 @@ def test_report_markdown_and_json_are_shareable_without_private_content(
     assert payload["next_action_detail"]["target"] == (
         "Set a stop condition for the dominant thread"
     )
+    assert payload["review_path"][2]["label"] == "Export the next run"
+    assert payload["review_path"][3]["success_check"] == (
+        "Export the next run as report JSON and compare largest_thread_share_pct before adopting the workflow change."
+    )
     assert payload["next_commands"][0] == f"codex-observe sessions --db {db} --json"
     assert "<next-session-id>" in payload["next_command_templates"][0]
     for private in PRIVATE_DEMO_STRINGS:
@@ -184,6 +207,30 @@ def test_report_follow_up_commands_are_structured_for_current_and_next_run() -> 
             "codex-observe compare --before-report run-report.json --after-report next-run-report.json --out run-comparison.md",
         ],
     }
+
+
+def test_report_review_path_guides_next_run_validation() -> None:
+    review_path = report_review_path(
+        "demo.sqlite",
+        "session-1",
+        {
+            "metric": "largest_thread_share_pct",
+            "target": "below 50.0%",
+            "verification": "Export the next run as report JSON and compare largest_thread_share_pct before adopting the workflow change.",
+        },
+    )
+
+    assert [step["label"] for step in review_path] == [
+        "Save this report JSON",
+        "Apply the recommended habit",
+        "Export the next run",
+        "Compare the workflow change",
+    ]
+    assert review_path[0]["command"] == (
+        "codex-observe report --db demo.sqlite --session-id session-1 --format json --out run-report.json"
+    )
+    assert "largest_thread_share_pct" in review_path[1]["success_check"]
+    assert review_path[-1]["success_check"].startswith("Export the next run")
 
 
 def test_load_report_json_requires_current_report_schema(tmp_path: Path) -> None:

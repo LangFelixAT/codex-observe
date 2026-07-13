@@ -254,6 +254,39 @@ def report_follow_up_commands(db_path: str, session_id: str) -> dict[str, list[s
     }
 
 
+def report_review_path(
+    db_path: str, session_id: str, success_target: dict[str, Any]
+) -> list[dict[str, str]]:
+    metric = str(success_target.get("metric") or "target metric")
+    target = str(success_target.get("target") or "the target threshold")
+    verification = str(
+        success_target.get("verification")
+        or "Export the next run as report JSON and compare the target metric."
+    )
+    return [
+        {
+            "label": "Save this report JSON",
+            "command": f"codex-observe report --db {db_path} --session-id {session_id} --format json --out run-report.json",
+            "success_check": "JSON includes schema_version, success_target, next_action_detail, and review_path.",
+        },
+        {
+            "label": "Apply the recommended habit",
+            "command": "Review the Recommended Action and Next Run Playbook sections before the next run.",
+            "success_check": f"Next run is planned around improving {metric} toward {target}.",
+        },
+        {
+            "label": "Export the next run",
+            "command": f"codex-observe report --db {db_path} --session-id <next-session-id> --format json --out next-run-report.json",
+            "success_check": "next-run-report.json uses the same report schema and aggregate-only privacy mode.",
+        },
+        {
+            "label": "Compare the workflow change",
+            "command": "codex-observe compare --before-report run-report.json --after-report next-run-report.json --out run-comparison.md",
+            "success_check": verification,
+        },
+    ]
+
+
 def build_report(db_path: str, session_id: str | None = None) -> dict[str, Any]:
     db = Path(db_path).expanduser()
     if not db.exists():
@@ -428,6 +461,9 @@ def build_report(db_path: str, session_id: str | None = None) -> dict[str, Any]:
     report["next_action_detail"] = report_next_action_detail(report)
     report["success_target"] = report_success_target(report)
     report.update(report_follow_up_commands(str(db), selected_session))
+    report["review_path"] = report_review_path(
+        str(db), selected_session, report["success_target"]
+    )
     return report
 
 
@@ -1295,6 +1331,24 @@ def report_markdown(report: dict[str, Any]) -> str:
         )
     if not report["playbook"]:
         lines.extend(["No playbook items available.", ""])
+
+    review_path = report.get("review_path", [])
+    if review_path:
+        lines.extend(["## Review Path", ""])
+        for index, step in enumerate(review_path, start=1):
+            if not isinstance(step, dict):
+                continue
+            label = str(step.get("label") or f"Step {index}")
+            command = str(step.get("command") or "")
+            success_check = str(step.get("success_check") or "Confirm the result.")
+            lines.extend(
+                [
+                    f"{index}. **{label}**",
+                    f"   Command: `{command}`",
+                    f"   Success check: {success_check}",
+                    "",
+                ]
+            )
 
     lines.extend(["## Follow-up Commands", ""])
     for command in report.get("next_commands", []):

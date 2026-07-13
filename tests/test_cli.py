@@ -639,10 +639,13 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     assert report_payload["success_target"]["target_value"] == 50.0
     assert report_payload["next_commands"]
     assert report_payload["next_command_templates"]
+    assert report_payload["review_path"][0]["label"] == "Save this report JSON"
     report_text = report.read_text(encoding="utf-8")
     assert "## Next Run Success Target" in report_text
     assert "## Recommended Action" in report_text
     assert "Action: apply next run habit" in report_text
+    assert "## Review Path" in report_text
+    assert "Save this report JSON" in report_text
     assert "## Follow-up Commands" in report_text
 
 

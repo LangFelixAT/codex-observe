@@ -1957,6 +1957,23 @@ def release_audit_report(
             and str(report_payload.get("success_target", {}).get("metric"))
             in report_written_text
         )
+        report_review_path = report_payload.get("review_path")
+        report_has_review_path = (
+            isinstance(report_review_path, list)
+            and len(report_review_path) >= 4
+            and all(
+                isinstance(step, dict)
+                and step.get("label")
+                and step.get("command")
+                and step.get("success_check")
+                for step in report_review_path
+            )
+            and any(
+                "codex-observe compare --before-report" in str(step.get("command"))
+                for step in report_review_path
+                if isinstance(step, dict)
+            )
+        )
         report_has_cost_profile = (
             out_path.exists()
             and out_path.stat().st_size > 0
@@ -1969,6 +1986,8 @@ def release_audit_report(
             and "Action:" in report_markdown_text
             and "Target:" in report_markdown_text
             and "## Next Run Success Target" in report_markdown_text
+            and "## Review Path" in report_markdown_text
+            and "Save this report JSON" in report_markdown_text
             and "## Follow-up Commands" in report_markdown_text
             and "codex-observe sessions --db" in report_markdown_text
             and "codex-observe compare --before-report" in report_markdown_text
@@ -1985,6 +2004,7 @@ def release_audit_report(
             and report_payload.get("next_action_detail", {}).get("action")
             and report_payload.get("success_target", {}).get("metric")
             and report_payload.get("success_target", {}).get("target_value") is not None
+            and report_has_review_path
             and report_confirmation_has_success_target
             and any(
                 str(command).startswith("codex-observe sessions --db ")
@@ -2001,11 +2021,12 @@ def release_audit_report(
             and '"success_target"' in report_json_text
             and '"next_commands"' in report_json_text
             and '"next_command_templates"' in report_json_text
+            and '"review_path"' in report_json_text
         )
         add(
             "aggregate report",
             report_has_cost_profile,
-            f"{out_path}; {json_out_path}; recommended action, cost profile, opportunity stack, terminal success target, triage, follow-up commands, structured next action, and schema verified",
+            f"{out_path}; {json_out_path}; recommended action, cost profile, opportunity stack, terminal success target, triage, review path, follow-up commands, structured next action, and schema verified",
         )
         comparison = compare_reports(report, report)
         comparison_out = out_path.with_name("run-comparison.md")
