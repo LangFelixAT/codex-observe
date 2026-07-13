@@ -537,6 +537,14 @@ def test_public_evidence_bundle_artifact_failures_require_limitations(
     assert "evidence bundle manifest missing review_checklist" in failures
 
     loaded = json.loads((bundle / "evidence-bundle.json").read_text(encoding="utf-8"))
+    loaded.pop("action_plan")
+    (bundle / "evidence-bundle.json").write_text(json.dumps(loaded), encoding="utf-8")
+
+    failures = cli.public_evidence_bundle_artifact_failures(Path.cwd(), bundle)
+
+    assert "evidence bundle manifest missing action_plan" in failures
+
+    loaded = json.loads((bundle / "evidence-bundle.json").read_text(encoding="utf-8"))
     loaded.pop("validation_commands")
     (bundle / "evidence-bundle.json").write_text(json.dumps(loaded), encoding="utf-8")
 
@@ -609,7 +617,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     )
     assert (
         checks["public evidence bundle artifacts"]["detail"]
-        == "manifest, reviewer README key findings, review checklist, feedback runbook, reproduce-local commands, validation commands, limitations doc, aggregate reports, and audit artifact verified"
+        == "manifest, reviewer README action plan and key findings, review checklist, feedback runbook, reproduce-local commands, validation commands, limitations doc, aggregate reports, and audit artifact verified"
     )
     assert (
         "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, metric cards, dashboard quick reads, report and comparison downloads, comparison preview and deltas, operator briefing, and success target verified"
@@ -892,6 +900,16 @@ def test_public_evidence_bundle_writes_privacy_safe_manifest_and_artifacts(
     assert "Verify release gates" in checklist_text
     assert "next validation command" in checklist_text
     assert str(tmp_path) not in checklist_text
+    action_plan = loaded["action_plan"]
+    action_plan_text = json.dumps(action_plan)
+    assert action_plan[0]["label"] == "Establish the safe review boundary"
+    assert "Read the run diagnosis" in action_plan_text
+    assert "Check change evidence" in action_plan_text
+    assert "Verify reproducibility gates" in action_plan_text
+    assert "Validate the next real run" in action_plan_text
+    assert "File feedback safely" in action_plan_text
+    assert "success_check" in action_plan_text
+    assert str(tmp_path) not in action_plan_text
     validation_commands = loaded["validation_commands"]
     assert validation_commands["next_report"] == (
         "codex-observe report --db <db> --session-id <next-session-id> --format json --out next-run-report.json"
@@ -934,6 +952,11 @@ def test_public_evidence_bundle_writes_privacy_safe_manifest_and_artifacts(
     assert "File feedback safely" in readme
     assert "demo/run-report.md" in readme
     assert "audit/audit.json" in readme
+    assert "## Reviewer Action Plan" in readme
+    assert "Establish the safe review boundary" in readme
+    assert "Read the run diagnosis" in readme
+    assert "Validate the next real run" in readme
+    assert "Success check:" in readme
     assert "## Key Findings" in readme
     assert "Run triage" in readme
     assert "Top opportunity" in readme
@@ -1009,6 +1032,9 @@ def test_evidence_bundle_cli_json_and_text_outputs_are_actionable(
         assert payload["artifacts"]["report_markdown"] == "demo/run-report.md"
         assert payload["review_summary"][0]["label"] == "Run triage"
         assert payload["review_checklist"][0]["label"] == "Confirm the bundle boundary"
+        assert (
+            payload["action_plan"][0]["label"] == "Establish the safe review boundary"
+        )
         assert "next_report" in payload["validation_commands"]
         assert payload["validation_commands"]["next_report"].startswith(
             "codex-observe report --db <db> --session-id <next-session-id>"
@@ -1032,7 +1058,13 @@ def test_evidence_bundle_cli_json_and_text_outputs_are_actionable(
     assert "limitations_markdown: LIMITATIONS.md" in captured.out
     assert "feedback_runbook: PUBLIC_TOUR_FEEDBACK.md" in captured.out
     assert "report_markdown: demo/run-report.md" in captured.out
+    assert "Reviewer action plan:" in captured.out
+    assert "1. Establish the safe review boundary: LIMITATIONS.md" in captured.out
+    assert "5. Validate the next real run: validation_commands" in captured.out
     assert "Key findings:" in captured.out
+    assert captured.out.index("Reviewer action plan:") < captured.out.index(
+        "Key findings:"
+    )
     assert captured.out.index("Key findings:") < captured.out.index("Artifacts:")
     assert "Run triage: high risk - Largest thread drives the run" in captured.out
     assert "Top opportunity: Largest thread - 33.2k tokens" in captured.out

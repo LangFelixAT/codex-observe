@@ -641,6 +641,7 @@ def public_evidence_bundle_artifact_failures(
             if required not in summary_text:
                 failures.append(f"evidence bundle review_summary missing {required}")
     review_checklist = manifest.get("review_checklist")
+    action_plan = manifest.get("action_plan")
     validation_commands = manifest.get("validation_commands")
     if not isinstance(review_checklist, list) or not review_checklist:
         failures.append("evidence bundle manifest missing review_checklist")
@@ -656,7 +657,22 @@ def public_evidence_bundle_artifact_failures(
         ]:
             if required not in checklist_text:
                 failures.append(f"evidence bundle review_checklist missing {required}")
-    validation_commands = manifest.get("validation_commands")
+    if not isinstance(action_plan, list) or not action_plan:
+        failures.append("evidence bundle manifest missing action_plan")
+    else:
+        action_plan_text = json.dumps(action_plan)
+        for required in [
+            "Establish the safe review boundary",
+            "Read the run diagnosis",
+            "Check change evidence",
+            "Verify reproducibility gates",
+            "Validate the next real run",
+            "File feedback safely",
+            "success_check",
+        ]:
+            if required not in action_plan_text:
+                failures.append(f"evidence bundle action_plan missing {required}")
+
     if not isinstance(validation_commands, dict):
         failures.append("evidence bundle manifest missing validation_commands")
     else:
@@ -2022,7 +2038,7 @@ def release_audit_report(
         add(
             "public evidence bundle artifacts",
             not public_bundle_failures,
-            "manifest, reviewer README key findings, review checklist, feedback runbook, reproduce-local commands, validation commands, limitations doc, aggregate reports, and audit artifact verified"
+            "manifest, reviewer README action plan and key findings, review checklist, feedback runbook, reproduce-local commands, validation commands, limitations doc, aggregate reports, and audit artifact verified"
             if not public_bundle_failures
             else "; ".join(public_bundle_failures[:3]),
         )
@@ -2318,7 +2334,7 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
             ],
             "success_checks": [
                 "bundle README starts with key findings and review checklist before artifact paths",
-                "manifest includes review_summary, validation_commands, LIMITATIONS.md, and PUBLIC_TOUR_FEEDBACK.md",
+                "manifest includes action_plan, review_summary, validation_commands, LIMITATIONS.md, and PUBLIC_TOUR_FEEDBACK.md",
             ],
             "commands": [
                 "codex-observe evidence-bundle --out .artifacts/public-evidence",
@@ -2800,12 +2816,71 @@ def evidence_bundle_review_checklist(
     return checklist
 
 
+def evidence_bundle_action_plan(
+    artifacts: dict[str, object], validation_commands: dict[str, str]
+) -> list[dict[str, object]]:
+    return [
+        {
+            "step": 1,
+            "label": "Establish the safe review boundary",
+            "artifact": str(artifacts.get("limitations_markdown", "LIMITATIONS.md")),
+            "action": "Confirm the bundle is synthetic-only and note approval-gated work before sharing anything externally.",
+            "success_check": "Reviewer can state what is safe to share and what still requires explicit human approval.",
+        },
+        {
+            "step": 2,
+            "label": "Read the run diagnosis",
+            "artifact": str(artifacts.get("report_markdown", "demo/run-report.md")),
+            "action": "Use the quick read, opportunity stack, recommended action, and next-run target to understand the expensive run.",
+            "success_check": "Reviewer can name the top aggregate driver, recommended habit, and measurable next-run target.",
+        },
+        {
+            "step": 3,
+            "label": "Check change evidence",
+            "artifact": str(
+                artifacts.get("comparison_markdown", "demo/run-comparison.md")
+            ),
+            "action": "Inspect whether the comparison verdict, triage movement, and opportunity movement support the next workflow step.",
+            "success_check": "Reviewer can explain whether the workflow improved, regressed, or stayed unchanged without reading private content.",
+        },
+        {
+            "step": 4,
+            "label": "Verify reproducibility gates",
+            "artifact": str(artifacts.get("audit_json", "audit/audit.json")),
+            "action": "Check status, failed_checks, and required_commands before treating the bundle as release evidence.",
+            "success_check": "Audit status is ok, failed_checks is empty, and required_commands are available for rerun.",
+        },
+        {
+            "step": 5,
+            "label": "Validate the next real run",
+            "artifact": "validation_commands",
+            "action": str(
+                validation_commands.get(
+                    "next_report",
+                    "codex-observe report --db <db> --session-id <next-session-id> --format json --out next-run-report.json",
+                )
+            ),
+            "success_check": "A future report JSON can be compared against the bundled success target before adopting the workflow change.",
+        },
+        {
+            "step": 6,
+            "label": "File feedback safely",
+            "artifact": str(
+                artifacts.get("feedback_runbook", "PUBLIC_TOUR_FEEDBACK.md")
+            ),
+            "action": "Record useful, confusing, visual, bundle, and privacy notes without private prompts, tool output, or local paths.",
+            "success_check": "Feedback uses synthetic or reviewed-redacted evidence and avoids private raw content.",
+        },
+    ]
+
+
 def evidence_bundle_readme(manifest: dict[str, object]) -> str:
     artifacts = manifest.get("artifacts", {})
     checks = manifest.get("checks", {})
     review_summary = manifest.get("review_summary")
     review_checklist = manifest.get("review_checklist")
     validation_commands = manifest.get("validation_commands")
+    action_plan = manifest.get("action_plan")
     lines = [
         "# Codex Observe Evidence Bundle",
         "",
@@ -2835,6 +2910,20 @@ def evidence_bundle_readme(manifest: dict[str, object]) -> str:
         if isinstance(screenshots, list) and screenshots:
             joined = ", ".join(f"`{item}`" for item in screenshots)
             lines.append(f"- {joined}: Dashboard screenshots.")
+
+    if isinstance(action_plan, list) and action_plan:
+        lines.extend(["", "## Reviewer Action Plan", ""])
+        for item in action_plan:
+            if not isinstance(item, dict):
+                continue
+            step = item.get("step") or "?"
+            label = str(item.get("label") or "Review step")
+            artifact = str(item.get("artifact") or "unknown")
+            action = str(item.get("action") or "Review the artifact.")
+            success_check = str(item.get("success_check") or "Confirm the result.")
+            lines.append(
+                f"{step}. **{label}** (`{artifact}`): {action} Success check: {success_check}"
+            )
 
     if isinstance(review_summary, list) and review_summary:
         lines.extend(["", "## Key Findings", ""])
@@ -3075,6 +3164,8 @@ def public_evidence_bundle(
             if isinstance(command, str) and command
         }
 
+    action_plan = evidence_bundle_action_plan(artifacts, validation_commands)
+
     manifest: dict[str, object] = {
         "schema_version": EVIDENCE_BUNDLE_SCHEMA_VERSION,
         "status": status,
@@ -3087,6 +3178,7 @@ def public_evidence_bundle(
         "artifacts": artifacts,
         "review_summary": review_summary,
         "review_checklist": review_checklist,
+        "action_plan": action_plan,
         "validation_commands": validation_commands,
         "checks": statuses,
         "next": next_step,
@@ -3099,10 +3191,20 @@ def public_evidence_bundle(
 def evidence_bundle_lines(output_dir: str, manifest: dict[str, object]) -> list[str]:
     artifacts = manifest.get("artifacts", {})
     review_summary = manifest.get("review_summary")
+    action_plan = manifest.get("action_plan")
     lines = [
         f"Evidence bundle: {Path(output_dir).expanduser()}",
         f"Status: {manifest.get('status', 'unknown')}",
     ]
+    if isinstance(action_plan, list) and action_plan:
+        lines.append("Reviewer action plan:")
+        for item in action_plan:
+            if not isinstance(item, dict):
+                continue
+            step = item.get("step") or "?"
+            label = str(item.get("label") or "Review step")
+            artifact = str(item.get("artifact") or "unknown")
+            lines.append(f"- {step}. {label}: {artifact}")
     if isinstance(review_summary, list) and review_summary:
         lines.append("Key findings:")
         for item in review_summary:
