@@ -698,6 +698,26 @@ def test_sessions_missing_json_payload_is_actionable_and_schema_versioned() -> N
     assert "codex-observe demo --db missing.sqlite" in payload["next_commands"]
 
 
+def test_session_recommendation_detail_includes_structured_tool_output_driver() -> None:
+    detail = cli.session_recommendation_detail(
+        {
+            "session_id": "session-high",
+            "triage_risk": "high",
+            "largest_thread_share_pct": 57.7,
+            "repeated_prompt_share_pct": 17.4,
+            "uncached_input_share_pct": 39.5,
+            "largest_tool_output_chars": 3960,
+        }
+    )
+
+    assert detail["drivers"] == {
+        "largest_thread_share_pct": 57.7,
+        "repeated_prompt_share_pct": 17.4,
+        "uncached_input_share_pct": 39.5,
+        "largest_tool_output_chars": 3960,
+    }
+
+
 def test_public_tour_payload_is_private_log_free_and_points_to_visual_verification() -> (
     None
 ):
@@ -723,6 +743,7 @@ def test_public_tour_payload_is_private_log_free_and_points_to_visual_verificati
     assert any("success target" in item for item in evidence)
     assert any("recommended-action block" in item for item in evidence)
     assert any("largest tool output" in item for item in evidence)
+    assert any("structured aggregate drivers" in item for item in evidence)
     assert any("Recommended Action" in item for item in evidence)
     assert any("report terminal confirmation" in item for item in evidence)
     assert any("comparison terminal confirmation" in item for item in evidence)

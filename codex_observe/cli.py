@@ -1662,6 +1662,7 @@ def release_audit_report(
             and recommendation_detail.get("target") == recommended_session_id
             and recommendation_detail.get("ranked_by") == ["triage_risk", "last_seen"]
             and isinstance(recommendation_detail.get("drivers"), dict)
+            and "largest_tool_output_chars" in recommendation_detail["drivers"]
         )
         session_lines_text = "\n".join(session_summary_lines(actual_db_path))
         sessions_text_has_recommended_action = (
@@ -2129,6 +2130,7 @@ def session_recommendation_detail(recommended: dict[str, object]) -> dict[str, o
             "largest_thread_share_pct": recommended.get("largest_thread_share_pct"),
             "repeated_prompt_share_pct": recommended.get("repeated_prompt_share_pct"),
             "uncached_input_share_pct": recommended.get("uncached_input_share_pct"),
+            "largest_tool_output_chars": recommended.get("largest_tool_output_chars"),
         },
     }
 
@@ -2186,7 +2188,7 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
             "evidence": [
                 "recommended_session chooses the highest-risk run",
                 "plain-text sessions output includes a recommended-action block with top aggregate drivers, including largest tool output",
-                "recommendation_detail explains the risk and recency tie-breakers",
+                "recommendation_detail explains the risk, recency tie-breakers, and structured aggregate drivers",
             ],
             "commands": [f"codex-observe sessions --db {db_path} --json"],
         },
