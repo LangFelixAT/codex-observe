@@ -62,6 +62,14 @@ EXPECTED_SUCCESS_TARGET = {
     "target": "below 50.0%",
 }
 
+EXPECTED_OPERATOR_BRIEFING = {
+    "label": "Operator briefing",
+    "risk": "High risk",
+    "best_habit": "Set a stop condition for the dominant thread",
+    "scale": "33.2k tokens (57.7% of run)",
+    "proof_target": "largest_thread_share_pct: 57.7% -> below 50.0%",
+}
+
 
 def visible_text_has_error(text: str) -> bool:
     error_markers = [
@@ -199,6 +207,55 @@ def success_target_failures(
     return failures
 
 
+def collect_operator_briefings(page) -> list[dict[str, str]]:
+    return page.evaluate(
+        r"""
+() => Array.from(document.querySelectorAll('.co-briefing')).map((card) => {
+  const facts = Array.from(card.querySelectorAll('.co-briefing-fact'));
+  const factByLabel = (label) => {
+    const fact = facts.find((item) => (item.querySelector('strong')?.innerText || '').replace(/\s+/g, ' ').trim() === label);
+    return fact ? Array.from(fact.querySelectorAll('p')).map((p) => (p.innerText || '').replace(/\s+/g, ' ').trim()) : [];
+  };
+  const bestHabit = factByLabel('Best next habit');
+  const proofTarget = factByLabel('Proof target');
+  return {
+    label: (card.querySelector('.co-briefing-label')?.innerText || '').replace(/\s+/g, ' ').trim(),
+    heading: (card.querySelector('h3')?.innerText || '').replace(/\s+/g, ' ').trim(),
+    action: (card.querySelector('h3 + p')?.innerText || '').replace(/\s+/g, ' ').trim(),
+    best_habit: bestHabit[0] || '',
+    scale: bestHabit[1] || '',
+    proof_target: proofTarget[0] || '',
+  };
+}).filter((item) => item.label || item.heading || item.best_habit || item.proof_target)
+        """
+    )
+
+
+def operator_briefing_failures(
+    briefings: list[dict[str, str]], viewport_name: str
+) -> list[str]:
+    if not briefings:
+        return [f"{viewport_name}: operator briefing card not rendered"]
+    observed = briefings[0]
+    failures = []
+    label = str(observed.get("label") or "").casefold()
+    expected_label = EXPECTED_OPERATOR_BRIEFING["label"].casefold()
+    if label != expected_label:
+        failures.append(f"{viewport_name}: operator briefing label missing")
+    if EXPECTED_OPERATOR_BRIEFING["risk"] not in str(observed.get("heading") or ""):
+        failures.append(
+            f"{viewport_name}: operator briefing risk expected {EXPECTED_OPERATOR_BRIEFING['risk']}"
+        )
+    for key in ["best_habit", "scale", "proof_target"]:
+        actual = str(observed.get(key) or "")
+        expected = EXPECTED_OPERATOR_BRIEFING[key]
+        if actual != expected:
+            failures.append(
+                f"{viewport_name}: operator briefing {key} expected {expected}, got {actual or 'missing'}"
+            )
+    return failures
+
+
 def collect_layout_snapshot(page) -> dict[str, object]:
     return page.evaluate(
         r"""
@@ -286,8 +343,10 @@ def validate_dashboard_page(
     page.evaluate("window.scrollTo(0, Math.min(document.body.scrollHeight, 900))")
     page.wait_for_timeout(500)
     success_targets = collect_success_targets(page)
+    operator_briefings = collect_operator_briefings(page)
     page.evaluate("window.scrollTo(0, 0)")
     failures.extend(success_target_failures(success_targets, viewport_name))
+    failures.extend(operator_briefing_failures(operator_briefings, viewport_name))
     for metric_label in ["Largest thread", "Uncached input"]:
         if metric_label not in text:
             failures.append(
@@ -344,6 +403,7 @@ def validate_dashboard_page(
         "metric_cards": metric_cards,
         "sidebar_risk_labels": sidebar_risk_labels,
         "success_targets": success_targets,
+        "operator_briefings": operator_briefings,
         "layout_review": layout_snapshot,
     }
     return failures, evidence
@@ -502,6 +562,16 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
             failures.extend(
                 failure.replace(f"{name}: ", f"manifest {name} ")
                 for failure in target_failures
+            )
+
+        operator_briefings = raw.get("operator_briefings")
+        if not isinstance(operator_briefings, list):
+            failures.append(f"manifest {name} missing operator briefing evidence")
+        else:
+            briefing_failures = operator_briefing_failures(operator_briefings, name)
+            failures.extend(
+                failure.replace(f"{name}: ", f"manifest {name} ")
+                for failure in briefing_failures
             )
 
         layout = raw.get("layout_review")

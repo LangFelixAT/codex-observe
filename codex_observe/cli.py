@@ -47,6 +47,13 @@ EXPECTED_VISUAL_SUCCESS_TARGET = {
     "target": "below 50.0%",
 }
 
+EXPECTED_VISUAL_OPERATOR_BRIEFING = {
+    "risk": "High risk",
+    "best_habit": "Set a stop condition for the dominant thread",
+    "scale": "33.2k tokens (57.7% of run)",
+    "proof_target": "largest_thread_share_pct: 57.7% -> below 50.0%",
+}
+
 EXPECTED_VISUAL_TABS = [
     "Overview",
     "Agent detail",
@@ -1044,6 +1051,30 @@ def visual_manifest_evidence_failures(root: Path) -> list[str]:
                 failures.append(
                     f"visual QA manifest {viewport_name} {label} expected {expected}, got {actual or 'missing'}"
                 )
+        operator_briefings = viewport.get("operator_briefings")
+        if not isinstance(operator_briefings, list) or not operator_briefings:
+            failures.append(
+                f"visual QA manifest missing {viewport_name} operator briefing evidence"
+            )
+        else:
+            briefing = operator_briefings[0]
+            if not isinstance(briefing, dict):
+                failures.append(
+                    f"visual QA manifest {viewport_name} operator briefing evidence is invalid"
+                )
+            else:
+                heading = str(briefing.get("heading") or "")
+                if EXPECTED_VISUAL_OPERATOR_BRIEFING["risk"] not in heading:
+                    failures.append(
+                        f"visual QA manifest {viewport_name} operator briefing risk expected {EXPECTED_VISUAL_OPERATOR_BRIEFING['risk']}"
+                    )
+                for key in ["best_habit", "scale", "proof_target"]:
+                    expected = EXPECTED_VISUAL_OPERATOR_BRIEFING[key]
+                    actual = str(briefing.get(key) or "")
+                    if actual != expected:
+                        failures.append(
+                            f"visual QA manifest {viewport_name} operator briefing {key} expected {expected}, got {actual or 'missing'}"
+                        )
         success_targets = viewport.get("success_targets")
         if not isinstance(success_targets, list) or not success_targets:
             failures.append(
@@ -1495,7 +1526,7 @@ def release_audit_report(
         f"{VISUAL_MANIFEST.as_posix()}; "
         f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['desktop']).as_posix()}; "
         f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['narrow']).as_posix()}; "
-        "visual manifest schema and contract, screenshots, layout review, risk labels, metric cards, and success target verified"
+        "visual manifest schema and contract, screenshots, layout review, risk labels, metric cards, operator briefing, and success target verified"
         if not visual_manifest_failures
         else "; ".join(visual_manifest_failures[:3]),
     )
@@ -1676,7 +1707,7 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
             "title": "Capture and verify UI evidence",
             "evidence": [
                 "visual manifest records desktop and narrow screenshots",
-                "layout review, sidebar risk labels, metric cards, and success target are verified",
+                "layout review, sidebar risk labels, metric cards, operator briefing, and success target are verified",
             ],
             "commands": [
                 "python scripts/visual_qa.py",

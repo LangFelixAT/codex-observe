@@ -25,6 +25,7 @@ visual_manifest_file_failures = visual_qa.visual_manifest_file_failures
 metric_card_failures = visual_qa.metric_card_failures
 metric_card_value_failures = visual_qa.metric_card_value_failures
 sidebar_risk_label_failures = visual_qa.sidebar_risk_label_failures
+operator_briefing_failures = visual_qa.operator_briefing_failures
 
 
 def test_playwright_install_hint_uses_project_extras() -> None:
@@ -151,6 +152,28 @@ def test_sidebar_risk_label_failures_require_high_and_low_risk_labels() -> None:
     assert "narrow: sidebar risk label not found: Low risk" in failures
 
 
+def test_operator_briefing_failures_require_briefing_contract() -> None:
+    assert (
+        operator_briefing_failures(
+            [
+                {
+                    "label": "Operator briefing",
+                    "heading": "High risk: Dominant thread concentration",
+                    "best_habit": "Set a stop condition for the dominant thread",
+                    "scale": "33.2k tokens (57.7% of run)",
+                    "proof_target": "largest_thread_share_pct: 57.7% -> below 50.0%",
+                }
+            ],
+            "desktop",
+        )
+        == []
+    )
+
+    failures = operator_briefing_failures([], "narrow")
+
+    assert "narrow: operator briefing card not rendered" in failures
+
+
 def test_evidence_path_label_preserves_relative_paths_and_redacts_external_absolute_paths(
     tmp_path: Path,
 ) -> None:
@@ -183,6 +206,16 @@ def complete_viewport_results(tmp_path: Path) -> dict[str, dict[str, object]]:
                     "metric": "largest_thread_share_pct",
                     "current": "57.7%",
                     "target": "below 50.0%",
+                }
+            ],
+            "operator_briefings": [
+                {
+                    "label": "Operator briefing",
+                    "heading": "High risk: Dominant thread concentration",
+                    "action": "Inspect the largest thread before changing workflow.",
+                    "best_habit": "Set a stop condition for the dominant thread",
+                    "scale": "33.2k tokens (57.7% of run)",
+                    "proof_target": "largest_thread_share_pct: 57.7% -> below 50.0%",
                 }
             ],
             "layout_review": {
@@ -235,6 +268,14 @@ def test_visual_manifest_records_review_evidence(tmp_path: Path) -> None:
         "current": "57.7%",
         "target": "below 50.0%",
     }
+    assert loaded["viewports"]["desktop"]["operator_briefings"][0] == {
+        "label": "Operator briefing",
+        "heading": "High risk: Dominant thread concentration",
+        "action": "Inspect the largest thread before changing workflow.",
+        "best_habit": "Set a stop condition for the dominant thread",
+        "scale": "33.2k tokens (57.7% of run)",
+        "proof_target": "largest_thread_share_pct: 57.7% -> below 50.0%",
+    }
     assert loaded["viewports"]["desktop"]["layout_review"]["document_width"] == 1440
     assert visual_manifest_failures(loaded) == []
 
@@ -258,6 +299,7 @@ def test_visual_manifest_failures_rejects_incomplete_evidence(tmp_path: Path) ->
                 "sidebar_risk_labels": ["High risk"],
                 "metric_cards": [{"label": "Threads", "value": "3"}],
                 "success_targets": [],
+                "operator_briefings": [],
                 "layout_review": {
                     "viewport_width": 390,
                     "document_width": 430,
@@ -278,6 +320,7 @@ def test_visual_manifest_failures_rejects_incomplete_evidence(tmp_path: Path) ->
     assert "manifest desktop metric card not rendered: Largest thread" in failures
     assert "manifest desktop metric card not rendered: Uncached input" in failures
     assert "manifest desktop success target card not rendered" in failures
+    assert "manifest desktop operator briefing card not rendered" in failures
     assert "manifest desktop layout review contains failures" in failures
     assert "manifest missing narrow viewport evidence" in failures
 

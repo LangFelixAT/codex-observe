@@ -178,6 +178,18 @@ def write_valid_visual_manifest(root: Path) -> None:
                 for label, value in cli.EXPECTED_VISUAL_METRICS.items()
             ],
             "success_targets": [dict(cli.EXPECTED_VISUAL_SUCCESS_TARGET)],
+            "operator_briefings": [
+                {
+                    "label": "Operator briefing",
+                    "heading": "High risk: Dominant thread concentration",
+                    "action": "Inspect the largest thread before changing workflow.",
+                    "best_habit": cli.EXPECTED_VISUAL_OPERATOR_BRIEFING["best_habit"],
+                    "scale": cli.EXPECTED_VISUAL_OPERATOR_BRIEFING["scale"],
+                    "proof_target": cli.EXPECTED_VISUAL_OPERATOR_BRIEFING[
+                        "proof_target"
+                    ],
+                }
+            ],
         }
 
     manifest_path.write_text(
@@ -236,6 +248,9 @@ def test_visual_manifest_evidence_failures_validate_saved_sidebar_metric_and_suc
     payload["viewports"]["desktop"]["sidebar_risk_labels"] = ["High risk"]
     payload["viewports"]["narrow"]["metric_cards"][1]["value"] = "2.9k tokens (34.5%)"
     payload["viewports"]["desktop"]["success_targets"][0]["current"] = "34.5%"
+    payload["viewports"]["desktop"]["operator_briefings"][0]["best_habit"] = (
+        "Read raw tables"
+    )
     manifest_path.write_text(json.dumps(payload), encoding="utf-8")
 
     failures = cli.visual_manifest_evidence_failures(tmp_path)
@@ -247,6 +262,11 @@ def test_visual_manifest_evidence_failures_validate_saved_sidebar_metric_and_suc
     )
     assert (
         "visual QA manifest desktop success target current expected 57.7%, got 34.5%"
+        in failures
+    )
+
+    assert (
+        "visual QA manifest desktop operator briefing best_habit expected Set a stop condition for the dominant thread, got Read raw tables"
         in failures
     )
 
@@ -281,6 +301,7 @@ def test_visual_manifest_evidence_rejects_stale_minimal_manifest_shape(
     assert "visual QA manifest desktop tabs_exercised incomplete" in failures
     assert "visual QA manifest desktop missing screenshot metadata" in failures
     assert "visual QA manifest desktop missing layout review" in failures
+    assert "visual QA manifest missing desktop operator briefing evidence" in failures
     assert (
         "visual QA manifest narrow agent detail selector was not exercised" in failures
     )
@@ -368,7 +389,13 @@ def test_public_evidence_bundle_artifact_failures_require_limitations(
     tmp_path: Path,
 ) -> None:
     bundle = tmp_path / "public-evidence"
-    status, manifest = cli.public_evidence_bundle(str(bundle), run_visual=False)
+    manifest_path, previous_manifest = preserve_visual_manifest()
+    try:
+        write_valid_visual_manifest(Path.cwd())
+        status, manifest = cli.public_evidence_bundle(str(bundle), run_visual=False)
+    finally:
+        restore_visual_manifest(manifest_path, previous_manifest)
+
     assert status == 0
     assert manifest["artifacts"]["limitations_markdown"] == "LIMITATIONS.md"
     assert cli.public_evidence_bundle_artifact_failures(Path.cwd(), bundle) == []
@@ -434,7 +461,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
         == "manifest, reviewer README, limitations doc, aggregate reports, and audit artifact verified"
     )
     assert (
-        "visual manifest schema and contract, screenshots, layout review, risk labels, metric cards, and success target verified"
+        "visual manifest schema and contract, screenshots, layout review, risk labels, metric cards, operator briefing, and success target verified"
         in checks["visual QA manifest evidence"]["detail"]
     )
     report_payload = json.loads(report.with_suffix(".json").read_text(encoding="utf-8"))
