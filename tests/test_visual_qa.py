@@ -26,6 +26,8 @@ metric_card_failures = visual_qa.metric_card_failures
 metric_card_value_failures = visual_qa.metric_card_value_failures
 sidebar_risk_label_failures = visual_qa.sidebar_risk_label_failures
 operator_briefing_failures = visual_qa.operator_briefing_failures
+collect_review_paths = visual_qa.collect_review_paths
+review_path_failures = visual_qa.review_path_failures
 download_control_failures = visual_qa.download_control_failures
 comparison_preview_failures = visual_qa.comparison_preview_failures
 comparison_delta_failures = visual_qa.comparison_delta_failures
@@ -219,6 +221,25 @@ def test_comparison_delta_failures_require_metric_delta_cards() -> None:
     assert "narrow: comparison delta not found: Largest thread tokens" in failures
 
 
+def test_review_path_failures_require_next_review_path_contract() -> None:
+    assert (
+        review_path_failures(
+            [
+                {
+                    "label": "Next review path",
+                    "body": "Next review path Save report JSON Compare workflow change Validate next run File safe feedback PUBLIC_TOUR_FEEDBACK.md",
+                }
+            ],
+            "desktop",
+        )
+        == []
+    )
+
+    failures = review_path_failures([], "narrow")
+
+    assert "narrow: next review path card not rendered" in failures
+
+
 def test_operator_briefing_failures_require_briefing_contract() -> None:
     assert (
         operator_briefing_failures(
@@ -290,6 +311,12 @@ def complete_viewport_results(tmp_path: Path) -> dict[str, dict[str, object]]:
                     "best_habit": "Set a stop condition for the dominant thread",
                     "scale": "33.2k tokens (57.7% of run)",
                     "proof_target": "largest_thread_share_pct: 57.7% -> below 50.0%",
+                }
+            ],
+            "review_paths": [
+                {
+                    "label": "Next review path",
+                    "body": "Next review path Save report JSON Compare workflow change Validate next run File safe feedback PUBLIC_TOUR_FEEDBACK.md",
                 }
             ],
             "comparison_previews": [
@@ -421,6 +448,12 @@ def test_visual_manifest_records_review_evidence(tmp_path: Path) -> None:
         "scale": "33.2k tokens (57.7% of run)",
         "proof_target": "largest_thread_share_pct: 57.7% -> below 50.0%",
     }
+    assert (
+        loaded["viewports"]["desktop"]["review_paths"][0]["label"] == "Next review path"
+    )
+    assert (
+        "Validate next run" in loaded["viewports"]["desktop"]["review_paths"][0]["body"]
+    )
     assert loaded["viewports"]["desktop"]["comparison_previews"][0]["label"] == (
         "Comparison quick read: regressed"
     )
@@ -464,6 +497,7 @@ def test_visual_manifest_failures_rejects_incomplete_evidence(tmp_path: Path) ->
                 "success_targets": [],
                 "download_controls": ["Download report MD"],
                 "operator_briefings": [],
+                "review_paths": [],
                 "comparison_previews": [],
                 "comparison_deltas": [],
                 "layout_review": {
@@ -489,6 +523,7 @@ def test_visual_manifest_failures_rejects_incomplete_evidence(tmp_path: Path) ->
     assert "manifest desktop metric card not rendered: Uncached input" in failures
     assert "manifest desktop success target card not rendered" in failures
     assert "manifest desktop operator briefing card not rendered" in failures
+    assert "manifest desktop next review path card not rendered" in failures
     assert "manifest desktop comparison preview card not rendered" in failures
     assert "manifest desktop comparison delta cards not rendered" in failures
     assert (

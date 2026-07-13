@@ -29,6 +29,7 @@ from codex_observe.dashboard import (
     metric_with_share,
     operator_briefing_html,
     pct_of_total,
+    review_path_html,
     report_download_payloads,
     triage_card_html,
     success_target_html,
@@ -542,6 +543,9 @@ def test_dashboard_css_contains_polish_hooks_without_viewport_scaled_type() -> N
     assert ".co-briefing" in css
     assert ".co-briefing-grid" in css
     assert ".co-briefing-fact" in css
+    assert ".co-review-path" in css
+    assert ".co-review-steps" in css
+    assert ".co-review-step" in css
     assert ".co-diagnostics" in css
     assert ".co-diagnostic-action" in css
     assert ".co-playbook" in css
@@ -624,6 +628,34 @@ def test_operator_briefing_html_summarizes_top_action_and_escapes_content() -> N
     assert "Stop &lt;dominant&gt; worker" in rendered
     assert "largest_thread_share_pct: 57.7% -> below &lt;50%" in rendered
     assert "Largest <thread>" not in rendered
+
+
+def test_review_path_html_guides_next_validation_and_escapes_content() -> None:
+    rendered = review_path_html(
+        {
+            "metric": "largest_thread_share_pct",
+            "current": "57.7%",
+            "target": "below <50%",
+        },
+        has_comparison=True,
+    )
+
+    assert 'class="co-review-path"' in rendered
+    assert "Next review path" in rendered
+    assert "Save report JSON" in rendered
+    assert "Compare workflow change" in rendered
+    assert "Pick the baseline run" in rendered
+    assert "Validate next run" in rendered
+    assert "largest_thread_share_pct: 57.7% -&gt; below &amp;lt;50%" in rendered
+    assert "PUBLIC_TOUR_FEEDBACK.md" in rendered
+    assert "below <50%" not in rendered
+
+
+def test_review_path_html_handles_single_run_without_comparison() -> None:
+    rendered = review_path_html({}, has_comparison=False)
+
+    assert "Collect another run, then compare it against this report JSON" in rendered
+    assert "target metric" in rendered
 
 
 def test_report_download_payloads_match_cli_report_contract() -> None:

@@ -6,6 +6,7 @@ The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
 
+- Added a dashboard next-review path card with visual QA evidence so users can move from diagnosis to validation without leaving the Overview.
 - Added an ordered reviewer action plan to public evidence bundles so handoffs start with clear next review steps.
 - Added per-step success checks to the public tour JSON/text contract so reviewers can verify each synthetic evaluation step without guessing.
 - Added ordered display labels to session recommendation driver summaries.

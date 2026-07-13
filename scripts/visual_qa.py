@@ -94,6 +94,14 @@ EXPECTED_OPERATOR_BRIEFING = {
     "scale": "33.2k tokens (57.7% of run)",
     "proof_target": "largest_thread_share_pct: 57.7% -> below 50.0%",
 }
+EXPECTED_REVIEW_PATH = [
+    "Next review path",
+    "Save report JSON",
+    "Compare workflow change",
+    "Validate next run",
+    "File safe feedback",
+    "PUBLIC_TOUR_FEEDBACK.md",
+]
 
 EMPTY_STATE_CHECKS = {
     "missing_database": "No database found",
@@ -375,6 +383,28 @@ def collect_operator_briefings(page) -> list[dict[str, str]]:
     )
 
 
+def collect_review_paths(page) -> list[dict[str, str]]:
+    return page.evaluate(
+        r"""
+() => Array.from(document.querySelectorAll('.co-review-path')).map((card) => ({
+  label: (card.querySelector('h3')?.innerText || '').replace(/\s+/g, ' ').trim(),
+  body: (card.innerText || '').replace(/\s+/g, ' ').trim(),
+})).filter((item) => item.label || item.body)
+        """
+    )
+
+
+def review_path_failures(paths: list[dict[str, str]], viewport_name: str) -> list[str]:
+    if not paths:
+        return [f"{viewport_name}: next review path card not rendered"]
+    body = str(paths[0].get("body") or "")
+    return [
+        f"{viewport_name}: next review path missing {expected}"
+        for expected in EXPECTED_REVIEW_PATH
+        if expected not in body
+    ]
+
+
 def operator_briefing_failures(
     briefings: list[dict[str, str]], viewport_name: str
 ) -> list[str]:
@@ -489,12 +519,14 @@ def validate_dashboard_page(
     page.wait_for_timeout(500)
     success_targets = collect_success_targets(page)
     operator_briefings = collect_operator_briefings(page)
+    review_paths = collect_review_paths(page)
     download_controls = collect_download_controls(page)
     comparison_previews = collect_comparison_previews(page)
     comparison_deltas = collect_comparison_deltas(page)
     page.evaluate("window.scrollTo(0, 0)")
     failures.extend(success_target_failures(success_targets, viewport_name))
     failures.extend(operator_briefing_failures(operator_briefings, viewport_name))
+    failures.extend(review_path_failures(review_paths, viewport_name))
     failures.extend(download_control_failures(download_controls, viewport_name))
     failures.extend(comparison_preview_failures(comparison_previews, viewport_name))
     failures.extend(comparison_delta_failures(comparison_deltas, viewport_name))
@@ -558,6 +590,7 @@ def validate_dashboard_page(
         "sidebar_risk_labels": sidebar_risk_labels,
         "success_targets": success_targets,
         "operator_briefings": operator_briefings,
+        "review_paths": review_paths,
         "download_controls": download_controls,
         "comparison_previews": comparison_previews,
         "comparison_deltas": comparison_deltas,
@@ -979,6 +1012,16 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
             failures.extend(
                 failure.replace(f"{name}: ", f"manifest {name} ")
                 for failure in briefing_failures
+            )
+
+        review_paths = raw.get("review_paths")
+        if not isinstance(review_paths, list):
+            failures.append(f"manifest {name} missing next review path evidence")
+        else:
+            path_failures = review_path_failures(review_paths, name)
+            failures.extend(
+                failure.replace(f"{name}: ", f"manifest {name} ")
+                for failure in path_failures
             )
 
         comparison_previews = raw.get("comparison_previews")

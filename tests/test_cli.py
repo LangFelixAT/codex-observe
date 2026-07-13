@@ -192,6 +192,12 @@ def write_valid_visual_manifest(root: Path) -> None:
                     ],
                 }
             ],
+            "review_paths": [
+                {
+                    "label": "Next review path",
+                    "body": "Next review path Save report JSON Compare workflow change Validate next run File safe feedback PUBLIC_TOUR_FEEDBACK.md",
+                }
+            ],
             "comparison_previews": [
                 {
                     "label": "Comparison quick read: regressed",
@@ -620,7 +626,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
         == "manifest, reviewer README action plan and key findings, review checklist, feedback runbook, reproduce-local commands, validation commands, limitations doc, aggregate reports, and audit artifact verified"
     )
     assert (
-        "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, metric cards, dashboard quick reads, report and comparison downloads, comparison preview and deltas, operator briefing, and success target verified"
+        "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, metric cards, dashboard quick reads, report and comparison downloads, comparison preview and deltas, operator briefing, next review path, and success target verified"
         in checks["visual QA manifest evidence"]["detail"]
     )
     report_payload = json.loads(report.with_suffix(".json").read_text(encoding="utf-8"))

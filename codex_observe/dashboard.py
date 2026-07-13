@@ -278,6 +278,59 @@ def dashboard_css() -> str:
   margin-bottom: 0.16rem;
 }
 
+.co-review-path {
+  background: var(--co-panel);
+  border: 1px solid var(--co-border);
+  border-radius: 8px;
+  margin: 0 0 1rem 0;
+  padding: 0.95rem 1rem;
+}
+
+.co-review-path h3 {
+  font-size: 1rem;
+  letter-spacing: 0;
+  line-height: 1.25;
+  margin: 0 0 0.35rem 0;
+}
+
+.co-review-path p {
+  color: var(--co-muted);
+  font-size: 0.88rem;
+  margin: 0.2rem 0 0.65rem 0;
+}
+
+.co-review-steps {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
+}
+
+.co-review-step {
+  background: var(--co-surface);
+  border: 1px solid var(--co-border);
+  border-radius: 8px;
+  min-width: 0;
+  padding: 0.65rem 0.75rem;
+}
+
+.co-review-step strong {
+  color: var(--co-ink);
+  display: block;
+  font-size: 0.84rem;
+  line-height: 1.22;
+  margin-bottom: 0.2rem;
+}
+
+.co-review-step span,
+.co-review-step code {
+  color: var(--co-muted);
+  display: block;
+  font-size: 0.8rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
 @media (max-width: 760px) {
   .co-briefing {
     grid-template-columns: 1fr;
@@ -787,6 +840,51 @@ def triage_card_html(triage: dict[str, object]) -> str:
         f"<p><strong>Next action:</strong> {action}</p>"
         f"<ul>{reason_items}</ul>"
         "</section>"
+    )
+
+
+def review_path_html(success_target: dict[str, object], has_comparison: bool) -> str:
+    metric = html.escape(str(success_target.get("metric") or "target metric"))
+    current = html.escape(str(success_target.get("current") or "current value"))
+    target = html.escape(str(success_target.get("target") or "target value"))
+    comparison_action = (
+        "Pick the baseline run in Compare selected run and download the comparison JSON."
+        if has_comparison
+        else "Collect another run, then compare it against this report JSON."
+    )
+    steps = [
+        (
+            "1. Save report JSON",
+            "Use Download report JSON for the aggregate baseline.",
+        ),
+        ("2. Compare workflow change", comparison_action),
+        (
+            "3. Validate next run",
+            f"{metric}: {current} -> {target}",
+        ),
+        (
+            "4. File safe feedback",
+            "Use PUBLIC_TOUR_FEEDBACK.md; avoid prompts, tool output, and local paths.",
+        ),
+    ]
+    rendered_steps = []
+    for label, body in steps:
+        rendered_steps.append(
+            '<div class="co-review-step">'
+            f"<strong>{html.escape(label)}</strong>"
+            f"<span>{html.escape(body)}</span>"
+            "</div>"
+        )
+    return "\n".join(
+        [
+            '<section class="co-review-path">',
+            "  <h3>Next review path</h3>",
+            "  <p>Turn this run into a validated workflow change without exposing private content.</p>",
+            '  <div class="co-review-steps">',
+            *[f"    {step}" for step in rendered_steps],
+            "  </div>",
+            "</section>",
+        ]
     )
 
 
@@ -1734,6 +1832,15 @@ def main() -> None:
             operator_briefing_html(triage, success_target, opportunities),
             unsafe_allow_html=True,
         )
+        comparison_options = [
+            str(row["session_id"])
+            for _, row in conversations.iterrows()
+            if str(row["session_id"]) != str(session_id)
+        ]
+        st.markdown(
+            review_path_html(success_target, has_comparison=bool(comparison_options)),
+            unsafe_allow_html=True,
+        )
         st.markdown(triage_card_html(triage), unsafe_allow_html=True)
         report = build_report(str(db), session_id)
         downloads = report_download_payloads(report)
@@ -1756,11 +1863,6 @@ def main() -> None:
                 width="stretch",
                 key=f"download_report_json_{session_id}",
             )
-        comparison_options = [
-            str(row["session_id"])
-            for _, row in conversations.iterrows()
-            if str(row["session_id"]) != str(session_id)
-        ]
         if comparison_options:
             st.subheader("Compare selected run")
             comparison_labels = {}
