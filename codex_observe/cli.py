@@ -1626,11 +1626,19 @@ def release_audit_report(
             and "| Metric | Before | After | Delta | % change | Direction |"
             in comparison_markdown_text
             and "Recommended next step:" in comparison_markdown_text
+            and "## Follow-up Commands" in comparison_markdown_text
+            and "codex-observe report --db <db> --session-id <next-session-id> --format json --out next-run-report.json"
+            in comparison_markdown_text
             and comparison.get("recommendation")
             and comparison.get("recommendation_detail", {}).get("action")
+            and any(
+                "codex-observe compare --before-report" in str(command)
+                for command in comparison_payload.get("next_command_templates", [])
+            )
             and '"verdict": "unchanged"' in comparison_json_text
             and '"recommendation"' in comparison_json_text
             and '"recommendation_detail"' in comparison_json_text
+            and '"next_command_templates"' in comparison_json_text
             and '"opportunity_change"' in comparison_json_text
             and comparison_payload.get("opportunity_change", {}).get("summary")
             and '"delta_pct"' in comparison_json_text
@@ -1638,7 +1646,7 @@ def release_audit_report(
         add(
             "aggregate comparison",
             comparison_has_quick_read,
-            f"{comparison_out}; {comparison_json_out}; quick read, triage risk, opportunity change, structured recommendation, and schema verified",
+            f"{comparison_out}; {comparison_json_out}; quick read, triage risk, opportunity change, structured recommendation, follow-up commands, and schema verified",
         )
     except (FileNotFoundError, ValueError, KeyError) as exc:
         add("aggregate report", False, str(exc))

@@ -373,6 +373,19 @@ def test_compare_reports_marks_improved_metrics_and_privacy_safe_output(
     assert "## Quick Read" in markdown
     assert "## Opportunity Change" in markdown
     assert "Top opportunity stayed Largest thread and improved" in markdown
+    assert "## Follow-up Commands" in markdown
+    assert (
+        "codex-observe report --db <db> --session-id <next-session-id> --format json --out next-run-report.json"
+        in markdown
+    )
+    assert (
+        "codex-observe compare --before-report <after-report.json> --after-report next-run-report.json --out next-run-comparison.md"
+        in markdown
+    )
+    assert (
+        "codex-observe compare --before-session after-run --after-session <next-session-id> --db <db> --out next-run-comparison.md"
+        in markdown
+    )
     assert "| Metric | Before | After | Delta | % change | Direction |" in markdown
     assert "| Total tokens | 57.5k | 47.5k | -10.0k | -17.4% | improved |" in markdown
     assert (
@@ -393,6 +406,11 @@ def test_compare_reports_marks_improved_metrics_and_privacy_safe_output(
         "reason": "The workflow improved, but this diagnostic still appears.",
     }
     assert payload["schema_version"] == COMPARISON_SCHEMA_VERSION
+    assert payload["next_command_templates"] == [
+        "codex-observe report --db <db> --session-id <next-session-id> --format json --out next-run-report.json",
+        "codex-observe compare --before-report <after-report.json> --after-report next-run-report.json --out next-run-comparison.md",
+        "codex-observe compare --before-session after-run --after-session <next-session-id> --db <db> --out next-run-comparison.md",
+    ]
     assert payload["triage_risk"]["direction"] == "unchanged"
     assert payload["opportunity_change"]["direction"] == "improved"
     assert payload["opportunity_change"]["before"]["driver"] == "Largest thread"

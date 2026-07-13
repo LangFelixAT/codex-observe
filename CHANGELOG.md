@@ -18,6 +18,7 @@ The project follows semantic versioning once release distribution is decided.
 - Added dashboard comparison metric delta cards and visual/audit evidence that they render.
 - Updated the public tour to point reviewers at dashboard comparison metric delta cards.
 - Added reproduce-local commands to the reviewer evidence bundle README and release audit validation.
+- Added follow-up command templates to aggregate comparison Markdown/JSON exports.
 
 ### Added
 

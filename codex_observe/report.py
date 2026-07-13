@@ -822,6 +822,19 @@ def comparison_recommendation_detail(comparison: dict[str, Any]) -> dict[str, An
     }
 
 
+def comparison_next_command_templates(comparison: dict[str, Any]) -> list[str]:
+    after = comparison.get("after", {})
+    after_session = "<after-session-id>"
+    if isinstance(after, dict) and after.get("session_id"):
+        after_session = str(after["session_id"])
+    return [
+        "codex-observe report --db <db> --session-id <next-session-id> --format json --out next-run-report.json",
+        "codex-observe compare --before-report <after-report.json> --after-report next-run-report.json --out next-run-comparison.md",
+        "codex-observe compare --before-session "
+        f"{after_session} --after-session <next-session-id> --db <db> --out next-run-comparison.md",
+    ]
+
+
 OPPORTUNITY_METRIC_BY_DRIVER = {
     "Largest thread": "largest_thread_tokens",
     "Repeated prompt blocks": "repeated_prompt_tokens",
@@ -992,6 +1005,7 @@ def compare_reports(
     comparison["headline"] = comparison_headline(comparison)
     comparison["recommendation_detail"] = comparison_recommendation_detail(comparison)
     comparison["recommendation"] = comparison_recommendation(comparison)
+    comparison["next_command_templates"] = comparison_next_command_templates(comparison)
     return comparison
 
 
@@ -1036,22 +1050,36 @@ def comparison_markdown(comparison: dict[str, Any]) -> str:
         f"- {comparison.get('headline', {}).get('diagnostic_change', 'No diagnostic change summary available.')}",
         f"- Recommended next step: {comparison.get('recommendation', 'Inspect the reports manually.')}",
         "",
-        "## Triage Risk",
+        "## Follow-up Commands",
         "",
-        f"- Before: {comparison.get('triage_risk', {}).get('before', 'unknown')}",
-        f"- After: {comparison.get('triage_risk', {}).get('after', 'unknown')}",
-        f"- Direction: {comparison.get('triage_risk', {}).get('direction', 'unknown')}",
-        "",
-        "## Opportunity Change",
-        "",
-        f"- Direction: {comparison.get('opportunity_change', {}).get('direction', 'unknown')}",
-        f"- Summary: {comparison.get('opportunity_change', {}).get('summary', 'No opportunity change summary available.')}",
-        "",
-        "## Metric Deltas",
-        "",
-        "| Metric | Before | After | Delta | % change | Direction |",
-        "| --- | ---: | ---: | ---: | ---: | --- |",
     ]
+    templates = comparison.get("next_command_templates", [])
+    if templates:
+        lines.extend(f"- `{command}`" for command in templates)
+    else:
+        lines.append(
+            "- Export the next run as report JSON and compare it against the after report."
+        )
+    lines.extend(
+        [
+            "",
+            "## Triage Risk",
+            "",
+            f"- Before: {comparison.get('triage_risk', {}).get('before', 'unknown')}",
+            f"- After: {comparison.get('triage_risk', {}).get('after', 'unknown')}",
+            f"- Direction: {comparison.get('triage_risk', {}).get('direction', 'unknown')}",
+            "",
+            "## Opportunity Change",
+            "",
+            f"- Direction: {comparison.get('opportunity_change', {}).get('direction', 'unknown')}",
+            f"- Summary: {comparison.get('opportunity_change', {}).get('summary', 'No opportunity change summary available.')}",
+            "",
+            "## Metric Deltas",
+            "",
+            "| Metric | Before | After | Delta | % change | Direction |",
+            "| --- | ---: | ---: | ---: | ---: | --- |",
+        ]
+    )
     for metric in comparison.get("metrics", []):
         delta_pct = metric.get("delta_pct")
         delta_pct_label = "n/a" if delta_pct is None else f"{delta_pct:+.1f}%"
