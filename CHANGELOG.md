@@ -8,6 +8,7 @@ The project follows semantic versioning once release distribution is decided.
 
 - Added dashboard comparison quick-read card plus Markdown/JSON report and comparison downloads for the selected Overview session and visual/audit evidence that the controls render.
 - Added an Agent detail thread brief that surfaces the selected thread's cost share, uncached input, tool count, and first inspection action.
+- Added a Tools quick read that highlights the noisiest captured output and the first command to tighten.
 
 ### Added
 

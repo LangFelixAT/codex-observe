@@ -46,7 +46,7 @@ TAB_CHECKS = {
     "Overview": "Run triage",
     "Agent detail": "Thread brief",
     "Timeline & jumps": "Spawn graph / thread lifecycle",
-    "Tools": "Tool calls",
+    "Tools": "Tool quick read",
     "Duplication": "Repeated prompt blocks",
     "Raw tables": "Conversations",
 }

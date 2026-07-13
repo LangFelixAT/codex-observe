@@ -30,7 +30,7 @@ Codex Observe is an offline tool for local Codex session logs. A release is read
 - [ ] `LICENSE`, `CHANGELOG.md`, and package metadata in `pyproject.toml` are present and accurate.
 - [ ] Report and dashboard diagnostics use the same shared analysis helpers.
 - [ ] Desktop and narrow screenshots pass automated nonblank/viewport quality checks and are reviewed for obvious layout problems, text overlap, and Streamlit exceptions.
-- [ ] Visual QA covers Overview, Agent detail thread brief, Timeline & jumps, Tools, Duplication, Raw tables, the Agent detail selector, and validated manifest evidence for desktop/narrow screenshots, missing/empty database onboarding states, sidebar risk labels, expected high-risk default metric cards, operator briefing, dashboard success target, and layout review.
+- [ ] Visual QA covers Overview, Agent detail thread brief, Timeline & jumps, Tools quick read, Duplication, Raw tables, the Agent detail selector, and validated manifest evidence for desktop/narrow screenshots, missing/empty database onboarding states, sidebar risk labels, expected high-risk default metric cards, operator briefing, dashboard success target, and layout review.
 - [ ] README install, demo, ingestion, serve, validation commands, and dashboard empty-state next actions are accurate.
 - [ ] `CONTRIBUTING.md` verification and privacy guidance matches this checklist.
 - [ ] `docs/AMAZING.md` reflects the current product bar and active fresh backlog drafts.

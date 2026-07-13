@@ -575,6 +575,32 @@ def dashboard_css() -> str:
   font-size: 0.82rem;
   margin-bottom: 0.18rem;
 }
+
+.co-tool-brief {
+  background: var(--co-panel);
+  border: 1px solid var(--co-border);
+  border-left: 5px solid var(--co-accent);
+  border-radius: 8px;
+  margin: 0.25rem 0 1rem 0;
+  padding: 0.9rem 1rem;
+}
+
+.co-tool-brief h3 {
+  font-size: 1rem;
+  letter-spacing: 0;
+  line-height: 1.25;
+  margin: 0 0 0.35rem 0;
+}
+
+.co-tool-brief p {
+  color: var(--co-muted);
+  font-size: 0.88rem;
+  margin: 0.22rem 0;
+}
+
+.co-tool-brief strong {
+  color: var(--co-ink);
+}
 </style>
 """
 
@@ -895,6 +921,40 @@ def conversation_button_label(row: pd.Series, selected: bool) -> str:
     risk_label = f"{risk.capitalize()} risk"
     prefix = "> " if selected else ""
     return f"{prefix}{risk_marker(risk)} {risk_label} | {preview}"
+
+
+def tool_quick_read_html(tools: pd.DataFrame) -> str:
+    if tools.empty:
+        return ""
+    tool_rows = tools.copy()
+    if "output_chars" not in tool_rows.columns:
+        tool_rows["output_chars"] = 0
+    tool_rows["output_chars"] = pd.to_numeric(
+        tool_rows["output_chars"], errors="coerce"
+    ).fillna(0)
+    total_calls = int(len(tool_rows))
+    total_output = int(tool_rows["output_chars"].sum())
+    largest = tool_rows.sort_values("output_chars", ascending=False).iloc[0]
+    largest_tool = html.escape(str(largest.get("tool_name") or "unknown tool"))
+    largest_output = int(largest.get("output_chars") or 0)
+    noisy_share = pct_of_total(largest_output, total_output)
+    if largest_output >= 20_000:
+        action = "Narrow this command or filter its output before feeding results back into the thread."
+    elif total_calls >= 20:
+        action = "Batch related tool calls and inspect repeated commands before replaying results."
+    elif total_output:
+        action = "Start with the largest output and decide whether the next run needs a tighter command."
+    else:
+        action = "Tool count is visible, but no captured output volume crossed a review threshold."
+    return "\n".join(
+        [
+            '<section class="co-tool-brief">',
+            "  <h3>Tool quick read</h3>",
+            f"  <p><strong>Inspect first:</strong> {html.escape(action)}</p>",
+            f"  <p><strong>Calls:</strong> {fmt_int(total_calls)} | <strong>Captured output:</strong> {fmt_short(total_output)} chars | <strong>Largest output:</strong> {largest_tool} at {fmt_short(largest_output)} chars ({noisy_share:.1f}% of captured output)</p>",
+            "</section>",
+        ]
+    )
 
 
 def thread_brief_html(selected_thread: pd.Series, total_tokens: object) -> str:
@@ -1626,6 +1686,7 @@ def main() -> None:
         if tools.empty:
             st.info("No tool calls found in this conversation.")
         else:
+            st.markdown(tool_quick_read_html(tools), unsafe_allow_html=True)
             by_tool = (
                 tools.groupby("tool_name", dropna=False)
                 .agg(calls=("call_id", "count"), output_chars=("output_chars", "sum"))

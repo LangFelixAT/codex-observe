@@ -29,6 +29,7 @@ from codex_observe.dashboard import (
     triage_card_html,
     success_target_html,
     thread_brief_html,
+    tool_quick_read_html,
 )
 
 
@@ -114,6 +115,30 @@ def test_thread_brief_html_summarizes_selected_thread_and_escapes() -> None:
     assert "57.7%" in rendered
     assert "12.0k tokens" in rendered
     assert "Worker <Parser>" not in rendered
+
+
+def test_tool_quick_read_html_summarizes_noisy_tool_output_and_escapes() -> None:
+    rendered = tool_quick_read_html(
+        pd.DataFrame(
+            [
+                {"tool_name": "shell <run>", "output_chars": 25_000},
+                {"tool_name": "search", "output_chars": 5_000},
+            ]
+        )
+    )
+
+    assert 'class="co-tool-brief"' in rendered
+    assert "Tool quick read" in rendered
+    assert "Narrow this command" in rendered
+    assert "shell &lt;run&gt;" in rendered
+    assert "30.0k chars" in rendered
+    assert "25.0k chars" in rendered
+    assert "83.3%" in rendered
+    assert "shell <run>" not in rendered
+
+
+def test_tool_quick_read_html_returns_empty_string_without_tools() -> None:
+    assert tool_quick_read_html(pd.DataFrame()) == ""
 
 
 def test_thread_kind_classifies_root_worker_explorer_guardian_and_unknown() -> None:
@@ -383,6 +408,7 @@ def test_dashboard_css_contains_polish_hooks_without_viewport_scaled_type() -> N
     assert ".co-empty-action" in css
     assert ".co-comparison-preview" in css
     assert ".co-thread-brief" in css
+    assert ".co-tool-brief" in css
     assert ".co-metric-grid" in css
     assert ".co-metric-card" in css
     assert ".co-metric-label" in css
