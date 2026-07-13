@@ -17,6 +17,7 @@ from codex_observe.report import (
     report_review_path,
     comparison_json,
     comparison_markdown,
+    comparison_review_path,
     load_report_json,
     report_json,
     report_markdown,
@@ -463,6 +464,10 @@ def test_compare_reports_marks_improved_metrics_and_privacy_safe_output(
     assert "Action: target persisted diagnostic" in markdown
     assert "Target: diagnostic: Largest thread drives the run" in markdown
     assert "Why: The workflow improved, but this diagnostic still appears." in markdown
+    assert "## Review Path" in markdown
+    assert "Read the verdict" in markdown
+    assert "Compare against this after run" in markdown
+    assert "File safe feedback" in markdown
     assert "## Follow-up Commands" in markdown
     assert (
         "codex-observe report --db <db> --session-id <next-session-id> --format json --out next-run-report.json"
@@ -501,12 +506,49 @@ def test_compare_reports_marks_improved_metrics_and_privacy_safe_output(
         "codex-observe compare --before-report <after-report.json> --after-report next-run-report.json --out next-run-comparison.md",
         "codex-observe compare --before-session after-run --after-session <next-session-id> --db <db> --out next-run-comparison.md",
     ]
+    assert [step["label"] for step in payload["review_path"]] == [
+        "Read the verdict",
+        "Act on the recommendation",
+        "Export the next run",
+        "Compare against this after run",
+        "File safe feedback",
+    ]
+    assert payload["review_path"][3]["command"] == (
+        "codex-observe compare --before-report <after-report.json> --after-report next-run-report.json --out next-run-comparison.md"
+    )
+    assert payload["review_path"][-1]["command"] == "docs/PUBLIC_TOUR_FEEDBACK.md"
     assert payload["triage_risk"]["direction"] == "unchanged"
     assert payload["opportunity_change"]["direction"] == "improved"
     assert payload["opportunity_change"]["before"]["driver"] == "Largest thread"
     assert payload["diagnostics"]["resolved"]
     for private in PRIVATE_DEMO_STRINGS:
         assert private not in serialized
+
+
+def test_comparison_review_path_guides_follow_up_validation() -> None:
+    comparison = {
+        "verdict": "mixed",
+        "after": {"session_id": "after-run"},
+        "recommendation": "Investigate repeated prompt tokens.",
+    }
+
+    review_path = comparison_review_path(comparison)
+
+    assert [step["label"] for step in review_path] == [
+        "Read the verdict",
+        "Act on the recommendation",
+        "Export the next run",
+        "Compare against this after run",
+        "File safe feedback",
+    ]
+    assert "mixed" in review_path[0]["success_check"]
+    assert review_path[1]["command"] == "Investigate repeated prompt tokens."
+    assert review_path[2]["command"] == (
+        "codex-observe report --db <db> --session-id <next-session-id> --format json --out next-run-report.json"
+    )
+    assert review_path[3]["command"] == (
+        "codex-observe compare --before-report <after-report.json> --after-report next-run-report.json --out next-run-comparison.md"
+    )
 
 
 def test_compare_reports_recommendation_uses_after_report_diagnostic_priority() -> None:

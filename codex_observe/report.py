@@ -916,6 +916,41 @@ def comparison_next_command_templates(comparison: dict[str, Any]) -> list[str]:
     ]
 
 
+def comparison_review_path(comparison: dict[str, Any]) -> list[dict[str, str]]:
+    verdict = str(comparison.get("verdict") or "unknown")
+    recommendation = str(
+        comparison.get("recommendation") or "Inspect the reports manually."
+    )
+    templates = comparison_next_command_templates(comparison)
+    return [
+        {
+            "label": "Read the verdict",
+            "command": "Review Quick Read, Triage Risk, Opportunity Change, and Metric Deltas.",
+            "success_check": f"Verdict is {verdict} and the recommendation is understood before changing workflow.",
+        },
+        {
+            "label": "Act on the recommendation",
+            "command": recommendation,
+            "success_check": "The next workflow change targets the recommended diagnostic, metric, or validation step.",
+        },
+        {
+            "label": "Export the next run",
+            "command": templates[0],
+            "success_check": "next-run-report.json uses codex-observe.report.v1 and aggregate-only privacy mode.",
+        },
+        {
+            "label": "Compare against this after run",
+            "command": templates[1],
+            "success_check": "next-run-comparison.md shows verdict, opportunity change, triage movement, and metric deltas.",
+        },
+        {
+            "label": "File safe feedback",
+            "command": "docs/PUBLIC_TOUR_FEEDBACK.md",
+            "success_check": "Feedback excludes private prompts, tool output, local paths, and raw logs.",
+        },
+    ]
+
+
 OPPORTUNITY_METRIC_BY_DRIVER = {
     "Largest thread": "largest_thread_tokens",
     "Repeated prompt blocks": "repeated_prompt_tokens",
@@ -1087,6 +1122,7 @@ def compare_reports(
     comparison["recommendation_detail"] = comparison_recommendation_detail(comparison)
     comparison["recommendation"] = comparison_recommendation(comparison)
     comparison["next_command_templates"] = comparison_next_command_templates(comparison)
+    comparison["review_path"] = comparison_review_path(comparison)
     return comparison
 
 
@@ -1136,9 +1172,32 @@ def comparison_markdown(comparison: dict[str, Any]) -> str:
         f"- Recommendation: {comparison.get('recommendation', 'Inspect the reports manually.')}",
         *_action_detail_lines(comparison.get("recommendation_detail")),
         "",
-        "## Follow-up Commands",
+        "## Review Path",
         "",
     ]
+    review_path = comparison.get("review_path", [])
+    if review_path:
+        for index, step in enumerate(review_path, start=1):
+            if not isinstance(step, dict):
+                continue
+            label = str(step.get("label") or f"Step {index}")
+            command = str(step.get("command") or "")
+            success_check = str(step.get("success_check") or "Confirm the result.")
+            lines.extend(
+                [
+                    f"{index}. **{label}**",
+                    f"   Command: `{command}`",
+                    f"   Success check: {success_check}",
+                    "",
+                ]
+            )
+    else:
+        lines.append(
+            "- Export the next run as report JSON and compare it against the after report."
+        )
+        lines.append("")
+
+    lines.extend(["## Follow-up Commands", ""])
     templates = comparison.get("next_command_templates", [])
     if templates:
         lines.extend(f"- `{command}`" for command in templates)

@@ -2044,6 +2044,28 @@ def release_audit_report(
             and "codex-observe report --db <db> --session-id <next-session-id>"
             in comparison_written_text
         )
+        comparison_review_path = comparison_payload.get("review_path")
+        comparison_has_review_path = (
+            isinstance(comparison_review_path, list)
+            and len(comparison_review_path) >= 5
+            and all(
+                isinstance(step, dict)
+                and step.get("label")
+                and step.get("command")
+                and step.get("success_check")
+                for step in comparison_review_path
+            )
+            and any(
+                "codex-observe compare --before-report" in str(step.get("command"))
+                for step in comparison_review_path
+                if isinstance(step, dict)
+            )
+            and any(
+                str(step.get("command")) == "docs/PUBLIC_TOUR_FEEDBACK.md"
+                for step in comparison_review_path
+                if isinstance(step, dict)
+            )
+        )
         comparison_has_quick_read = (
             comparison.get("verdict") == "unchanged"
             and comparison_out.exists()
@@ -2063,11 +2085,15 @@ def release_audit_report(
             and "| Metric | Before | After | Delta | % change | Direction |"
             in comparison_markdown_text
             and "Recommended next step:" in comparison_markdown_text
+            and "## Review Path" in comparison_markdown_text
+            and "Read the verdict" in comparison_markdown_text
+            and "File safe feedback" in comparison_markdown_text
             and "## Follow-up Commands" in comparison_markdown_text
             and "codex-observe report --db <db> --session-id <next-session-id> --format json --out next-run-report.json"
             in comparison_markdown_text
             and comparison.get("recommendation")
             and comparison.get("recommendation_detail", {}).get("action")
+            and comparison_has_review_path
             and comparison_confirmation_has_validation_command
             and any(
                 "codex-observe compare --before-report" in str(command)
@@ -2077,6 +2103,7 @@ def release_audit_report(
             and '"recommendation"' in comparison_json_text
             and '"recommendation_detail"' in comparison_json_text
             and '"next_command_templates"' in comparison_json_text
+            and '"review_path"' in comparison_json_text
             and '"opportunity_change"' in comparison_json_text
             and comparison_payload.get("opportunity_change", {}).get("summary")
             and '"delta_pct"' in comparison_json_text
@@ -2084,7 +2111,7 @@ def release_audit_report(
         add(
             "aggregate comparison",
             comparison_has_quick_read,
-            f"{comparison_out}; {comparison_json_out}; quick read, recommended action, triage risk, opportunity change, terminal validation command, structured recommendation, follow-up commands, and schema verified",
+            f"{comparison_out}; {comparison_json_out}; quick read, recommended action, triage risk, opportunity change, terminal validation command, structured recommendation, review path, follow-up commands, and schema verified",
         )
     except (FileNotFoundError, ValueError, KeyError) as exc:
         add("aggregate report", False, str(exc))

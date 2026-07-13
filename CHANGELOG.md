@@ -6,6 +6,7 @@ The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
 
+- Added structured comparison review paths so comparison outputs guide verdict review, next-run validation, repeat comparison, and safe feedback.
 - Added structured report review paths so exported run reports guide next-run validation and comparison.
 - Added structured demo review paths so synthetic first-run output guides users through health checks, session selection, report export, and dashboard review.
 - Added structured ingest review paths so fresh imports guide users through health checks, session selection, report export, and dashboard review.
@@ -68,7 +69,7 @@ The project follows semantic versioning once release distribution is decided.
 
 - Dashboard tables use current Streamlit `width="stretch"` behavior.
 - README first-run path now uses synthetic data instead of any local private sample database.
-- Report and dashboard diagnostics share non-UI analysis helpers, keeping CLI exports independent from Streamlit; reports and comparisons now include aggregate-only quick-read summaries, opportunity/change summaries, plus structured next-step recommendations and schema-versioned comparison failure payloads that preserve diagnostic priority for persisted issues.
+- Report and dashboard diagnostics share non-UI analysis helpers, keeping CLI exports independent from Streamlit; reports and comparisons now include aggregate-only quick-read summaries, opportunity/change summaries, structured review paths, plus structured next-step recommendations and schema-versioned comparison failure payloads that preserve diagnostic priority for persisted issues.
 - CLI doctor, report, sessions, and compare paths now print privacy-safe next commands for healthy databases, successful session listings, missing databases, unknown sessions, and incomplete comparison inputs.
 - CI now runs Ruff lint, Ruff format check, pytest, audit, demo generation, demo JSON contract verification, synthetic ingest JSON contract verification, session listing, database doctor, report export, visual QA, reviewer evidence-bundle generation, and artifact uploads; release audit verifies those report and visual evidence artifact paths.
 - GitHub issue and PR templates now require synthetic/redacted visual evidence instead of private local sample databases.
