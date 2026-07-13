@@ -624,6 +624,20 @@ def public_evidence_bundle_artifact_failures(
     if not isinstance(artifacts, dict):
         return [*failures, "evidence bundle manifest missing artifacts"]
 
+    review_checklist = manifest.get("review_checklist")
+    if not isinstance(review_checklist, list) or not review_checklist:
+        failures.append("evidence bundle manifest missing review_checklist")
+    else:
+        checklist_text = json.dumps(review_checklist)
+        for required in [
+            "Confirm the bundle boundary",
+            "Read the run outcome",
+            "Check workflow-change evidence",
+            "Verify release gates",
+            "next validation command",
+        ]:
+            if required not in checklist_text:
+                failures.append(f"evidence bundle review_checklist missing {required}")
     expected_artifacts = {
         "bundle_readme": "README.md",
         "limitations_markdown": "LIMITATIONS.md",
@@ -647,6 +661,12 @@ def public_evidence_bundle_artifact_failures(
         readme = readme_path.read_text(encoding="utf-8")
         for required in [
             "# Codex Observe Evidence Bundle",
+            "## Review Checklist",
+            "Confirm the bundle boundary",
+            "Read the run outcome",
+            "Check workflow-change evidence",
+            "Verify release gates",
+            "next validation command",
             "## Reproduce Locally",
             "codex-observe demo --db demo/codex_observe_demo.sqlite",
             "codex-observe report --db demo/codex_observe_demo.sqlite --out demo/run-report.md",
@@ -1825,7 +1845,7 @@ def release_audit_report(
         add(
             "public evidence bundle artifacts",
             not public_bundle_failures,
-            "manifest, reviewer README reproduce-local commands, limitations doc, aggregate reports, and audit artifact verified"
+            "manifest, reviewer README review checklist and reproduce-local commands, limitations doc, aggregate reports, and audit artifact verified"
             if not public_bundle_failures
             else "; ".join(public_bundle_failures[:3]),
         )
@@ -2412,9 +2432,48 @@ def write_json_artifact(path: Path, payload: dict[str, object]) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
 
+def evidence_bundle_review_checklist(
+    artifacts: dict[str, object], visual_status: object
+) -> list[dict[str, str]]:
+    checklist = [
+        {
+            "label": "Confirm the bundle boundary",
+            "artifact": str(artifacts.get("limitations_markdown", "LIMITATIONS.md")),
+            "look_for": "Synthetic-only scope, approval-gated distribution, and human-approved private input requirements.",
+        },
+        {
+            "label": "Read the run outcome",
+            "artifact": str(artifacts.get("report_markdown", "demo/run-report.md")),
+            "look_for": "Quick read, triage risk, opportunity stack, next-run success target, and follow-up commands.",
+        },
+        {
+            "label": "Check workflow-change evidence",
+            "artifact": str(
+                artifacts.get("comparison_markdown", "demo/run-comparison.md")
+            ),
+            "look_for": "Verdict, triage movement, opportunity change, next step, and next validation command.",
+        },
+        {
+            "label": "Verify release gates",
+            "artifact": str(artifacts.get("audit_json", "audit/audit.json")),
+            "look_for": "status=ok, failed_checks=[], and the required command list for reproducing gates.",
+        },
+    ]
+    if visual_status == "ok" and isinstance(artifacts.get("visual_manifest"), str):
+        checklist.append(
+            {
+                "label": "Inspect dashboard evidence",
+                "artifact": str(artifacts["visual_manifest"]),
+                "look_for": "Desktop/narrow screenshots, operator briefing, quick reads, comparison cards, and layout review.",
+            }
+        )
+    return checklist
+
+
 def evidence_bundle_readme(manifest: dict[str, object]) -> str:
     artifacts = manifest.get("artifacts", {})
     checks = manifest.get("checks", {})
+    review_checklist = manifest.get("review_checklist")
     lines = [
         "# Codex Observe Evidence Bundle",
         "",
@@ -2443,6 +2502,16 @@ def evidence_bundle_readme(manifest: dict[str, object]) -> str:
         if isinstance(screenshots, list) and screenshots:
             joined = ", ".join(f"`{item}`" for item in screenshots)
             lines.append(f"- {joined}: Dashboard screenshots.")
+
+    if isinstance(review_checklist, list) and review_checklist:
+        lines.extend(["", "## Review Checklist", ""])
+        for item in review_checklist:
+            if not isinstance(item, dict):
+                continue
+            label = str(item.get("label") or "Review artifact")
+            artifact = str(item.get("artifact") or "unknown")
+            look_for = str(item.get("look_for") or "Review the artifact.")
+            lines.append(f"- {label}: `{artifact}` - {look_for}")
 
     commands = manifest.get("commands")
     if isinstance(commands, list) and commands:
@@ -2621,6 +2690,8 @@ def public_evidence_bundle(
     status = (
         "ok" if audit_status == 0 and visual_status in {"ok", "skipped"} else "failed"
     )
+    review_checklist = evidence_bundle_review_checklist(artifacts, visual_status)
+
     next_step = "Start with README.md and LIMITATIONS.md, then review evidence-bundle.json, run-report.md, run-comparison.md, and audit.json before publishing or attaching artifacts."
     if visual_status == "ok":
         next_step = "Start with README.md and LIMITATIONS.md, then review evidence-bundle.json, run-report.md, run-comparison.md, audit.json, and visual QA screenshots before publishing or attaching artifacts."
@@ -2635,6 +2706,7 @@ def public_evidence_bundle(
         },
         "commands": commands,
         "artifacts": artifacts,
+        "review_checklist": review_checklist,
         "checks": statuses,
         "next": next_step,
     }

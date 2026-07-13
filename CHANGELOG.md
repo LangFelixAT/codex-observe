@@ -20,6 +20,7 @@ The project follows semantic versioning once release distribution is decided.
 - Added reproduce-local commands to the reviewer evidence bundle README and release audit validation.
 - Added follow-up command templates to aggregate comparison Markdown/JSON exports.
 - Added the comparison next validation command to the dashboard Overview quick-read card and visual/audit evidence.
+- Added a structured reviewer checklist to the public evidence bundle manifest, README, and audit validation.
 
 ### Added
 
@@ -70,4 +71,3 @@ The project follows semantic versioning once release distribution is decided.
 - `codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --format json --out .artifacts/demo/run-comparison.json`
 - `codex-observe evidence-bundle --out .artifacts/public-evidence --skip-visual --json`
 - `python scripts/visual_qa.py`
-

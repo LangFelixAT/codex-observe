@@ -126,7 +126,7 @@ Type: AFK
 
 Labels: `type: slice`, `area: release`, `area: dashboard`, `status: ready`
 
-What was built: `codex-observe evidence-bundle` now creates one synthetic local directory with a reviewer README, `LIMITATIONS.md`, the demo database, aggregate report Markdown/JSON, aggregate comparison Markdown/JSON, audit JSON, visual QA artifacts, and a schema-versioned `codex-observe.evidence-bundle.v1` manifest.
+What was built: `codex-observe evidence-bundle` now creates one synthetic local directory with a reviewer README with a review checklist, `LIMITATIONS.md`, the demo database, aggregate report Markdown/JSON, aggregate comparison Markdown/JSON, audit JSON, visual QA artifacts, and a schema-versioned `codex-observe.evidence-bundle.v1` manifest.
 
 Acceptance criteria:
 
@@ -134,7 +134,7 @@ Acceptance criteria:
 - [x] The manifest records artifact paths, check status, privacy metadata, and `codex-observe.evidence-bundle.v1` schema version.
 - [x] `--skip-visual` supports faster local and test runs while the default path collects visual QA evidence.
 - [x] Text and JSON CLI output point reviewers at the generated evidence.
-- [x] The generated bundle README gives reviewers a privacy-safe starting point with the key artifact paths and sharing cautions.
+- [x] The generated bundle README gives reviewers a privacy-safe review checklist with the key artifact paths and sharing cautions.
 - [x] The bundle includes `LIMITATIONS.md` so known boundaries, approval-gated work, and next-work sources travel with reviewer evidence.
 - [x] Tests cover the manifest contract, artifact creation, and actionable CLI output.
 
