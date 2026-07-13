@@ -18,6 +18,7 @@ from codex_observe.dashboard import (
     comparison_download_payloads,
     conversation_button_label,
     dashboard_css,
+    empty_state_commands_html,
     risk_marker,
     order_conversations_for_review,
     metric_with_share,
@@ -352,6 +353,8 @@ def test_dashboard_css_contains_polish_hooks_without_viewport_scaled_type() -> N
 
     assert ".co-hero" in css
     assert ".co-empty" in css
+    assert ".co-empty-actions" in css
+    assert ".co-empty-action" in css
     assert ".co-metric-grid" in css
     assert ".co-metric-card" in css
     assert ".co-metric-label" in css
@@ -373,6 +376,24 @@ def test_dashboard_css_contains_polish_hooks_without_viewport_scaled_type() -> N
     assert "white-space: normal;" in css
     assert "letter-spacing: 0;" in css
     assert "vw" not in css
+
+
+def test_empty_state_commands_html_renders_copy_pasteable_safe_actions() -> None:
+    rendered = empty_state_commands_html(
+        [
+            ("Try <demo>", "codex-observe demo --serve --db demo<db>.sqlite"),
+            ("Ingest logs", "codex-observe ingest ~/.codex/sessions --db demo.sqlite"),
+            ("Check health", "codex-observe doctor --db demo.sqlite"),
+        ]
+    )
+
+    assert 'class="co-empty-actions"' in rendered
+    assert rendered.count('class="co-empty-action"') == 3
+    assert "Try &lt;demo&gt;" in rendered
+    assert "demo&lt;db&gt;.sqlite" in rendered
+    assert "codex-observe ingest ~/.codex/sessions --db demo.sqlite" in rendered
+    assert "codex-observe doctor --db demo.sqlite" in rendered
+    assert "Try <demo>" not in rendered
 
 
 def test_triage_card_html_escapes_content_and_renders_reasons() -> None:

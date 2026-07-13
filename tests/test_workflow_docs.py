@@ -133,6 +133,7 @@ def test_current_state_handoff_covers_gates_evidence_and_remaining_blocker() -> 
         "codex-observe doctor --db .artifacts/demo/codex_observe_demo.sqlite --json",
         "structured `next_commands`",
         "copy-pasteable",
+        "copy-pasteable next actions",
         "same `--db` path",
         "priority-preserving next-step recommendations",
         "ruff check",
@@ -291,6 +292,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
     assert "codex-observe sessions --db <db>" in readme
     assert "structured `next_commands`" in readme
     assert "copy-pasteable" in readme
+    assert "synthetic demo data, local ingestion, and database health checks" in readme
     assert "same `--db` path" in readme
     assert "diagnostic priority" in readme
     assert "valid but empty" in readme
@@ -335,6 +337,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
     assert "required_commands" in release
     assert "structured `next_commands`" in release
     assert "docs/CURRENT.md" in release
+    assert "dashboard empty-state next actions" in release
     assert "remaining HITL blocker" in release
     assert "docs/LIMITATIONS.md" in release
     assert "release branch is pushed to `origin`" in release

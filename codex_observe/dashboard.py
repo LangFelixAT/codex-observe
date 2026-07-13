@@ -198,6 +198,32 @@ def dashboard_css() -> str:
   margin: 0;
 }
 
+.co-empty-actions {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 0.9rem;
+}
+
+.co-empty-action {
+  background: #f8faf9;
+  border: 1px solid var(--co-border);
+  border-radius: 8px;
+  padding: 0.75rem 0.85rem;
+}
+
+.co-empty-action strong {
+  display: block;
+  font-size: 0.88rem;
+  letter-spacing: 0;
+  margin-bottom: 0.35rem;
+}
+
+.co-empty-action code {
+  color: var(--co-ink);
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
 .co-briefing {
   background: var(--co-panel);
   border: 1px solid var(--co-border);
@@ -688,6 +714,22 @@ def render_app_header() -> None:
     )
 
 
+def empty_state_commands_html(commands: list[tuple[str, str]]) -> str:
+    items = []
+    for label, command in commands:
+        items.append(
+            "\n".join(
+                [
+                    '<div class="co-empty-action">',
+                    f"  <strong>{html.escape(label)}</strong>",
+                    f"  <code>{html.escape(command)}</code>",
+                    "</div>",
+                ]
+            )
+        )
+    return "\n".join(['<div class="co-empty-actions">', *items, "</div>"])
+
+
 def render_empty_state(title: str, body: str) -> None:
     st.markdown(
         f"""
@@ -886,7 +928,22 @@ def main() -> None:
             "No database found",
             "Ingest Codex session logs first, then refresh this dashboard.",
         )
-        st.code(f"codex-observe ingest ~/.codex/sessions --db {db}", language="bash")
+        st.markdown(
+            empty_state_commands_html(
+                [
+                    (
+                        "Try synthetic data",
+                        f"codex-observe demo --serve --db {db} --host 127.0.0.1 --port 8501",
+                    ),
+                    (
+                        "Ingest private logs locally",
+                        f"codex-observe ingest ~/.codex/sessions --db {db}",
+                    ),
+                    ("Check database health", f"codex-observe doctor --db {db}"),
+                ]
+            ),
+            unsafe_allow_html=True,
+        )
         return
 
     conversations = read_sql(
@@ -923,7 +980,22 @@ def main() -> None:
             "No conversations imported yet",
             "The database exists, but it does not contain any parsed conversations. Re-run ingestion against a directory that contains Codex JSONL session files.",
         )
-        st.code(f"codex-observe ingest ~/.codex/sessions --db {db}", language="bash")
+        st.markdown(
+            empty_state_commands_html(
+                [
+                    (
+                        "Try synthetic data",
+                        f"codex-observe demo --serve --db {db} --host 127.0.0.1 --port 8501",
+                    ),
+                    (
+                        "Ingest private logs locally",
+                        f"codex-observe ingest ~/.codex/sessions --db {db}",
+                    ),
+                    ("Check database health", f"codex-observe doctor --db {db}"),
+                ]
+            ),
+            unsafe_allow_html=True,
+        )
         return
 
     conversations = order_conversations_for_review(conversations, session_summaries(db))

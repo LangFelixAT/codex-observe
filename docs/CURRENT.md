@@ -4,7 +4,7 @@ This is the short handoff for returning to Codex Observe after time away. The de
 
 ## Product State
 
-Codex Observe is currently a local-first workbench for understanding Codex session cost and context growth. A user can generate synthetic demo data with contrasting high- and low-risk runs, inspect the dashboard, download aggregate-only reports and comparisons from the Overview, export aggregate-only reports, compare runs, collect visual QA evidence, and produce a one-command public evidence bundle with a human-readable index without scanning private logs.
+Codex Observe is currently a local-first workbench for understanding Codex session cost and context growth. A user landing on an empty dashboard sees copy-pasteable next actions for synthetic demo data, local ingestion, and database health checks. A user can generate synthetic demo data with contrasting high- and low-risk runs, inspect the dashboard, download aggregate-only reports and comparisons from the Overview, export aggregate-only reports, compare runs, collect visual QA evidence, and produce a one-command public evidence bundle with a human-readable index without scanning private logs.
 
 The current core loop is printed by `codex-observe tour`; `codex-observe tour --json` exposes the same synthetic-data commands as a schema-versioned automation contract. The loop is:
 
