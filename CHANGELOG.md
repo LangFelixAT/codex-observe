@@ -27,6 +27,7 @@ The project follows semantic versioning once release distribution is decided.
 - Bundled the privacy-safe public-tour feedback runbook in reviewer evidence bundles.
 - Moved evidence bundle terminal key findings before artifact paths.
 - Hardened redacted fixture verification against raw identifier-field leaks.
+- Extended release audit redaction checks to require raw ID verify-only rejection.
 
 ### Added
 

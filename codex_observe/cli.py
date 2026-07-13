@@ -8,6 +8,7 @@ import shutil
 import sqlite3
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 from . import __version__
@@ -1024,6 +1025,70 @@ def redaction_cli_privacy_failures(root: Path | None = None) -> list[str]:
         failures.append("redaction --json validation failure exit code was not 2")
     if output_dir.exists():
         failures.append("redaction --json validation touched output directory")
+
+    verify_result = None
+    try:
+        raw_id_parent = root / ".artifacts"
+        raw_id_parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(
+            prefix="redaction-raw-id-audit-", dir=raw_id_parent
+        ) as raw_id_tmp:
+            raw_id_dir = Path(raw_id_tmp)
+            (raw_id_dir / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "mode": "redacted-fixture-candidate",
+                        "review_required": True,
+                        "files": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (raw_id_dir / "redacted-001.jsonl").write_text(
+                json.dumps(
+                    {
+                        "timestamp": "2026-02-01T00:00:00Z",
+                        "type": "event",
+                        "payload": {
+                            "type": "message",
+                            "session_id": "session-private",
+                            "thread_id": "thread-private",
+                        },
+                    },
+                    separators=(",", ":"),
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            verify_result = subprocess.run(
+                [sys.executable, str(script), str(raw_id_dir), "--verify-only"],
+                cwd=root,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=20,
+            )
+    except (OSError, subprocess.TimeoutExpired):
+        failures.append("redaction verify-only raw ID check could not run")
+
+    if verify_result is not None:
+        verify_output = f"{verify_result.stdout}\n{verify_result.stderr}"
+        if "session-private" in verify_output or "thread-private" in verify_output:
+            failures.append("redaction verify-only raw ID failure leaked raw IDs")
+        try:
+            verify_payload = json.loads(verify_result.stdout)
+        except json.JSONDecodeError:
+            failures.append("redaction verify-only raw ID failure was not JSON")
+        else:
+            findings = verify_payload.get("findings")
+            if verify_payload.get("status") != "failed" or not isinstance(
+                findings, list
+            ):
+                failures.append("redaction verify-only raw ID failure missing status")
+            elif not any("session_id" in str(finding) for finding in findings):
+                failures.append("redaction verify-only raw ID failure missing finding")
+        if verify_result.returncode != 1:
+            failures.append("redaction verify-only raw ID failure exit code was not 1")
     return failures
 
 
@@ -1931,7 +1996,7 @@ def release_audit_report(
     add(
         "redaction validation privacy",
         not redaction_privacy_failures,
-        "privacy-safe JSON failure uses error codes and does not touch output"
+        "privacy-safe JSON failure uses error codes, does not touch output, and verify-only rejects raw IDs"
         if not redaction_privacy_failures
         else "; ".join(redaction_privacy_failures[:3]),
     )

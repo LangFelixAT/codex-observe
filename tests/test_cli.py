@@ -588,6 +588,10 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
         == "GitHub issue snapshot, local draft state, approval gate, and push cadence documented"
     )
     assert (
+        checks["redaction validation privacy"]["detail"]
+        == "privacy-safe JSON failure uses error codes, does not touch output, and verify-only rejects raw IDs"
+    )
+    assert (
         checks["CI reviewer evidence bundle"]["detail"]
         == "CI generates and uploads reviewer public evidence bundle"
     )
