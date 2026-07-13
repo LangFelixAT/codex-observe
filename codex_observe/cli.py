@@ -214,6 +214,62 @@ def doctor_next_commands(db: Path, status: str) -> list[str]:
     return []
 
 
+def doctor_review_path(db: Path, status: str) -> list[dict[str, str]]:
+    if status == "ok":
+        return [
+            {
+                "label": "Choose a reportable run",
+                "command": f"codex-observe sessions --db {db} --json",
+                "success_check": "sessions JSON includes status ok and a recommended_session.",
+            },
+            {
+                "label": "Open the dashboard",
+                "command": f"codex-observe serve --db {db}",
+                "success_check": "dashboard opens without a missing-database or empty-database state.",
+            },
+            {
+                "label": "Export the recommended report",
+                "command": f"codex-observe report --db {db} --out run-report.md",
+                "success_check": "report output includes Recommended Action and Next Run Success Target.",
+            },
+        ]
+    if status == "empty":
+        return [
+            {
+                "label": "Ingest local logs",
+                "command": f"codex-observe ingest ~/.codex/sessions --db {db}",
+                "success_check": "doctor reports a populated ok database after ingest.",
+            },
+            {
+                "label": "Try synthetic data",
+                "command": f"codex-observe demo --db {db}",
+                "success_check": "demo creates reportable synthetic conversations.",
+            },
+        ]
+    if status in {"missing", "invalid schema"}:
+        return [
+            {
+                "label": "Create synthetic database",
+                "command": f"codex-observe demo --db {db}",
+                "success_check": "doctor reports status ok for the generated demo database.",
+            },
+            {
+                "label": "Ingest local logs",
+                "command": f"codex-observe ingest ~/.codex/sessions --db {db}",
+                "success_check": "ingest summary reports imported files, threads, and events.",
+            },
+        ]
+    if status == "unreadable":
+        return [
+            {
+                "label": "Regenerate synthetic database",
+                "command": f"codex-observe demo --db {db}",
+                "success_check": "new demo database can be opened by doctor.",
+            }
+        ]
+    return []
+
+
 def doctor_report(db_path: str) -> tuple[int, dict]:
     db = Path(db_path).expanduser()
     report = {
@@ -229,12 +285,14 @@ def doctor_report(db_path: str) -> tuple[int, dict]:
         "missing_tables": [],
         "next": "run `codex-observe serve --db <this-db>` to inspect the dashboard.",
         "next_commands": [],
+        "review_path": [],
     }
     if not db.exists():
         report.update(
             {
                 "status": "missing",
                 "next_commands": doctor_next_commands(db, "missing"),
+                "review_path": doctor_review_path(db, "missing"),
                 "next": (
                     f"run `codex-observe demo --db {db}` for synthetic data or "
                     f"`codex-observe ingest ~/.codex/sessions --db {db}` for your logs."
@@ -259,6 +317,7 @@ def doctor_report(db_path: str) -> tuple[int, dict]:
                         "status": "invalid schema",
                         "missing_tables": missing,
                         "next_commands": doctor_next_commands(db, "invalid schema"),
+                        "review_path": doctor_review_path(db, "invalid schema"),
                         "next": (
                             "this file does not look like a Codex Observe database; "
                             f"run `codex-observe demo --db {db}` for synthetic data "
@@ -287,6 +346,7 @@ def doctor_report(db_path: str) -> tuple[int, dict]:
                 "status": "unreadable",
                 "error": str(exc),
                 "next_commands": doctor_next_commands(db, "unreadable"),
+                "review_path": doctor_review_path(db, "unreadable"),
                 "next": (
                     "check the database path or regenerate it with "
                     f"`codex-observe demo --db {db}`."
@@ -307,12 +367,14 @@ def doctor_report(db_path: str) -> tuple[int, dict]:
             f"or `codex-observe demo --db {db}`."
         )
         report["next_commands"] = doctor_next_commands(db, "empty")
+        report["review_path"] = doctor_review_path(db, "empty")
     else:
         report["next"] = (
             f"run `codex-observe sessions --db {db}` to choose a reportable conversation, "
             f"or `codex-observe serve --db {db}` to inspect the dashboard."
         )
         report["next_commands"] = doctor_next_commands(db, "ok")
+        report["review_path"] = doctor_review_path(db, "ok")
     return 0, report
 
 
@@ -333,6 +395,14 @@ def doctor_lines(db_path: str) -> tuple[int, list[str]]:
                 f"cached_input_tokens: {report['totals']['cached_input_tokens']}",
             ]
         )
+    review_path = report.get("review_path")
+    if isinstance(review_path, list) and review_path:
+        lines.append("Review path:")
+        for item in review_path:
+            if not isinstance(item, dict):
+                continue
+            lines.append(f"- {item.get('label')}: {item.get('command')}")
+            lines.append(f"  Success check: {item.get('success_check')}")
     lines.append(f"Next: {report['next']}")
     return status, lines
 
@@ -1660,22 +1730,41 @@ def release_audit_report(
 
     doctor_status, doctor = doctor_report(actual_db_path)
     doctor_has_schema = doctor.get("schema_version") == DOCTOR_SCHEMA_VERSION
+    doctor_review_path = doctor.get("review_path")
+    doctor_has_review_path = (
+        isinstance(doctor_review_path, list)
+        and len(doctor_review_path) >= 3
+        and all(
+            isinstance(item, dict)
+            and item.get("label")
+            and item.get("command")
+            and item.get("success_check")
+            for item in doctor_review_path
+        )
+        and any(
+            "codex-observe sessions" in str(item.get("command"))
+            and "--json" in str(item.get("command"))
+            for item in doctor_review_path
+            if isinstance(item, dict)
+        )
+    )
     doctor_ok = (
         doctor_status == 0
         and doctor.get("status") == "ok"
         and doctor_has_schema
         and doctor.get("next_commands")
         == doctor_next_commands(Path(actual_db_path), "ok")
+        and doctor_has_review_path
     )
     add(
         "database doctor",
         doctor_ok,
-        "ok; schema and next commands verified"
+        "ok; schema, next commands, and review path verified"
         if doctor_ok
         else (
             str(doctor.get("status"))
             if doctor_has_schema
-            else "doctor schema_version or next_commands missing"
+            else "doctor schema_version, next_commands, or review_path missing"
         ),
     )
 
@@ -2377,12 +2466,13 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
         {
             "title": "Verify the demo database contract",
             "evidence": [
-                "doctor JSON includes schema_version and structured next_commands",
+                "doctor JSON includes schema_version, structured next_commands, and review_path",
                 "recovery hints preserve the selected database path",
             ],
             "success_checks": [
                 "doctor JSON status is ok for the demo database",
                 "next_commands include sessions and serve commands for the same database",
+                "review_path points to sessions JSON, dashboard inspection, and report export",
             ],
             "commands": [f"codex-observe doctor --db {db_path} --json"],
         },

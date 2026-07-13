@@ -594,6 +594,9 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
         checks["session listing"]["detail"]
         == "2 sessions; triage risk, status, schema, text recommended action, session table tool-output column, tool-output driver, structured driver summary, recommendation detail, review path, and next commands verified"
     )
+    assert checks["database doctor"]["detail"] == (
+        "ok; schema, next commands, and review path verified"
+    )
     assert checks["aggregate report"]["ok"] is True
     assert "success target" in checks["aggregate report"]["detail"]
     assert checks["visual QA manifest evidence"]["ok"] is True
@@ -714,6 +717,58 @@ def test_sessions_missing_json_payload_is_actionable_and_schema_versioned() -> N
     assert payload["review_path"][1]["label"] == "Ingest local logs"
 
 
+def test_doctor_report_includes_review_path_for_healthy_and_missing_databases(
+    tmp_path: Path,
+) -> None:
+    db = tmp_path / "demo.sqlite"
+    sessions = tmp_path / "sessions"
+    cli.create_demo_database(str(db), str(sessions), keep_sessions=True)
+
+    status, report = cli.doctor_report(str(db))
+    lines_status, lines = cli.doctor_lines(str(db))
+    text = "\n".join(lines)
+
+    assert status == 0
+    assert lines_status == 0
+    assert report["schema_version"] == cli.DOCTOR_SCHEMA_VERSION
+    assert report["review_path"] == [
+        {
+            "label": "Choose a reportable run",
+            "command": f"codex-observe sessions --db {db} --json",
+            "success_check": "sessions JSON includes status ok and a recommended_session.",
+        },
+        {
+            "label": "Open the dashboard",
+            "command": f"codex-observe serve --db {db}",
+            "success_check": "dashboard opens without a missing-database or empty-database state.",
+        },
+        {
+            "label": "Export the recommended report",
+            "command": f"codex-observe report --db {db} --out run-report.md",
+            "success_check": "report output includes Recommended Action and Next Run Success Target.",
+        },
+    ]
+    assert "Review path:" in text
+    assert f"Choose a reportable run: codex-observe sessions --db {db} --json" in text
+    assert (
+        "Success check: sessions JSON includes status ok and a recommended_session."
+        in text
+    )
+
+    missing = tmp_path / "missing.sqlite"
+    missing_status, missing_report = cli.doctor_report(str(missing))
+
+    assert missing_status == 2
+    assert missing_report["status"] == "missing"
+    assert [item["label"] for item in missing_report["review_path"]] == [
+        "Create synthetic database",
+        "Ingest local logs",
+    ]
+    assert missing_report["review_path"][0]["command"] == (
+        f"codex-observe demo --db {missing}"
+    )
+
+
 def test_session_recommendation_detail_includes_structured_tool_output_driver() -> None:
     detail = cli.session_recommendation_detail(
         {
@@ -808,6 +863,11 @@ def test_public_tour_payload_is_private_log_free_and_points_to_visual_verificati
     assert any("structured aggregate drivers" in item for item in evidence)
     assert any("driver_summary" in item for item in evidence)
     assert any("review_path" in item for item in evidence)
+    assert any(
+        "doctor JSON includes schema_version, structured next_commands, and review_path"
+        in item
+        for item in evidence
+    )
     assert [item["label"] for item in payload["review_path"]] == [
         "Create synthetic evidence",
         "Verify database health",

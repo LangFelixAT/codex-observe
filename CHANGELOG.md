@@ -6,6 +6,7 @@ The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
 
+- Added structured doctor review paths so database health checks guide users toward recovery, session selection, dashboard inspection, and report export.
 - Added a top-level public-tour review path so text and JSON tour output expose the end-to-end evaluation checklist.
 - Added a structured session review path to sessions JSON and plain-text listings so terminal users can move from diagnosis to report, comparison, next-run validation, and safe feedback.
 - Added a dashboard next-review path card with visual QA evidence so users can move from diagnosis to validation without leaving the Overview.
@@ -47,7 +48,7 @@ The project follows semantic versioning once release distribution is decided.
 ### Added
 
 - Synthetic demo database workflow through `codex-observe demo`, including `--serve` for a one-command first run and `--json` for schema-versioned creation status.
-- Privacy-safe database health checks through `codex-observe doctor` with text output, JSON `schema_version` metadata, structured `next_commands`, and copy-pasteable recovery hints that preserve the selected `--db` path.
+- Privacy-safe database health checks through `codex-observe doctor` with text output, JSON `schema_version` metadata, structured `next_commands`, structured `review_path`, and copy-pasteable recovery hints that preserve the selected `--db` path.
 - Privacy-safe session listing through `codex-observe sessions` for choosing reportable conversations without printing prompts or tool output, including `schema_version` and `status` metadata, a machine-readable `recommended_session`, structured `recommendation_detail`, structured `next_commands`, and machine-readable missing-database JSON output.
 - Privacy-safe Markdown/JSON run reports through `codex-observe report`, including `schema_version` metadata, a quick-read headline, cost profile percentages, a ranked aggregate opportunity stack, aggregate diagnostics, structured next-action metadata, schema-versioned JSON failure payloads, and an impact-targeted next-run playbook; comparison inputs with missing or unsupported report schema versions are rejected with a regeneration hint.
 - Fast release-readiness audit through `codex-observe audit`, covering demo data, doctor/session/report flows, Markdown/JSON report artifacts with cost-profile and `schema_version` evidence, comparison quick-read, opportunity-change, percent-delta, command-help product concepts, `schema_version`, JSON evidence, demo creation JSON contract evidence, public tour JSON contract evidence including privacy-safe feedback guidance, generated public evidence bundle artifact validation, full visual manifest contract evidence with referenced screenshots and layout review, release metadata, dev tooling metadata, CI reviewer evidence-bundle generation/upload, issue template evidence/privacy requirements, redaction validation privacy, planning backlog closeout, audit JSON `schema_version`, machine-readable `required_commands`, and actionable `failed_checks` failure summaries.
