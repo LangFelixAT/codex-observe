@@ -1,0 +1,72 @@
+﻿name: Public tour feedback
+description: Report privacy-safe feedback from trying the public tour or reviewer evidence bundle
+title: "[Feedback] "
+labels: ["type: feedback", "area: onboarding", "status: needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this after trying `codex-observe tour`, the synthetic demo, or `codex-observe evidence-bundle --out .artifacts/public-evidence`.
+        Do not paste private prompts, private Codex logs, raw message text, tool commands, tool output, local paths, or unreviewed screenshots.
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment and install path
+      description: Include OS, Python version, install command, and Codex Observe version. Do not include private local paths.
+      value: |
+        - OS:
+        - Python:
+        - Install command:
+        - `codex-observe --version`:
+    validations:
+      required: true
+  - type: checkboxes
+    id: tour_steps
+    attributes:
+      label: Steps tried
+      options:
+        - label: `codex-observe tour`
+        - label: `codex-observe demo --serve --host 127.0.0.1 --port 8501`
+        - label: `codex-observe doctor --db .artifacts/demo/codex_observe_demo.sqlite --json`
+        - label: `codex-observe sessions --db .artifacts/demo/codex_observe_demo.sqlite --json`
+        - label: `codex-observe report --db .artifacts/demo/codex_observe_demo.sqlite --out .artifacts/demo/run-report.md`
+        - label: `codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --out .artifacts/demo/run-comparison.md`
+        - label: `python scripts/visual_qa.py --verify-manifest .artifacts/visual/visual-qa-manifest.json`
+        - label: `codex-observe evidence-bundle --out .artifacts/public-evidence`
+  - type: textarea
+    id: useful
+    attributes:
+      label: What was useful?
+      description: Which screen, command, report, comparison, or evidence bundle artifact helped you understand cost/context growth?
+      placeholder: The ranked opportunity stack made it obvious that...
+    validations:
+      required: true
+  - type: textarea
+    id: confusing
+    attributes:
+      label: What was confusing or missing?
+      description: Describe the first confusing moment and what you expected instead.
+      placeholder: I expected the next command to...
+    validations:
+      required: true
+  - type: textarea
+    id: visual_feedback
+    attributes:
+      label: Visual/UI feedback from synthetic data
+      description: Mention desktop/narrow viewport issues, text overlap, Streamlit exceptions, or visual polish gaps from synthetic or reviewed-redacted data only.
+  - type: textarea
+    id: evidence_bundle_feedback
+    attributes:
+      label: Reviewer evidence bundle feedback
+      description: Mention whether README.md, LIMITATIONS.md, evidence-bundle.json, reports, comparison, audit JSON, and screenshots were enough to review the project. Do not attach private artifacts.
+  - type: textarea
+    id: privacy_review
+    attributes:
+      label: Privacy review
+      description: Confirm that the issue body and any attachments contain only synthetic or reviewed-redacted evidence.
+      value: |
+        - [ ] I did not include private prompts, raw logs, message text, tool commands, tool output, local paths, or unreviewed screenshots.
+        - [ ] Any attached evidence is synthetic or reviewed-redacted.
+        - [ ] I reviewed `docs/PUBLIC_TOUR_FEEDBACK.md` and `docs/LIMITATIONS.md` before submitting.
+    validations:
+      required: true

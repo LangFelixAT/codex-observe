@@ -1,0 +1,1196 @@
+from __future__ import annotations
+
+import json
+import sqlite3
+from pathlib import Path
+from typing import Any
+
+import pandas as pd
+
+from .analysis import (
+    compactions_df,
+    diagnostics_df,
+    findings_df,
+    fmt_short,
+    next_run_playbook_df,
+    opportunity_df,
+    numericize,
+    prepare_threads,
+)
+
+
+REPORT_SCHEMA_VERSION = "codex-observe.report.v1"
+COMPARISON_SCHEMA_VERSION = "codex-observe.comparison.v1"
+
+
+def _read_sql(conn: sqlite3.Connection, query: str, params: tuple = ()) -> pd.DataFrame:
+    return pd.read_sql_query(query, conn, params=params)
+
+
+def available_sessions(db_path: str) -> list[str]:
+    db = Path(db_path).expanduser()
+    if not db.exists():
+        return []
+    with sqlite3.connect(db) as conn:
+        rows = conn.execute(
+            "SELECT session_id FROM conversations ORDER BY last_seen DESC"
+        ).fetchall()
+    return [str(row[0]) for row in rows]
+
+
+RISK_RANK = {"low": 0, "moderate": 1, "high": 2}
+
+
+def _pct_of_total(value: int, total: int) -> float:
+    return round(value / (total or 1) * 100, 1)
+
+
+def sort_session_summaries(summaries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return sorted(
+        summaries,
+        key=lambda row: (
+            RISK_RANK.get(str(row.get("triage_risk") or "unknown"), -1),
+            str(row.get("last_seen") or ""),
+        ),
+        reverse=True,
+    )
+
+
+def session_summaries(db_path: str) -> list[dict[str, Any]]:
+    db = Path(db_path).expanduser()
+    if not db.exists():
+        raise FileNotFoundError(str(db))
+    with sqlite3.connect(db) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """
+            SELECT
+              c.session_id,
+              c.first_seen,
+              c.last_seen,
+              c.thread_count,
+              c.total_tokens,
+              c.total_uncached_input_tokens,
+              c.total_cached_input_tokens,
+              COALESCE((
+                SELECT SUM(t.tool_call_count)
+                FROM threads t
+                WHERE t.session_id = c.session_id
+              ), 0) AS tool_calls,
+              COALESCE((
+                SELECT MAX(t.final_total_tokens)
+                FROM threads t
+                WHERE t.session_id = c.session_id
+              ), 0) AS largest_thread_tokens,
+              COALESCE((
+                SELECT MAX(tc.output_chars)
+                FROM tool_calls tc
+                WHERE tc.thread_id IN (
+                  SELECT t.thread_id FROM threads t WHERE t.session_id = c.session_id
+                )
+              ), 0) AS largest_tool_output_chars,
+              COALESCE((
+                SELECT SUM(replayed.approx_tokens_replayed)
+                FROM (
+                  SELECT SUM(pb.approx_tokens) AS approx_tokens_replayed
+                  FROM prompt_blocks pb
+                  WHERE pb.thread_id IN (
+                    SELECT t.thread_id FROM threads t WHERE t.session_id = c.session_id
+                  )
+                  GROUP BY pb.label, pb.block_hash
+                  HAVING COUNT(*) > 1
+                ) replayed
+              ), 0) AS repeated_prompt_tokens
+            FROM conversations c
+            ORDER BY c.last_seen DESC
+            """
+        ).fetchall()
+    summaries = []
+    for row in rows:
+        total_tokens = int(row["total_tokens"] or 0)
+        largest_thread_tokens = int(row["largest_thread_tokens"] or 0)
+        repeated_prompt_tokens = int(row["repeated_prompt_tokens"] or 0)
+        uncached_input_tokens = int(row["total_uncached_input_tokens"] or 0)
+        largest_tool_output_chars = int(row["largest_tool_output_chars"] or 0)
+        largest_thread_share_pct = _pct_of_total(largest_thread_tokens, total_tokens)
+        repeated_prompt_share_pct = _pct_of_total(repeated_prompt_tokens, total_tokens)
+        uncached_input_share_pct = _pct_of_total(uncached_input_tokens, total_tokens)
+        triage = report_triage(
+            {
+                "summary": {
+                    "total_tokens": total_tokens,
+                    "largest_thread_share_pct": largest_thread_share_pct,
+                    "repeated_prompt_share_pct": repeated_prompt_share_pct,
+                    "uncached_input_share_pct": uncached_input_share_pct,
+                    "largest_tool_output_chars": largest_tool_output_chars,
+                    "compactions": 0,
+                },
+                "headline": {
+                    "top_diagnostic": "Run needs triage",
+                    "recommendation": "Open the aggregate report for next-action details.",
+                },
+            }
+        )
+        summaries.append(
+            {
+                "session_id": row["session_id"],
+                "first_seen": row["first_seen"],
+                "last_seen": row["last_seen"],
+                "threads": int(row["thread_count"] or 0),
+                "tool_calls": int(row["tool_calls"] or 0),
+                "total_tokens": total_tokens,
+                "uncached_input_tokens": uncached_input_tokens,
+                "cached_input_tokens": int(row["total_cached_input_tokens"] or 0),
+                "triage_risk": triage["risk_level"],
+                "largest_thread_share_pct": largest_thread_share_pct,
+                "repeated_prompt_share_pct": repeated_prompt_share_pct,
+                "uncached_input_share_pct": uncached_input_share_pct,
+            }
+        )
+    return sort_session_summaries(summaries)
+
+
+def session_report_hint(db_path: str, session_id: str | None = None) -> str:
+    session_part = f" --session-id {session_id}" if session_id else ""
+    return (
+        f"run `codex-observe report --db {db_path}{session_part} --out run-report.md` "
+        "to export a shareable aggregate-only report."
+    )
+
+
+def session_summary_lines(db_path: str) -> list[str]:
+    summaries = session_summaries(db_path)
+    if not summaries:
+        return [
+            "No conversations found.",
+            f"Next: run `codex-observe ingest ~/.codex/sessions --db {db_path}` or `codex-observe demo`.",
+        ]
+    lines = ["Session ID | Last seen | Risk | Threads | Tools | Tokens | Uncached"]
+    for row in summaries:
+        lines.append(
+            " | ".join(
+                [
+                    str(row["session_id"]),
+                    str(row.get("last_seen") or "unknown"),
+                    str(row["triage_risk"]),
+                    str(row["threads"]),
+                    str(row["tool_calls"]),
+                    fmt_short(row["total_tokens"]),
+                    fmt_short(row["uncached_input_tokens"]),
+                ]
+            )
+        )
+    recommended = summaries[0]
+    lines.append(
+        "Next: review the highest-risk run "
+        f"({recommended['session_id']}, {recommended['triage_risk']} risk); "
+        f"{session_report_hint(db_path, str(recommended['session_id']))}"
+    )
+    return lines
+
+
+def default_report_session(db_path: str) -> str:
+    summaries = session_summaries(db_path)
+    if not summaries:
+        raise ValueError("no conversations found in database")
+    return str(summaries[0]["session_id"])
+
+
+def build_report(db_path: str, session_id: str | None = None) -> dict[str, Any]:
+    db = Path(db_path).expanduser()
+    if not db.exists():
+        raise FileNotFoundError(str(db))
+
+    with sqlite3.connect(db) as conn:
+        conn.row_factory = sqlite3.Row
+        selected_session = session_id or default_report_session(str(db))
+        conv = conn.execute(
+            "SELECT * FROM conversations WHERE session_id=?",
+            (selected_session,),
+        ).fetchone()
+        if conv is None:
+            raise ValueError(f"session not found: {selected_session}")
+
+        threads = _read_sql(
+            conn,
+            "SELECT * FROM threads WHERE session_id=? ORDER BY created_at, first_seen",
+            (selected_session,),
+        )
+        usage = _read_sql(
+            conn,
+            "SELECT * FROM usage_snapshots WHERE thread_id IN (SELECT thread_id FROM threads WHERE session_id=?) ORDER BY timestamp, idx",
+            (selected_session,),
+        )
+        tools = _read_sql(
+            conn,
+            "SELECT * FROM tool_calls WHERE thread_id IN (SELECT thread_id FROM threads WHERE session_id=?) ORDER BY timestamp",
+            (selected_session,),
+        )
+        events = _read_sql(
+            conn,
+            """
+            SELECT e.*
+            FROM events e
+            JOIN threads t ON t.thread_id = e.thread_id
+            WHERE t.session_id=?
+            ORDER BY e.timestamp, e.idx
+            """,
+            (selected_session,),
+        )
+        duplicated_blocks = _read_sql(
+            conn,
+            """
+            SELECT label, block_hash, COUNT(*) AS seen, COUNT(DISTINCT thread_id) AS threads,
+                   MAX(approx_tokens) AS approx_tokens_each,
+                   SUM(approx_tokens) AS approx_tokens_replayed
+            FROM prompt_blocks
+            WHERE thread_id IN (SELECT thread_id FROM threads WHERE session_id=?)
+            GROUP BY label, block_hash
+            HAVING COUNT(*) > 1
+            ORDER BY approx_tokens_replayed DESC
+            LIMIT 300
+            """,
+            (selected_session,),
+        )
+
+    threads = prepare_threads(threads)
+    usage = numericize(
+        usage,
+        [
+            "idx",
+            "input_tokens",
+            "cached_input_tokens",
+            "uncached_input_tokens",
+            "output_tokens",
+            "reasoning_tokens",
+            "total_tokens",
+        ],
+    )
+    tools = numericize(tools, ["timeout_ms", "success", "duration_ms", "output_chars"])
+    for private_col in ["arguments_json", "command", "workdir", "output"]:
+        if private_col in tools.columns:
+            tools[private_col] = ""
+
+    diagnostics = diagnostics_df(threads, usage, events, tools, duplicated_blocks)
+    playbook = next_run_playbook_df(diagnostics)
+    findings = findings_df(threads, usage, events)
+    compactions = compactions_df(events, usage, threads)
+
+    total_input = int(conv["total_input_tokens"] or 0)
+    cached = int(conv["total_cached_input_tokens"] or 0)
+    cache_pct = cached / (total_input or 1) * 100
+    kind_counts = threads["kind"].value_counts().to_dict() if not threads.empty else {}
+    largest_thread = threads.sort_values("final_total_tokens", ascending=False).head(1)
+    repeated_prompt_tokens = 0
+    if (
+        not duplicated_blocks.empty
+        and "approx_tokens_replayed" in duplicated_blocks.columns
+    ):
+        repeated_prompt_tokens = int(
+            pd.to_numeric(duplicated_blocks["approx_tokens_replayed"], errors="coerce")
+            .fillna(0)
+            .sum()
+        )
+    largest_tool_output_chars = 0
+    if not tools.empty and "output_chars" in tools.columns:
+        largest_tool_output_chars = int(tools["output_chars"].fillna(0).max())
+
+    total_tokens = int(conv["total_tokens"] or 0)
+    largest_thread_tokens = (
+        int(largest_thread["final_total_tokens"].iloc[0])
+        if not largest_thread.empty
+        else 0
+    )
+
+    def pct_of_total(value: int) -> float:
+        return round(value / (total_tokens or 1) * 100, 1)
+
+    opportunities = opportunity_df(
+        {
+            "total_tokens": total_tokens,
+            "largest_thread_tokens": largest_thread_tokens,
+            "repeated_prompt_tokens": repeated_prompt_tokens,
+            "uncached_input_tokens": int(conv["total_uncached_input_tokens"] or 0),
+            "largest_tool_output_chars": largest_tool_output_chars,
+            "compactions": int(len(compactions)),
+        }
+    )
+
+    report = {
+        "schema_version": REPORT_SCHEMA_VERSION,
+        "privacy": {
+            "mode": "aggregate-only",
+            "excluded": [
+                "message text",
+                "prompt block previews",
+                "event payload JSON",
+                "tool arguments",
+                "tool commands",
+                "tool output",
+            ],
+        },
+        "session": {
+            "session_id": selected_session,
+            "first_seen": conv["first_seen"],
+            "last_seen": conv["last_seen"],
+        },
+        "summary": {
+            "threads": int(conv["thread_count"] or 0),
+            "workers": int(kind_counts.get("worker", 0)),
+            "explorers": int(kind_counts.get("explorer", 0)),
+            "guardians": int(kind_counts.get("guardian", 0)),
+            "tool_calls": int(threads["tool_call_count"].fillna(0).sum())
+            if not threads.empty
+            else 0,
+            "compactions": int(len(compactions)),
+            "total_tokens": total_tokens,
+            "input_tokens": total_input,
+            "uncached_input_tokens": int(conv["total_uncached_input_tokens"] or 0),
+            "cached_input_tokens": cached,
+            "cache_pct": round(cache_pct, 1),
+            "largest_thread_tokens": largest_thread_tokens,
+            "largest_thread_share_pct": pct_of_total(largest_thread_tokens),
+            "largest_thread_kind": str(largest_thread["kind"].iloc[0])
+            if not largest_thread.empty
+            else "",
+            "repeated_prompt_tokens": repeated_prompt_tokens,
+            "repeated_prompt_share_pct": pct_of_total(repeated_prompt_tokens),
+            "uncached_input_share_pct": pct_of_total(
+                int(conv["total_uncached_input_tokens"] or 0)
+            ),
+            "largest_tool_output_chars": largest_tool_output_chars,
+        },
+        "diagnostics": diagnostics.to_dict("records"),
+        "playbook": playbook.to_dict("records"),
+        "opportunities": opportunities.to_dict("records"),
+        "findings": findings.to_dict("records"),
+    }
+    report["headline"] = report_headline(report)
+    report["triage"] = report_triage(report)
+    report["next_action_detail"] = report_next_action_detail(report)
+    report["success_target"] = report_success_target(report)
+    return report
+
+
+def _safe_int(value: Any) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _metric_delta(
+    before: dict[str, Any], after: dict[str, Any], key: str, label: str
+) -> dict[str, Any]:
+    before_value = _safe_int(before.get(key))
+    after_value = _safe_int(after.get(key))
+    delta = after_value - before_value
+    delta_pct = round(delta / before_value * 100, 1) if before_value else None
+    if delta < 0:
+        direction = "improved"
+    elif delta > 0:
+        direction = "regressed"
+    else:
+        direction = "unchanged"
+    return {
+        "metric": key,
+        "label": label,
+        "before": before_value,
+        "after": after_value,
+        "delta": delta,
+        "delta_pct": delta_pct,
+        "direction": direction,
+    }
+
+
+def _diagnostic_names_ordered(report: dict[str, Any]) -> list[str]:
+    names: list[str] = []
+    seen: set[str] = set()
+    for row in report.get("diagnostics", []):
+        name = str(row.get("Diagnostic") or "").strip()
+        if name and name not in seen:
+            names.append(name)
+            seen.add(name)
+    return names
+
+
+def _diagnostic_names(report: dict[str, Any]) -> set[str]:
+    return set(_diagnostic_names_ordered(report))
+
+
+def report_headline(report: dict[str, Any]) -> dict[str, str]:
+    summary = report.get("summary", {})
+    diagnostics = report.get("diagnostics", [])
+    playbook = report.get("playbook", [])
+    total = fmt_short(summary.get("total_tokens", 0))
+    largest = fmt_short(summary.get("largest_thread_tokens", 0))
+    largest_share = float(summary.get("largest_thread_share_pct", 0) or 0)
+    repeated = fmt_short(summary.get("repeated_prompt_tokens", 0))
+    repeated_share = float(summary.get("repeated_prompt_share_pct", 0) or 0)
+    tool_chars = fmt_short(summary.get("largest_tool_output_chars", 0))
+    top_diagnostic = (
+        str(diagnostics[0].get("Diagnostic"))
+        if diagnostics and diagnostics[0].get("Diagnostic")
+        else "No high-signal diagnostic"
+    )
+    recommendation = (
+        str(playbook[0].get("Habit"))
+        if playbook and playbook[0].get("Habit")
+        else "Inspect the largest thread before changing workflow."
+    )
+    return {
+        "headline": f"{total} total tokens; largest thread {largest} ({largest_share:.1f}%); repeated prompts {repeated} ({repeated_share:.1f}%); largest tool output {tool_chars} chars.",
+        "top_diagnostic": top_diagnostic,
+        "recommendation": recommendation,
+    }
+
+
+def report_triage(report: dict[str, Any]) -> dict[str, Any]:
+    summary = report.get("summary", {})
+    headline = report.get("headline", {})
+    largest_share = float(summary.get("largest_thread_share_pct", 0) or 0)
+    repeated_share = float(summary.get("repeated_prompt_share_pct", 0) or 0)
+    uncached_share = float(summary.get("uncached_input_share_pct", 0) or 0)
+    tool_chars = _safe_int(summary.get("largest_tool_output_chars"))
+    total_tokens = _safe_int(summary.get("total_tokens"))
+    compactions = _safe_int(summary.get("compactions"))
+
+    high_reasons: list[str] = []
+    moderate_reasons: list[str] = []
+    if largest_share >= 50:
+        high_reasons.append(
+            f"Largest thread used {largest_share:.1f}% of total tokens."
+        )
+    elif largest_share >= 35:
+        moderate_reasons.append(
+            f"Largest thread used {largest_share:.1f}% of total tokens."
+        )
+    if repeated_share >= 15:
+        high_reasons.append(
+            f"Repeated prompt blocks used {repeated_share:.1f}% of total tokens."
+        )
+    elif repeated_share >= 8:
+        moderate_reasons.append(
+            f"Repeated prompt blocks used {repeated_share:.1f}% of total tokens."
+        )
+    if uncached_share >= 35:
+        high_reasons.append(
+            f"Uncached input used {uncached_share:.1f}% of total tokens."
+        )
+    elif uncached_share >= 20:
+        moderate_reasons.append(
+            f"Uncached input used {uncached_share:.1f}% of total tokens."
+        )
+    if tool_chars >= 5_000:
+        high_reasons.append(f"Largest tool output was {fmt_short(tool_chars)} chars.")
+    elif tool_chars >= 2_000:
+        moderate_reasons.append(
+            f"Largest tool output was {fmt_short(tool_chars)} chars."
+        )
+    if total_tokens >= 100_000:
+        high_reasons.append(f"Run used {fmt_short(total_tokens)} total tokens.")
+    elif total_tokens >= 25_000:
+        moderate_reasons.append(f"Run used {fmt_short(total_tokens)} total tokens.")
+    if compactions:
+        moderate_reasons.append(f"Run compacted context {compactions} time(s).")
+
+    if high_reasons:
+        risk_level = "high"
+        reasons = high_reasons + moderate_reasons
+    elif moderate_reasons:
+        risk_level = "moderate"
+        reasons = moderate_reasons
+    else:
+        risk_level = "low"
+        reasons = ["No high-risk cost driver crossed review thresholds."]
+
+    return {
+        "risk_level": risk_level,
+        "primary_driver": headline.get("top_diagnostic", "No high-signal diagnostic"),
+        "next_action": headline.get(
+            "recommendation", "Inspect the largest thread before changing workflow."
+        ),
+        "reasons": reasons,
+    }
+
+
+def report_next_action_detail(report: dict[str, Any]) -> dict[str, Any]:
+    playbook = report.get("playbook", []) or []
+    diagnostics = report.get("diagnostics", []) or []
+    triage = report.get("triage", {}) or {}
+    if playbook:
+        first = playbook[0]
+        return {
+            "action": "apply_next_run_habit",
+            "target_type": "playbook_habit",
+            "target": str(
+                first.get("Habit")
+                or "Inspect the largest thread before changing workflow."
+            ),
+            "impact": str(first.get("Impact") or "Targets the top diagnostic."),
+            "source": str(
+                first.get("Source")
+                or triage.get("primary_driver")
+                or "No high-signal diagnostic"
+            ),
+        }
+    if diagnostics:
+        first_diagnostic = diagnostics[0]
+        return {
+            "action": "inspect_top_diagnostic",
+            "target_type": "diagnostic",
+            "target": str(
+                first_diagnostic.get("Diagnostic") or "No high-signal diagnostic"
+            ),
+            "impact": str(
+                first_diagnostic.get("Action")
+                or triage.get("next_action")
+                or "Inspect the report."
+            ),
+            "source": str(first_diagnostic.get("Evidence") or "aggregate report"),
+        }
+    return {
+        "action": "inspect_report",
+        "target_type": "report",
+        "target": str(report.get("session", {}).get("session_id") or "run report"),
+        "impact": str(triage.get("next_action") or "Inspect the report."),
+        "source": "aggregate report",
+    }
+
+
+def _pct_target(
+    current: float, high_threshold: float, moderate_threshold: float
+) -> float:
+    return high_threshold if current >= high_threshold else moderate_threshold
+
+
+def report_success_target(report: dict[str, Any]) -> dict[str, Any]:
+    summary = report.get("summary", {}) or {}
+    opportunities = report.get("opportunities", []) or []
+    driver = str(opportunities[0].get("Driver") or "") if opportunities else ""
+
+    if driver == "Largest thread":
+        current = float(summary.get("largest_thread_share_pct") or 0)
+        target = _pct_target(current, 50.0, 35.0)
+        return {
+            "metric": "largest_thread_share_pct",
+            "direction": "lower_is_better",
+            "current_value": current,
+            "target_value": target,
+            "unit": "percent_of_run",
+            "current": f"{current:.1f}%",
+            "target": f"below {target:.1f}%",
+            "rationale": "The top opportunity is a dominant thread; the next run should prove that work was split or stopped earlier.",
+            "verification": "Export the next run as report JSON and compare largest_thread_share_pct before adopting the workflow change.",
+        }
+    if driver == "Repeated prompt blocks":
+        current = float(summary.get("repeated_prompt_share_pct") or 0)
+        target = _pct_target(current, 15.0, 8.0)
+        return {
+            "metric": "repeated_prompt_share_pct",
+            "direction": "lower_is_better",
+            "current_value": current,
+            "target_value": target,
+            "unit": "percent_of_run",
+            "current": f"{current:.1f}%",
+            "target": f"below {target:.1f}%",
+            "rationale": "The top opportunity is replayed instructions; the next run should reduce repeated prompt share.",
+            "verification": "Export the next run as report JSON and compare repeated_prompt_share_pct before adopting the workflow change.",
+        }
+    if driver == "Uncached input":
+        current = float(summary.get("uncached_input_share_pct") or 0)
+        target = _pct_target(current, 35.0, 20.0)
+        return {
+            "metric": "uncached_input_share_pct",
+            "direction": "lower_is_better",
+            "current_value": current,
+            "target_value": target,
+            "unit": "percent_of_run",
+            "current": f"{current:.1f}%",
+            "target": f"below {target:.1f}%",
+            "rationale": "The top opportunity is fresh context cost; the next run should filter or summarize inputs earlier.",
+            "verification": "Export the next run as report JSON and compare uncached_input_share_pct before adopting the workflow change.",
+        }
+    if driver == "Largest tool output":
+        current = _safe_int(summary.get("largest_tool_output_chars"))
+        target = 5_000 if current >= 5_000 else 2_000
+        return {
+            "metric": "largest_tool_output_chars",
+            "direction": "lower_is_better",
+            "current_value": current,
+            "target_value": target,
+            "unit": "chars",
+            "current": f"{fmt_short(current)} chars",
+            "target": f"below {fmt_short(target)} chars",
+            "rationale": "The top opportunity is bulky tool output; the next run should narrow commands before output enters context.",
+            "verification": "Export the next run as report JSON and compare largest_tool_output_chars before adopting the workflow change.",
+        }
+    if driver == "Context compaction":
+        current = _safe_int(summary.get("compactions"))
+        return {
+            "metric": "compactions",
+            "direction": "lower_is_better",
+            "current_value": current,
+            "target_value": 0,
+            "unit": "events",
+            "current": f"{current} event(s)",
+            "target": "0 events",
+            "rationale": "The top opportunity is compaction; the next run should create a handoff before context has to be rewritten.",
+            "verification": "Export the next run as report JSON and compare compactions before adopting the workflow change.",
+        }
+
+    total = _safe_int(summary.get("total_tokens"))
+    target = int(total * 0.9) if total else 0
+    return {
+        "metric": "total_tokens",
+        "direction": "lower_is_better",
+        "current_value": total,
+        "target_value": target,
+        "unit": "tokens",
+        "current": f"{fmt_short(total)} tokens",
+        "target": f"below {fmt_short(target)} tokens",
+        "rationale": "No single opportunity dominates; use total tokens as the next-run guardrail.",
+        "verification": "Export the next run as report JSON and compare total_tokens before adopting the workflow change.",
+    }
+
+
+def _risk_level(report: dict[str, Any]) -> str:
+
+    triage = report.get("triage", {})
+    risk = str(triage.get("risk_level") or "unknown")
+    return risk if risk in RISK_RANK else "unknown"
+
+
+def triage_risk_comparison(
+    before_report: dict[str, Any], after_report: dict[str, Any]
+) -> dict[str, str]:
+    before = _risk_level(before_report)
+    after = _risk_level(after_report)
+    before_rank = RISK_RANK.get(before)
+    after_rank = RISK_RANK.get(after)
+    if before_rank is None or after_rank is None:
+        direction = "unknown"
+    elif after_rank < before_rank:
+        direction = "improved"
+    elif after_rank > before_rank:
+        direction = "regressed"
+    else:
+        direction = "unchanged"
+    return {"before": before, "after": after, "direction": direction}
+
+
+def comparison_headline(comparison: dict[str, Any]) -> dict[str, str]:
+    verdict = str(comparison.get("verdict") or "unknown")
+    metrics = comparison.get("metrics", [])
+    changed = [metric for metric in metrics if metric.get("direction") != "unchanged"]
+    largest = max(
+        changed or metrics, key=lambda m: abs(_safe_int(m.get("delta"))), default={}
+    )
+    label = str(largest.get("label") or "No metric")
+    delta = fmt_short(largest.get("delta", 0))
+    direction = str(largest.get("direction") or "unchanged")
+    diagnostics = comparison.get("diagnostics", {})
+    resolved = len(diagnostics.get("resolved", []))
+    new = len(diagnostics.get("new", []))
+    return {
+        "headline": f"Verdict: {verdict}; largest change: {label} {delta} ({direction}).",
+        "diagnostic_change": f"{resolved} resolved diagnostics; {new} new diagnostics.",
+    }
+
+
+def _largest_metric(
+    metrics: list[dict[str, Any]], direction: str
+) -> dict[str, Any] | None:
+    matching = [metric for metric in metrics if metric.get("direction") == direction]
+    if not matching:
+        return None
+    return max(matching, key=lambda metric: abs(_safe_int(metric.get("delta"))))
+
+
+def comparison_recommendation(comparison: dict[str, Any]) -> str:
+    verdict = str(comparison.get("verdict") or "unknown")
+    diagnostics = comparison.get("diagnostics", {})
+    new_diagnostics = diagnostics.get("new", []) or []
+    persisted = diagnostics.get("persisted", []) or []
+    metrics = comparison.get("metrics", [])
+    largest_regression = _largest_metric(metrics, "regressed")
+    largest_improvement = _largest_metric(metrics, "improved")
+
+    if verdict == "regressed":
+        if new_diagnostics:
+            return f"Inspect new diagnostic first: {new_diagnostics[0]}."
+        if largest_regression:
+            return f"Inspect the largest regressed metric first: {largest_regression['label']}."
+        return "Inspect the after-run report before adopting this workflow change."
+    if verdict == "mixed":
+        if largest_regression:
+            return f"Keep the improved habits, but investigate {largest_regression['label']} before adopting the change."
+        return "Review the metric deltas before adopting this workflow change."
+    if verdict == "improved":
+        if persisted:
+            return f"Keep the change, then target persisted diagnostic: {persisted[0]}."
+        if largest_improvement:
+            return f"Keep the change; strongest improvement is {largest_improvement['label']}."
+        return "Keep the change and compare another run to confirm the trend."
+    return "No aggregate metric changed; compare against a different run or inspect the reports manually."
+
+
+def comparison_recommendation_detail(comparison: dict[str, Any]) -> dict[str, Any]:
+    verdict = str(comparison.get("verdict") or "unknown")
+    diagnostics = comparison.get("diagnostics", {})
+    new_diagnostics = diagnostics.get("new", []) or []
+    persisted = diagnostics.get("persisted", []) or []
+    metrics = comparison.get("metrics", [])
+    largest_regression = _largest_metric(metrics, "regressed")
+    largest_improvement = _largest_metric(metrics, "improved")
+
+    if verdict == "regressed":
+        if new_diagnostics:
+            return {
+                "action": "inspect_new_diagnostic",
+                "target_type": "diagnostic",
+                "target": new_diagnostics[0],
+                "reason": "A new diagnostic appeared after the workflow change.",
+            }
+        if largest_regression:
+            return {
+                "action": "inspect_regressed_metric",
+                "target_type": "metric",
+                "target": largest_regression["label"],
+                "reason": "This metric had the largest aggregate regression.",
+            }
+        return {
+            "action": "inspect_after_report",
+            "target_type": "report",
+            "target": comparison.get("after", {}).get("session_id", "after run"),
+            "reason": "The comparison regressed without a more specific aggregate target.",
+        }
+    if verdict == "mixed":
+        if largest_regression:
+            return {
+                "action": "investigate_regressed_metric_before_adopting_change",
+                "target_type": "metric",
+                "target": largest_regression["label"],
+                "reason": "The run improved in some areas but this metric regressed most.",
+            }
+        return {
+            "action": "review_metric_deltas",
+            "target_type": "comparison",
+            "target": "metric deltas",
+            "reason": "The comparison is mixed without one dominant regression.",
+        }
+    if verdict == "improved":
+        if persisted:
+            return {
+                "action": "target_persisted_diagnostic",
+                "target_type": "diagnostic",
+                "target": persisted[0],
+                "reason": "The workflow improved, but this diagnostic still appears.",
+            }
+        if largest_improvement:
+            return {
+                "action": "keep_change_and_confirm_improvement",
+                "target_type": "metric",
+                "target": largest_improvement["label"],
+                "reason": "This metric had the strongest aggregate improvement.",
+            }
+        return {
+            "action": "compare_another_run",
+            "target_type": "comparison",
+            "target": "another run",
+            "reason": "The workflow improved; another comparison can confirm the trend.",
+        }
+    return {
+        "action": "compare_different_run",
+        "target_type": "comparison",
+        "target": "different run",
+        "reason": "No aggregate metric changed in this comparison.",
+    }
+
+
+OPPORTUNITY_METRIC_BY_DRIVER = {
+    "Largest thread": "largest_thread_tokens",
+    "Repeated prompt blocks": "repeated_prompt_tokens",
+    "Uncached input": "uncached_input_tokens",
+    "Largest tool output": "largest_tool_output_chars",
+    "Context compaction": "compactions",
+}
+
+
+def _top_opportunity_from_summary(summary: dict[str, Any]) -> dict[str, Any] | None:
+    opportunities = opportunity_df(summary, limit=1).to_dict("records")
+    if not opportunities:
+        return None
+    row = opportunities[0]
+    return {
+        "driver": str(row.get("Driver") or "unknown"),
+        "habit": str(row.get("Habit") or "Inspect the report"),
+        "scale": str(row.get("Scale") or "unknown"),
+    }
+
+
+def opportunity_change_comparison(
+    before_summary: dict[str, Any],
+    after_summary: dict[str, Any],
+    metrics: list[dict[str, Any]],
+) -> dict[str, Any]:
+    before_top = _top_opportunity_from_summary(before_summary)
+    after_top = _top_opportunity_from_summary(after_summary)
+    if not before_top and not after_top:
+        return {
+            "before": None,
+            "after": None,
+            "direction": "unknown",
+            "summary": "No aggregate opportunity stack is available for either run.",
+        }
+    if not before_top:
+        return {
+            "before": None,
+            "after": after_top,
+            "direction": "new",
+            "summary": f"Top opportunity appeared after the change: {after_top['driver']}.",
+        }
+    if not after_top:
+        return {
+            "before": before_top,
+            "after": None,
+            "direction": "resolved",
+            "summary": f"Top opportunity resolved after the change: {before_top['driver']}.",
+        }
+
+    before_driver = before_top["driver"]
+    after_driver = after_top["driver"]
+    if before_driver != after_driver:
+        return {
+            "before": before_top,
+            "after": after_top,
+            "direction": "shifted",
+            "summary": f"Top opportunity shifted from {before_driver} to {after_driver}.",
+        }
+
+    metric_name = OPPORTUNITY_METRIC_BY_DRIVER.get(before_driver)
+    direction = "unknown"
+    if metric_name:
+        direction = next(
+            (
+                str(metric.get("direction") or "unknown")
+                for metric in metrics
+                if metric.get("metric") == metric_name
+            ),
+            "unknown",
+        )
+    return {
+        "before": before_top,
+        "after": after_top,
+        "direction": direction,
+        "summary": f"Top opportunity stayed {before_driver} and {direction}: {before_top['scale']} -> {after_top['scale']}.",
+    }
+
+
+def compare_reports(
+    before_report: dict[str, Any], after_report: dict[str, Any]
+) -> dict[str, Any]:
+    before_summary = before_report.get("summary", {})
+    after_summary = after_report.get("summary", {})
+    metrics = [
+        _metric_delta(before_summary, after_summary, "total_tokens", "Total tokens"),
+        _metric_delta(
+            before_summary,
+            after_summary,
+            "uncached_input_tokens",
+            "Uncached input tokens",
+        ),
+        _metric_delta(
+            before_summary,
+            after_summary,
+            "largest_thread_tokens",
+            "Largest thread tokens",
+        ),
+        _metric_delta(
+            before_summary,
+            after_summary,
+            "repeated_prompt_tokens",
+            "Repeated prompt tokens",
+        ),
+        _metric_delta(
+            before_summary,
+            after_summary,
+            "largest_tool_output_chars",
+            "Largest tool output chars",
+        ),
+        _metric_delta(before_summary, after_summary, "tool_calls", "Tool calls"),
+        _metric_delta(before_summary, after_summary, "compactions", "Compactions"),
+    ]
+    improved = sum(1 for metric in metrics if metric["direction"] == "improved")
+    regressed = sum(1 for metric in metrics if metric["direction"] == "regressed")
+    if regressed and not improved:
+        verdict = "regressed"
+    elif improved and not regressed:
+        verdict = "improved"
+    elif improved or regressed:
+        verdict = "mixed"
+    else:
+        verdict = "unchanged"
+
+    before_diagnostics_ordered = _diagnostic_names_ordered(before_report)
+    after_diagnostics_ordered = _diagnostic_names_ordered(after_report)
+    before_diagnostics = set(before_diagnostics_ordered)
+    after_diagnostics = set(after_diagnostics_ordered)
+    comparison = {
+        "schema_version": COMPARISON_SCHEMA_VERSION,
+        "privacy": {
+            "mode": "aggregate-only",
+            "excluded": [
+                "message text",
+                "prompt block previews",
+                "event payload JSON",
+                "tool arguments",
+                "tool commands",
+                "tool output",
+            ],
+        },
+        "before": before_report.get("session", {}),
+        "after": after_report.get("session", {}),
+        "verdict": verdict,
+        "metrics": metrics,
+        "triage_risk": triage_risk_comparison(before_report, after_report),
+        "opportunity_change": opportunity_change_comparison(
+            before_summary, after_summary, metrics
+        ),
+        "diagnostics": {
+            "before": before_diagnostics_ordered,
+            "after": after_diagnostics_ordered,
+            "resolved": [
+                name
+                for name in before_diagnostics_ordered
+                if name not in after_diagnostics
+            ],
+            "new": [
+                name
+                for name in after_diagnostics_ordered
+                if name not in before_diagnostics
+            ],
+            "persisted": [
+                name for name in after_diagnostics_ordered if name in before_diagnostics
+            ],
+        },
+    }
+    comparison["headline"] = comparison_headline(comparison)
+    comparison["recommendation_detail"] = comparison_recommendation_detail(comparison)
+    comparison["recommendation"] = comparison_recommendation(comparison)
+    return comparison
+
+
+def load_report_json(path: str) -> dict[str, Any]:
+    report_path = Path(path).expanduser()
+    if not report_path.exists():
+        raise FileNotFoundError(str(report_path))
+    payload = json.loads(report_path.read_text(encoding="utf-8"))
+    if (
+        not isinstance(payload, dict)
+        or "summary" not in payload
+        or "session" not in payload
+    ):
+        raise ValueError(f"not a Codex Observe report JSON file: {report_path}")
+    schema_version = payload.get("schema_version")
+    if schema_version != REPORT_SCHEMA_VERSION:
+        raise ValueError(
+            "unsupported Codex Observe report JSON schema: "
+            f"{schema_version or 'missing'}; expected {REPORT_SCHEMA_VERSION}: "
+            f"{report_path}"
+        )
+    return payload
+
+
+def comparison_markdown(comparison: dict[str, Any]) -> str:
+    before = comparison.get("before", {})
+    after = comparison.get("after", {})
+    lines = [
+        "# Codex Observe Run Comparison",
+        "",
+        "Privacy: aggregate-only comparison. Message text, prompt block previews, event payload JSON, tool arguments, tool commands, and tool output are excluded.",
+        "",
+        "## Sessions",
+        "",
+        f"- Before: `{before.get('session_id', 'unknown')}`",
+        f"- After: `{after.get('session_id', 'unknown')}`",
+        f"- Verdict: {comparison.get('verdict', 'unknown')}",
+        "",
+        "## Quick Read",
+        "",
+        f"- {comparison.get('headline', {}).get('headline', 'No headline available.')}",
+        f"- {comparison.get('headline', {}).get('diagnostic_change', 'No diagnostic change summary available.')}",
+        f"- Recommended next step: {comparison.get('recommendation', 'Inspect the reports manually.')}",
+        "",
+        "## Triage Risk",
+        "",
+        f"- Before: {comparison.get('triage_risk', {}).get('before', 'unknown')}",
+        f"- After: {comparison.get('triage_risk', {}).get('after', 'unknown')}",
+        f"- Direction: {comparison.get('triage_risk', {}).get('direction', 'unknown')}",
+        "",
+        "## Opportunity Change",
+        "",
+        f"- Direction: {comparison.get('opportunity_change', {}).get('direction', 'unknown')}",
+        f"- Summary: {comparison.get('opportunity_change', {}).get('summary', 'No opportunity change summary available.')}",
+        "",
+        "## Metric Deltas",
+        "",
+        "| Metric | Before | After | Delta | % change | Direction |",
+        "| --- | ---: | ---: | ---: | ---: | --- |",
+    ]
+    for metric in comparison.get("metrics", []):
+        delta_pct = metric.get("delta_pct")
+        delta_pct_label = "n/a" if delta_pct is None else f"{delta_pct:+.1f}%"
+        lines.append(
+            "| {label} | {before} | {after} | {delta} | {delta_pct} | {direction} |".format(
+                label=metric["label"],
+                before=fmt_short(metric["before"]),
+                after=fmt_short(metric["after"]),
+                delta=fmt_short(metric["delta"]),
+                delta_pct=delta_pct_label,
+                direction=metric["direction"],
+            )
+        )
+
+    diagnostics = comparison.get("diagnostics", {})
+    lines.extend(
+        [
+            "",
+            "## Diagnostic Changes",
+            "",
+            "- Resolved: " + (", ".join(diagnostics.get("resolved", [])) or "none"),
+            "- New: " + (", ".join(diagnostics.get("new", [])) or "none"),
+            "- Persisted: " + (", ".join(diagnostics.get("persisted", [])) or "none"),
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def comparison_json(comparison: dict[str, Any]) -> str:
+    return json.dumps(comparison, indent=2, sort_keys=True)
+
+
+def report_markdown(report: dict[str, Any]) -> str:
+    summary = report["summary"]
+    session = report["session"]
+    success_target = report.get("success_target", {})
+    lines = [
+        "# Codex Observe Run Report",
+        "",
+        "Privacy: aggregate-only export. Message text, prompt block previews, event payload JSON, tool arguments, tool commands, and tool output are excluded.",
+        "",
+        "## Session",
+        "",
+        f"- Session: `{session['session_id']}`",
+        f"- First seen: {session.get('first_seen') or 'unknown'}",
+        f"- Last seen: {session.get('last_seen') or 'unknown'}",
+        "",
+        "## Quick Read",
+        "",
+        f"- {report.get('headline', {}).get('headline', 'No headline available.')}",
+        f"- Top diagnostic: {report.get('headline', {}).get('top_diagnostic', 'none')}",
+        f"- Recommended next habit: {report.get('headline', {}).get('recommendation', 'none')}",
+        "",
+        "## Triage",
+        "",
+        f"- Risk level: {report.get('triage', {}).get('risk_level', 'unknown')}",
+        f"- Primary driver: {report.get('triage', {}).get('primary_driver', 'none')}",
+        f"- Next action: {report.get('triage', {}).get('next_action', 'none')}",
+    ]
+    for reason in report.get("triage", {}).get("reasons", []):
+        lines.append(f"- Why: {reason}")
+
+    lines.extend(
+        [
+            "",
+            "## Next Run Success Target",
+            "",
+            f"- Metric: {success_target.get('metric', 'total_tokens')}",
+            f"- Current: {success_target.get('current', 'unknown')}",
+            f"- Target: {success_target.get('target', 'unknown')}",
+            f"- Why: {success_target.get('rationale', 'Use the next run to validate the recommended habit.')}",
+            f"- Verify: {success_target.get('verification', 'Export the next run as report JSON and compare the target metric.')}",
+            "",
+            "## Summary",
+            "",
+            f"- Threads: {summary['threads']} ({summary['workers']} workers, {summary['explorers']} explorers, {summary['guardians']} guardians)",
+            f"- Tool calls: {summary['tool_calls']}",
+            f"- Compactions: {summary['compactions']}",
+            f"- Total tokens: {fmt_short(summary['total_tokens'])}",
+            f"- Input tokens: {fmt_short(summary['input_tokens'])} ({fmt_short(summary['uncached_input_tokens'])} uncached, {summary['cache_pct']:.1f}% cache hit)",
+            f"- Largest thread: {fmt_short(summary['largest_thread_tokens'])} tokens ({summary['largest_thread_kind'] or 'unknown'})",
+            f"- Repeated prompt tokens: {fmt_short(summary.get('repeated_prompt_tokens', 0))}",
+            f"- Largest tool output: {fmt_short(summary.get('largest_tool_output_chars', 0))} chars",
+            "",
+            "## Cost Profile",
+            "",
+            f"- Largest thread share: {summary.get('largest_thread_share_pct', 0):.1f}% of total tokens",
+            f"- Repeated prompt share: {summary.get('repeated_prompt_share_pct', 0):.1f}% of total tokens",
+            f"- Uncached input share: {summary.get('uncached_input_share_pct', 0):.1f}% of total tokens",
+            "",
+            "## Opportunity Stack",
+            "",
+        ]
+    )
+    for row in report.get("opportunities", []):
+        lines.extend(
+            [
+                f"{row['Rank']}. **{row['Habit']}**",
+                f"   Driver: {row['Driver']}",
+                f"   Scale: {row['Scale']}",
+                f"   Why: {row['Why']}",
+                "",
+            ]
+        )
+    if not report.get("opportunities"):
+        lines.extend(["No opportunity items available.", ""])
+
+    lines.extend(
+        [
+            "## What To Inspect First",
+            "",
+        ]
+    )
+    for row in report["diagnostics"]:
+        lines.extend(
+            [
+                f"### {row['Diagnostic']} ({row['Priority']})",
+                "",
+                f"- Action: {row['Action']}",
+                f"- Evidence: {row['Evidence']}",
+                "",
+            ]
+        )
+    if not report["diagnostics"]:
+        lines.extend(["No diagnostics available.", ""])
+
+    lines.extend(["## Next Run Playbook", ""])
+    for row in report["playbook"]:
+        lines.extend(
+            [
+                f"{row['Step']}. **{row['Habit']}**",
+                f"   Impact: {row.get('Impact', 'Targets the top diagnostic.')}",
+                f"   {row['Why']}",
+                f"   Source: {row['Source']}",
+                "",
+            ]
+        )
+    if not report["playbook"]:
+        lines.extend(["No playbook items available.", ""])
+
+    lines.extend(["## Findings", ""])
+    for row in report["findings"]:
+        lines.extend(
+            [
+                f"- **{row['Finding']}**: {row['Why it matters']} Evidence: {row['Evidence']}",
+            ]
+        )
+    if not report["findings"]:
+        lines.append("- No findings available.")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def report_json(report: dict[str, Any]) -> str:
+    return json.dumps(report, indent=2, sort_keys=True)

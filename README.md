@@ -2,11 +2,61 @@
 
 Offline observability dashboard for Codex `.jsonl` session logs.
 
+## Product direction
+
+The current quality bar and implementation backlog live in [docs/AMAZING.md](docs/AMAZING.md), known limitations and next-work sources live in [docs/LIMITATIONS.md](docs/LIMITATIONS.md), privacy-safe public-tour feedback guidance lives in [docs/PUBLIC_TOUR_FEEDBACK.md](docs/PUBLIC_TOUR_FEEDBACK.md), and the short returning-to-project handoff lives in [docs/CURRENT.md](docs/CURRENT.md). In short, Codex Observe should help a Codex power user understand what made a run expensive and what to change before the next run.
+
+## Try it now
+
+Codex Observe can run entirely against local data. To see the privacy-safe public evaluation path:
+
+```bash
+python -m pip install -e .
+codex-observe tour
+```
+
+To try it without scanning your own logs, generate a synthetic demo database with contrasting high- and low-risk runs; add `--json` when automation needs schema-versioned creation status:
+
+```bash
+codex-observe demo --serve --host 127.0.0.1 --port 8501
+```
+Then open <http://127.0.0.1:8501>.
+
+To scan your own Codex sessions and open the dashboard:
+
+```bash
+codex-observe scan-and-serve ~/.codex/sessions
+```
+
+## Public Tour
+
+A new user can evaluate the product without private logs. `codex-observe tour` prints this path from the terminal with evidence to look for at each step, and `codex-observe tour --json` emits the same synthetic-data path plus `codex-observe.tour.v1` schema metadata for automation:
+
+1. Run `codex-observe demo --serve --host 127.0.0.1 --port 8501` to create a synthetic database and open the dashboard; use `codex-observe demo --json` for machine-readable demo creation status.
+2. Inspect the Overview triage card, diagnostics, and cost-share metrics, Agent detail, Timeline & jumps, Tools, Duplication, and Raw tables tabs to see how Codex Observe explains cost and context growth.
+3. Run `codex-observe doctor --db .artifacts/demo/codex_observe_demo.sqlite --json` to verify aggregate database health and `schema_version` before consuming automation output.
+4. Run `codex-observe sessions --db .artifacts/demo/codex_observe_demo.sqlite --json` to list reportable runs with aggregate triage risk, `schema_version`, `status`, a structured `recommended_session`, `recommendation_detail`, and structured `next_commands` without printing prompts or tool output; the demo includes a newer low-risk follow-up so the highest-risk recommendation is visible.
+5. Run `codex-observe report --db .artifacts/demo/codex_observe_demo.sqlite --out .artifacts/demo/run-report.md`, then `codex-observe report --db .artifacts/demo/codex_observe_demo.sqlite --format json --out .artifacts/demo/run-report.json`, to export aggregate-only evidence with a quick-read headline, ranked opportunity stack, recommended next habit, next-run success target, and structured next-action target.
+6. Run `codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --out .artifacts/demo/run-comparison.md`, then `codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --format json --out .artifacts/demo/run-comparison.json`, to compare workflow changes with a verdict, largest-change summary, opportunity-change summary, percent-delta table, diagnostic-change summary, structured recommendation target, and triage-risk movement without exposing raw content.
+7. Run `python scripts/visual_qa.py` to regenerate desktop and narrow synthetic screenshots plus `.artifacts/visual/visual-qa-manifest.json`; use `python scripts/visual_qa.py --verify-manifest .artifacts/visual/visual-qa-manifest.json` to validate saved manifest evidence, sidebar risk labels, expected high-risk default metric card values, the dashboard success target, and referenced screenshot files without launching the dashboard.
+8. Run `codex-observe evidence-bundle --out .artifacts/public-evidence` when a reviewer needs one local synthetic bundle containing a reviewer README, `LIMITATIONS.md`, the demo database, aggregate report Markdown/JSON, aggregate comparison Markdown/JSON, audit JSON, visual screenshots, and a schema-versioned `codex-observe.evidence-bundle.v1` manifest.
+9. Use [docs/PUBLIC_TOUR_FEEDBACK.md](docs/PUBLIC_TOUR_FEEDBACK.md) and `.github/ISSUE_TEMPLATE/public_tour_feedback.yml` to file privacy-safe feedback from the public tour or reviewer evidence bundle without private logs, raw prompts, tool output, local paths, or unreviewed screenshots.
+
+The visual evidence and public evidence bundle are intentionally generated into ignored `.artifacts/` paths. Reference the manifest and screenshot filenames in reviews; do not commit private logs, private SQLite databases, or unreviewed local artifacts.
+
 ## Install locally
+
+Supported distribution is currently a source checkout with editable install. Python 3.10, 3.11, and 3.12 are supported; PyPI publishing, binary installers, hosted mode, and telemetry are not enabled without explicit approval. See [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md) and [docs/LIMITATIONS.md](docs/LIMITATIONS.md).
 
 ```bash
 cd codex-observe
 python -m pip install -e .
+```
+
+Verify the installed command:
+
+```bash
+codex-observe --version
 ```
 
 ## Run
@@ -29,11 +79,52 @@ The default database is stored at:
 ~/.codex-observe/codex_observe.sqlite
 ```
 
+
+After ingestion, the CLI prints an aggregate summary that distinguishes imported files, duplicates, empty files, malformed files, files missing `session_meta`, unreadable files, malformed lines skipped, threads, and events. Use `codex-observe ingest ~/.codex/sessions --json` for a `codex-observe.ingest.v1` aggregate-only payload with counts, skipped categories, privacy metadata, and structured `next_commands`. A partial ingest can still be useful; run `codex-observe doctor --db <db>` next to confirm the resulting database is valid. Doctor recovery hints are copy-pasteable and preserve the same `--db` path for missing, empty, invalid, or unreadable databases. A healthy populated database points to `codex-observe sessions --db <db>` for report selection and `codex-observe serve --db <db>` for dashboard inspection.
+
 To serve an existing database without scanning first:
 
 ```bash
 codex-observe serve --db ~/.codex-observe/codex_observe.sqlite
 ```
+
+To check a database without opening the dashboard or printing private log content:
+
+```bash
+codex-observe doctor --db ~/.codex-observe/codex_observe.sqlite
+```
+
+To list reportable conversation IDs and aggregate triage risk without printing private log content:
+
+```bash
+codex-observe sessions --db ~/.codex-observe/codex_observe.sqlite
+```
+
+If the database has conversations, codex-observe sessions shows each run's aggregate risk and prints the next report command for the highest-risk session, using latest run as the tie-breaker. With `--json`, the payload includes `schema_version`, `status`, a structured `recommended_session`, `recommendation_detail`, and structured `next_commands` for automation; missing databases also return a machine-readable JSON recovery payload with the same exit code. If the database is valid but empty, it prints the next ingest or demo command instead of a blank table.
+
+To export a shareable aggregate-only run report for the recommended highest-risk conversation:
+
+```bash
+codex-observe report --db ~/.codex-observe/codex_observe.sqlite --out run-report.md
+```
+
+Use `--format json` for automation or `--session-id <id>` to report a specific conversation. Report JSON includes `schema_version`, `success_target`, and `next_action_detail` so automation can verify the aggregate artifact contract, measure the next-run target, and consume the top next-run action before reading display text; if report generation fails in `--format json` mode, the CLI returns a `codex-observe.report-failure.v1` payload with `status`, `error`, and recovery `next_commands`. If a session id is stale or mistyped, `codex-observe report` points back to `codex-observe sessions --db <db>` so you can list available aggregate-only session IDs. When `--out` is used, the CLI prints a privacy-safe triage and top-opportunity confirmation after writing the file. Reports include a quick-read headline, aggregate triage assessment, a next-run success target, summary totals, cost profile percentages, a ranked opportunity stack, diagnostics, and an impact-targeted next-run playbook; they exclude message text, prompt previews, event payload JSON, tool arguments, tool commands, and tool output.
+
+To compare whether a workflow change reduced waste, export two JSON reports and compare them:
+
+```bash
+codex-observe report --db ~/.codex-observe/codex_observe.sqlite --session-id before-run --format json --out before.json
+codex-observe report --db ~/.codex-observe/codex_observe.sqlite --session-id after-run --format json --out after.json
+codex-observe compare --before-report before.json --after-report after.json --out run-comparison.md
+```
+
+You can also compare two sessions directly from one database:
+
+```bash
+codex-observe compare --db ~/.codex-observe/codex_observe.sqlite --before-session before-run --after-session after-run --format json
+```
+
+When `--out` is used, the CLI prints a privacy-safe comparison confirmation with verdict, triage-risk movement, opportunity-change summary, and next step. Comparisons are aggregate-only and highlight before/after values, absolute and percentage deltas for total tokens, uncached input, largest-thread tokens, repeated-prompt tokens, largest-tool-output chars, tool calls, compactions, opportunity-change movement, diagnostic changes, triage-risk movement, a human recommended next step, and a structured recommendation target that preserves diagnostic priority when choosing persisted issues to target next. Comparison JSON also includes `schema_version` for automation-safe contract checks; if comparison setup fails in `--format json` mode, the CLI returns a `codex-observe.comparison-failure.v1` payload with `status`, `input_mode`, `error`, and recovery `next_commands`. `codex-observe compare --before-report/--after-report` rejects missing or unsupported report `schema_version` values; regenerate stale inputs with `codex-observe report --format json`.
 
 `serve` and `scan-and-serve` accept `--host` and `--port`. These are passed to Streamlit before the dashboard app arguments:
 
@@ -42,13 +133,17 @@ codex-observe serve --db ./codex_observe.sqlite --host 127.0.0.1 --port 9999
 codex-observe scan-and-serve ~/.codex/sessions --db ./codex_observe.sqlite --host 127.0.0.1 --port 9999
 ```
 
+## Data privacy
+
+Codex Observe runs against local Codex session logs and local SQLite databases. It does not intentionally send session content to external services. `codex-observe doctor` reports aggregate table/token counts only and supports `--json` with `schema_version` and structured `next_commands` for automation; it does not print message text, tool output, payload JSON, or prompt blocks. Treat screenshots, copied table rows, and issue text as potentially sensitive because they may include prompts, file paths, command output, or tool results. See [docs/RELEASE.md](docs/RELEASE.md) for release and privacy checks.
+
 ## Supported log shapes
 
 The parser is defensive because Codex JSONL payloads are not guaranteed stable. The currently supported shapes are:
 
 - `session_meta` rows with thread/session metadata, including root sessions and spawned subagent threads.
 - Message payloads with `type=message` plus `role` and `content`, and legacy `user_message` / `agent_message` payloads.
-- `token_count` payloads with `total_token_usage`, `last_token_usage`, and `model_context_window`.
+- `token_count` payloads with Codex `total_token_usage` or OpenAI-style `usage`, including nested cached/reasoning token details, `last_token_usage`, and `model_context_window`.
 - Tool calls: `function_call`, `custom_tool_call`, and `tool_search_call`.
 - Tool outputs: `function_call_output`, `custom_tool_call_output`, `tool_search_output`, and `patch_apply_end`.
 - Compaction markers from top-level `compacted` events and `context_compacted` payloads.
@@ -77,15 +172,75 @@ Re-importing the same file path refreshes the event-derived rows for that thread
 - tool distribution and largest tool outputs
 - guardian overhead
 - prompt duplication breakdown
+- impact-targeted next-run playbook with concrete workflow habits
+- privacy-safe Markdown or JSON report export with a quick-read headline
 - raw tables for inspection
+
+
+## Redacted fixtures
+
+Parser gaps found in real local logs should be reduced to redacted fixture candidates before they are used in issues or tests:
+
+```bash
+python scripts/redact_fixtures.py ~/.codex/sessions --out .artifacts/redacted-fixtures --limit 5
+```
+
+The script writes redacted JSONL files plus `manifest.json`. It preserves event types, timestamps, token fields, tool categories, unknown payload shape, and thread/call relationships while redacting message text, prompt text, tool arguments, tool commands, tool output, local paths, raw IDs, manifest source/output paths, and source-derived candidate filenames. The manifest includes `schema_version` and an automated `privacy_review` that scans generated JSONL rows and manifest metadata; use `--json` for machine-readable generation status and privacy-safe validation failures with error codes. You can re-run it with `python scripts/redact_fixtures.py .artifacts/redacted-fixtures --verify-only`. Review every generated file and manifest before committing any fixture; the script validates the selected input path before touching output and refuses to overwrite arbitrary existing directories. Follow [docs/REAL_LOG_FEEDBACK.md](docs/REAL_LOG_FEEDBACK.md) for the full human review loop.
+
+## Visual QA
+
+For UI-facing changes, run the dashboard against a representative database and capture desktop plus narrow screenshots:
+
+```bash
+codex-observe demo
+python scripts/visual_qa.py
+```
+
+The script clicks every main dashboard tab, exercises the Agent detail selector, writes screenshots plus a schema-versioned, path-safe `.artifacts/visual/visual-qa-manifest.json`, validates manifest evidence covers desktop/narrow viewports and records validated manifest evidence for desktop/narrow viewports, tabs, screenshots, selector exercise, sidebar risk labels, expected high-risk default metric cards, dashboard success target, and layout review, and fails if expected tab content, obvious Streamlit exception checks, layout overflow/clipping checks, or screenshot quality checks fail. It requires Playwright, Pillow, and a Chromium browser runtime locally; if missing, install the visual extra and browser runtime with:
+
+```bash
+python -m pip install -e ".[visual]"
+python -m playwright install chromium
+```
+
+## Project workflow
+
+Contributors should follow [CONTRIBUTING.md](CONTRIBUTING.md) for setup, privacy rules, verification commands, and release evidence.
+Completed and retired local slice records are tracked in [docs/BACKLOG.md](docs/BACKLOG.md), implemented next-wave closeout is tracked in [docs/NEXT_WAVE.md](docs/NEXT_WAVE.md), and the completed `009` public evidence bundle slice is implemented locally as `codex-observe evidence-bundle`. Fresh work should be promoted into new GitHub issues only after explicit approval and once it is more than a human-input reminder; public-tour observations should use the privacy-safe feedback template and `docs/PUBLIC_TOUR_FEEDBACK.md` before becoming implementation work. PRs should use the repository template to link the relevant issue when one exists, list verification commands, record visual QA evidence, record public evidence bundle artifacts when generated, and confirm `docs/LIMITATIONS.md` remains current.
+
+## CI quality gate
+
+Pull requests run the clean-install smoke gate, Ruff lint, Ruff format checks, the regression suite, the aggregate release audit, synthetic demo generation, demo JSON contract check, aggregate ingest JSON contract check, aggregate-only session listing, database doctor, aggregate report export, aggregate report comparison, evidence-bundle contract check, and visual QA. CI uploads the aggregate run report, comparison report, desktop/narrow dashboard screenshots, visual QA manifest with metric card evidence and success-target evidence, and the reviewer public evidence bundle as workflow artifacts.
 
 ## Validate locally
 
-Run the regression suite:
+Generate a reviewer-facing synthetic evidence bundle when you need one local directory with a reviewer README, `LIMITATIONS.md`, report, comparison, audit, and visual QA artifacts:
 
 ```bash
+codex-observe evidence-bundle --out .artifacts/public-evidence
+```
+
+Run the final aggregate-only release audit after visual evidence has been generated and verified:
+
+```bash
+codex-observe audit
+```
+
+The audit generates synthetic demo data, runs database/session/report checks, verifies schema-versioned demo creation JSON, synthetic ingest JSON, public tour JSON, generated public evidence bundle artifacts including `LIMITATIONS.md`, CI reviewer evidence-bundle generation/upload, issue template evidence/privacy requirements, release metadata files, redaction validation privacy, saved visual QA manifest schema/contract evidence for referenced screenshots, layout review, sidebar risk labels, high-risk metric cards, and dashboard success target, aggregate report cost-profile, success-target, triage, structured next-action, and `schema_version` evidence, aggregate comparison quick-read, triage-risk, opportunity-change, percent-delta, command-help product concepts, and `schema_version` evidence, and planning backlog closeout, writes `.artifacts/demo/run-report.md`, `.artifacts/demo/run-report.json`, `.artifacts/demo/run-comparison.md`, and `.artifacts/demo/run-comparison.json`, includes `schema_version`, machine-readable `required_commands`, and `failed_checks` lists in `--json` output, and prints the same required command list plus a `Failed checks` section in plain-text output when a gate fails. It does not run Ruff, `pytest`, clean-install smoke, or browser visual QA; run those first before the final audit.
+
+Run the clean-install smoke gate to prove a fresh source checkout can install, create synthetic demo data, generate the reviewer evidence bundle README/manifest plus bundled limitations doc, audit that generated bundle, and import optional dev dependencies:
+
+```bash
+python scripts/clean_install_smoke.py --extra dev
+```
+
+Run lint, formatting, and the regression suite:
+
+```bash
+ruff check
+ruff format --check
 pytest -q
 ```
 
-For UI-facing dashboard changes, browser-verify Streamlit against a database that contains at least one conversation, multiple threads, usage snapshots, tool calls, and prompt blocks. Click through these tabs at desktop and narrow/mobile widths and confirm there is no visible Streamlit exception: Overview, Agent detail, Timeline & jumps, Tools, Duplication, and Raw tables. Exercise the Agent detail thread selector during the check. Record the local URL, tested database source, viewport sizes, and screenshot filenames or equivalent visual evidence in the PR or issue.
+For UI-facing dashboard changes, browser-verify Streamlit against a database that contains at least one conversation, multiple threads, usage snapshots, tool calls, and prompt blocks. `codex-observe demo` creates a synthetic database with those shapes. Click through these tabs at desktop and narrow/mobile widths and confirm there is no visible Streamlit exception: Overview, Agent detail, Timeline & jumps, Tools, Duplication, and Raw tables. Exercise the Agent detail thread selector during the check. Record the local URL, tested database source, viewport sizes, screenshot filenames, and `.artifacts/visual/visual-qa-manifest.json` in the PR or issue.
 

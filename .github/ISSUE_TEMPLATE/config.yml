@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Project quality bar and backlog
+    url: https://github.com/LangFelixAT/codex-observe/blob/main/docs/AMAZING.md
+    about: Read the current product bar and implementation backlog before opening new work.

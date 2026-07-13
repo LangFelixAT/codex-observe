@@ -2,27 +2,231 @@ from __future__ import annotations
 
 import pandas as pd
 
-from codex_observe.dashboard import build_tree, prepare_threads, role_label, thread_kind
+from codex_observe.analysis import (
+    build_tree,
+    diagnostics_cards_html,
+    diagnostics_df,
+    next_run_playbook_df,
+    opportunity_df,
+    opportunity_html,
+    playbook_html,
+    prepare_threads,
+    role_label,
+    thread_kind,
+)
+from codex_observe.dashboard import (
+    conversation_button_label,
+    dashboard_css,
+    risk_marker,
+    order_conversations_for_review,
+    metric_with_share,
+    pct_of_total,
+    triage_card_html,
+    success_target_html,
+)
+
+
+def test_order_conversations_for_review_uses_risk_aware_session_summaries() -> None:
+    conversations = pd.DataFrame(
+        [
+            {
+                "session_id": "newer-low",
+                "last_seen": "2026-01-01T12:35:00Z",
+                "preview": "newer low-risk follow-up",
+            },
+            {
+                "session_id": "older-high",
+                "last_seen": "2026-01-01T12:23:00Z",
+                "preview": "older high-risk run",
+            },
+        ]
+    )
+    summaries = [
+        {"session_id": "older-high", "triage_risk": "high"},
+        {"session_id": "newer-low", "triage_risk": "low"},
+    ]
+
+    ordered = order_conversations_for_review(conversations, summaries)
+
+    assert ordered["session_id"].tolist() == ["older-high", "newer-low"]
+    assert ordered["triage_risk"].tolist() == ["high", "low"]
+    assert "_review_order" not in ordered.columns
+
+
+def test_conversation_button_label_includes_risk_and_selection_marker() -> None:
+    row = pd.Series(
+        {
+            "session_id": "session-high",
+            "preview": "Investigate a costly run with repeated context",
+            "triage_risk": "high",
+        }
+    )
+
+    assert conversation_button_label(row, selected=True) == (
+        "> !! High risk | Investigate a costly run with repeated context"
+    )
+    assert conversation_button_label(row, selected=False) == (
+        "!! High risk | Investigate a costly run with repeated context"
+    )
+
+
+def test_conversation_button_label_falls_back_to_session_id_and_unknown_risk() -> None:
+    row = pd.Series({"session_id": "session-unknown", "preview": ""})
+
+    assert conversation_button_label(row, selected=False) == (
+        "?? Unknown risk | session-unknown"
+    )
+
+
+def test_risk_marker_makes_sidebar_risk_scannable() -> None:
+    assert risk_marker("high") == "!!"
+    assert risk_marker("moderate") == "!"
+    assert risk_marker("low") == "OK"
+    assert risk_marker("unknown") == "??"
+    assert risk_marker("") == "??"
 
 
 def test_thread_kind_classifies_root_worker_explorer_guardian_and_unknown() -> None:
-    assert thread_kind({"agent_role": "", "source_kind": "", "parent_thread_id": "", "agent_nickname": "", "thread_source": "root"}) == "root"
-    assert thread_kind({"agent_role": "guardian", "source_kind": "", "parent_thread_id": "parent", "agent_nickname": "", "thread_source": "subagent"}) == "guardian"
-    assert thread_kind({"agent_role": "", "source_kind": "guardian", "parent_thread_id": "parent", "agent_nickname": "", "thread_source": "subagent"}) == "guardian"
-    assert thread_kind({"agent_role": "explorer", "source_kind": "", "parent_thread_id": "parent", "agent_nickname": "Scout", "thread_source": "subagent"}) == "explorer"
-    assert thread_kind({"agent_role": "", "source_kind": "thread_spawn", "parent_thread_id": "parent", "agent_nickname": "Builder", "thread_source": "subagent"}) == "worker"
-    assert thread_kind({"agent_role": "", "source_kind": "", "parent_thread_id": "parent", "agent_nickname": "", "thread_source": "manual"}) == "unknown"
+    assert (
+        thread_kind(
+            {
+                "agent_role": "",
+                "source_kind": "",
+                "parent_thread_id": "",
+                "agent_nickname": "",
+                "thread_source": "root",
+            }
+        )
+        == "root"
+    )
+    assert (
+        thread_kind(
+            {
+                "agent_role": "guardian",
+                "source_kind": "",
+                "parent_thread_id": "parent",
+                "agent_nickname": "",
+                "thread_source": "subagent",
+            }
+        )
+        == "guardian"
+    )
+    assert (
+        thread_kind(
+            {
+                "agent_role": "",
+                "source_kind": "guardian",
+                "parent_thread_id": "parent",
+                "agent_nickname": "",
+                "thread_source": "subagent",
+            }
+        )
+        == "guardian"
+    )
+    assert (
+        thread_kind(
+            {
+                "agent_role": "explorer",
+                "source_kind": "",
+                "parent_thread_id": "parent",
+                "agent_nickname": "Scout",
+                "thread_source": "subagent",
+            }
+        )
+        == "explorer"
+    )
+    assert (
+        thread_kind(
+            {
+                "agent_role": "",
+                "source_kind": "thread_spawn",
+                "parent_thread_id": "parent",
+                "agent_nickname": "Builder",
+                "thread_source": "subagent",
+            }
+        )
+        == "worker"
+    )
+    assert (
+        thread_kind(
+            {
+                "agent_role": "",
+                "source_kind": "",
+                "parent_thread_id": "parent",
+                "agent_nickname": "",
+                "thread_source": "manual",
+            }
+        )
+        == "unknown"
+    )
 
 
 def test_role_label_uses_deterministic_names_and_nicknames() -> None:
-    assert role_label({"parent_thread_id": "", "agent_role": "", "source_kind": "", "agent_nickname": "", "thread_source": "root"}) == "Root"
-    assert role_label({"parent_thread_id": "parent", "agent_role": "guardian", "source_kind": "", "agent_nickname": "", "thread_source": "subagent"}) == "Guardian"
-    assert role_label({"parent_thread_id": "parent", "agent_role": "explorer", "source_kind": "", "agent_nickname": "Scout", "thread_source": "subagent"}) == "Explorer (Scout)"
-    assert role_label({"parent_thread_id": "parent", "agent_role": "", "source_kind": "thread_spawn", "agent_nickname": "Builder", "thread_source": "subagent"}) == "Worker (Builder)"
-    assert role_label({"parent_thread_id": "parent", "agent_role": "", "source_kind": "", "agent_nickname": "", "thread_source": "manual"}) == "Unknown"
+    assert (
+        role_label(
+            {
+                "parent_thread_id": "",
+                "agent_role": "",
+                "source_kind": "",
+                "agent_nickname": "",
+                "thread_source": "root",
+            }
+        )
+        == "Root"
+    )
+    assert (
+        role_label(
+            {
+                "parent_thread_id": "parent",
+                "agent_role": "guardian",
+                "source_kind": "",
+                "agent_nickname": "",
+                "thread_source": "subagent",
+            }
+        )
+        == "Guardian"
+    )
+    assert (
+        role_label(
+            {
+                "parent_thread_id": "parent",
+                "agent_role": "explorer",
+                "source_kind": "",
+                "agent_nickname": "Scout",
+                "thread_source": "subagent",
+            }
+        )
+        == "Explorer (Scout)"
+    )
+    assert (
+        role_label(
+            {
+                "parent_thread_id": "parent",
+                "agent_role": "",
+                "source_kind": "thread_spawn",
+                "agent_nickname": "Builder",
+                "thread_source": "subagent",
+            }
+        )
+        == "Worker (Builder)"
+    )
+    assert (
+        role_label(
+            {
+                "parent_thread_id": "parent",
+                "agent_role": "",
+                "source_kind": "",
+                "agent_nickname": "",
+                "thread_source": "manual",
+            }
+        )
+        == "Unknown"
+    )
 
 
-def test_prepare_threads_coerces_numbers_and_calculates_metrics_with_zero_denominators() -> None:
+def test_prepare_threads_coerces_numbers_and_calculates_metrics_with_zero_denominators() -> (
+    None
+):
     threads = pd.DataFrame(
         [
             {
@@ -135,7 +339,375 @@ def test_build_tree_renders_root_with_child_thread() -> None:
 
     assert tree == (
         "Conversation session-1\n"
-        "\u2514\u2500\u2500 Root [abcdef01] input=100, uncached=80, tools=1\n"
-        "    \u2514\u2500\u2500 Worker (Builder) [12345678] input=5.0k, uncached=4.0k, tools=2"
+        "+-- Root [abcdef01] input=100, uncached=80, tools=1\n"
+        "    +-- Worker (Builder) [12345678] input=5.0k, uncached=4.0k, tools=2"
     )
 
+
+def test_dashboard_css_contains_polish_hooks_without_viewport_scaled_type() -> None:
+    css = dashboard_css()
+
+    assert ".co-hero" in css
+    assert ".co-empty" in css
+    assert ".co-metric-grid" in css
+    assert ".co-metric-card" in css
+    assert ".co-metric-label" in css
+    assert ".co-metric-value" in css
+    assert "repeat(auto-fit, minmax(150px, 1fr))" in css
+    assert ".co-diagnostics" in css
+    assert ".co-diagnostic-action" in css
+    assert ".co-playbook" in css
+    assert ".co-playbook-impact" in css
+    assert ".co-opportunities" in css
+    assert ".co-opportunity-scale" in css
+    assert ".co-triage" in css
+    assert ".co-triage-risk" in css
+    assert '[data-testid="stMetric"]' in css
+    assert '[data-testid="stSidebar"] button' in css
+    assert "white-space: normal;" in css
+    assert "letter-spacing: 0;" in css
+    assert "vw" not in css
+
+
+def test_triage_card_html_escapes_content_and_renders_reasons() -> None:
+    rendered = triage_card_html(
+        {
+            "risk_level": "high",
+            "primary_driver": "Largest <thread>",
+            "next_action": "Set stop & summarize",
+            "reasons": ["Prompt replay > 15%", "Tool output <large>"],
+        }
+    )
+
+    assert 'class="co-triage"' in rendered
+    assert 'class="co-triage-risk"' in rendered
+    assert "Run triage" in rendered
+    assert "Largest &lt;thread&gt;" in rendered
+    assert "Set stop &amp; summarize" in rendered
+    assert "Tool output &lt;large&gt;" in rendered
+    assert "Largest <thread>" not in rendered
+
+
+def test_success_target_html_escapes_and_renders_target_card() -> None:
+    rendered = success_target_html(
+        {
+            "metric": "largest_thread_share_pct",
+            "current": "57.7%",
+            "target": "below <50%",
+            "rationale": "Split & stop earlier",
+            "verification": "Compare <next> report JSON",
+        }
+    )
+
+    assert 'class="co-success-target"' in rendered
+    assert "Next run success target" in rendered
+    assert "largest_thread_share_pct" in rendered
+    assert "below &lt;50%" in rendered
+    assert "Split &amp; stop earlier" in rendered
+    assert "Compare &lt;next&gt; report JSON" in rendered
+    assert "below <50%" not in rendered
+
+
+def test_dashboard_metric_share_helpers_format_actionable_percentages() -> None:
+    assert pct_of_total(33200, 57510) == 57.7
+    assert pct_of_total(0, 0) == 0.0
+    assert pct_of_total("not-a-number", 100) == 0.0
+    assert metric_with_share(33200, 57510) == "33.2k tokens (57.7%)"
+    assert metric_with_share(4000, 57510, unit="chars") == "4.0k chars (7.0%)"
+
+
+def test_opportunity_df_ranks_aggregate_cost_drivers() -> None:
+    opportunities = opportunity_df(
+        {
+            "total_tokens": 57_510,
+            "largest_thread_tokens": 33_200,
+            "repeated_prompt_tokens": 10_000,
+            "uncached_input_tokens": 22_700,
+            "largest_tool_output_chars": 4_000,
+            "compactions": 1,
+        }
+    )
+
+    assert opportunities["Driver"].tolist()[:3] == [
+        "Largest thread",
+        "Uncached input",
+        "Repeated prompt blocks",
+    ]
+    assert opportunities.iloc[0].to_dict() == {
+        "Rank": 1,
+        "Habit": "Set a stop condition for the dominant thread",
+        "Driver": "Largest thread",
+        "Scale": "33.2k tokens (57.7% of run)",
+        "Why": "This is the biggest aggregate token pool to shorten or split first.",
+    }
+
+
+def test_opportunity_html_escapes_card_content() -> None:
+    rendered = opportunity_html(
+        pd.DataFrame(
+            [
+                {
+                    "Rank": 1,
+                    "Habit": "Stop <thread>",
+                    "Driver": "Largest & risky",
+                    "Scale": "10k tokens",
+                    "Why": "Use <shorter> checkpoints",
+                }
+            ]
+        )
+    )
+
+    assert 'class="co-opportunities"' in rendered
+    assert 'class="co-opportunity-scale"' in rendered
+    assert "Stop &lt;thread&gt;" in rendered
+    assert "Largest &amp; risky" in rendered
+    assert "Use &lt;shorter&gt; checkpoints" in rendered
+    assert "Stop <thread>" not in rendered
+
+
+def test_diagnostics_df_prioritizes_actionable_cost_signals() -> None:
+    threads = prepare_threads(
+        pd.DataFrame(
+            [
+                {
+                    "thread_id": "root-thread",
+                    "parent_thread_id": "",
+                    "agent_role": "",
+                    "source_kind": "",
+                    "agent_nickname": "",
+                    "thread_source": "root",
+                    "created_at": "2026-01-01T00:00:00Z",
+                    "first_seen": "2026-01-01T00:00:00Z",
+                    "last_seen": "2026-01-01T00:10:00Z",
+                    "event_count": 8,
+                    "turn_count": 2,
+                    "tool_call_count": 1,
+                    "final_input_tokens": 12000,
+                    "final_cached_input_tokens": 2000,
+                    "final_uncached_input_tokens": 10000,
+                    "final_output_tokens": 500,
+                    "final_reasoning_tokens": 250,
+                    "final_total_tokens": 12750,
+                    "base_instruction_chars": 0,
+                },
+                {
+                    "thread_id": "guardian-thread",
+                    "parent_thread_id": "root-thread",
+                    "agent_role": "guardian",
+                    "source_kind": "guardian",
+                    "agent_nickname": "",
+                    "thread_source": "subagent",
+                    "created_at": "2026-01-01T00:03:00Z",
+                    "first_seen": "2026-01-01T00:03:00Z",
+                    "last_seen": "2026-01-01T00:04:00Z",
+                    "event_count": 3,
+                    "turn_count": 1,
+                    "tool_call_count": 0,
+                    "final_input_tokens": 2000,
+                    "final_cached_input_tokens": 1000,
+                    "final_uncached_input_tokens": 1000,
+                    "final_output_tokens": 40,
+                    "final_reasoning_tokens": 10,
+                    "final_total_tokens": 2050,
+                    "base_instruction_chars": 0,
+                },
+            ]
+        )
+    )
+    usage = pd.DataFrame(
+        [
+            {
+                "thread_id": "root-thread",
+                "idx": 1,
+                "timestamp": "2026-01-01T00:01:00Z",
+                "input_tokens": 100,
+                "cached_input_tokens": 0,
+                "uncached_input_tokens": 100,
+                "output_tokens": 10,
+                "reasoning_tokens": 0,
+                "total_tokens": 110,
+            },
+            {
+                "thread_id": "root-thread",
+                "idx": 2,
+                "timestamp": "2026-01-01T00:02:00Z",
+                "input_tokens": 12100,
+                "cached_input_tokens": 2000,
+                "uncached_input_tokens": 10100,
+                "output_tokens": 100,
+                "reasoning_tokens": 20,
+                "total_tokens": 12220,
+            },
+        ]
+    )
+    events = pd.DataFrame(
+        [
+            {
+                "thread_id": "root-thread",
+                "idx": 2,
+                "timestamp": "2026-01-01T00:02:30Z",
+                "type": "compacted",
+                "payload_type": "",
+            },
+        ]
+    )
+    tools = pd.DataFrame(
+        [
+            {
+                "thread_id": "root-thread",
+                "tool_name": "shell_command",
+                "command": "Get-ChildItem -Recurse",
+                "output_chars": 25000,
+            },
+        ]
+    )
+    duplicated = pd.DataFrame(
+        [
+            {"label": "AGENTS.md", "seen": 3, "approx_tokens_replayed": 15000},
+        ]
+    )
+
+    diagnostics = diagnostics_df(threads, usage, events, tools, duplicated)
+
+    assert diagnostics["Diagnostic"].tolist() == [
+        "Largest thread drives the run",
+        "Largest context jump",
+        "Largest tool output",
+        "Repeated prompt blocks",
+        "Context compaction occurred",
+        "Guardian overhead",
+    ]
+    assert diagnostics.iloc[0]["Priority"] == "High"
+    assert "Inspect this thread first" in diagnostics.iloc[0]["Action"]
+    assert (
+        "+12.0k input tokens"
+        in diagnostics.loc[
+            diagnostics["Diagnostic"] == "Largest context jump", "Evidence"
+        ].iloc[0]
+    )
+    assert (
+        "25.0k chars"
+        in diagnostics.loc[
+            diagnostics["Diagnostic"] == "Largest tool output", "Evidence"
+        ].iloc[0]
+    )
+    assert (
+        "15.0k approximate replayed tokens"
+        in diagnostics.loc[
+            diagnostics["Diagnostic"] == "Repeated prompt blocks", "Evidence"
+        ].iloc[0]
+    )
+
+
+def test_diagnostics_df_returns_schema_for_empty_threads() -> None:
+    diagnostics = diagnostics_df(
+        pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+    )
+
+    assert diagnostics.empty
+    assert diagnostics.columns.tolist() == [
+        "Priority",
+        "Diagnostic",
+        "Action",
+        "Evidence",
+    ]
+
+
+def test_diagnostics_cards_html_escapes_content_and_renders_cards() -> None:
+    diagnostics = pd.DataFrame(
+        [
+            {
+                "Priority": "High",
+                "Diagnostic": "Largest <thread>",
+                "Action": "Inspect & reduce context",
+                "Evidence": "demo-root used > 50%",
+            }
+        ]
+    )
+
+    rendered = diagnostics_cards_html(diagnostics)
+
+    assert 'class="co-diagnostics"' in rendered
+    assert 'class="co-diagnostic"' in rendered
+    assert "Largest &lt;thread&gt;" in rendered
+    assert "Inspect &amp; reduce context" in rendered
+    assert "demo-root used &gt; 50%" in rendered
+    assert "Largest <thread>" not in rendered
+
+
+def test_diagnostics_cards_html_returns_empty_string_for_no_rows() -> None:
+    assert diagnostics_cards_html(pd.DataFrame()) == ""
+
+
+def test_next_run_playbook_df_turns_diagnostics_into_habits() -> None:
+    diagnostics = pd.DataFrame(
+        [
+            {
+                "Priority": "High",
+                "Diagnostic": "Largest context jump",
+                "Action": "Inspect timeline",
+                "Evidence": "Root +18.0k input tokens",
+            },
+            {
+                "Priority": "High",
+                "Diagnostic": "Largest tool output",
+                "Action": "Narrow command",
+                "Evidence": "shell_command produced 30.0k chars",
+            },
+            {
+                "Priority": "Medium",
+                "Diagnostic": "Largest context jump",
+                "Action": "Duplicate should be ignored",
+                "Evidence": "duplicate",
+            },
+        ]
+    )
+
+    playbook = next_run_playbook_df(diagnostics)
+
+    assert playbook.columns.tolist() == ["Step", "Habit", "Impact", "Why", "Source"]
+    assert playbook["Step"].tolist() == [1, 2]
+    assert playbook["Habit"].tolist() == [
+        "Gate large context before it enters the chat",
+        "Narrow bulky commands before sharing output",
+    ]
+    assert playbook["Impact"].tolist() == [
+        "Targets sudden input-token growth.",
+        "Targets bulky tool-output feedback loops.",
+    ]
+    assert "Root +18.0k input tokens" in playbook.iloc[0]["Source"]
+
+
+def test_next_run_playbook_df_returns_schema_for_empty_diagnostics() -> None:
+    playbook = next_run_playbook_df(pd.DataFrame())
+
+    assert playbook.empty
+    assert playbook.columns.tolist() == ["Step", "Habit", "Impact", "Why", "Source"]
+
+
+def test_playbook_html_escapes_content_and_renders_steps() -> None:
+    playbook = pd.DataFrame(
+        [
+            {
+                "Step": 1,
+                "Habit": "Gate <context>",
+                "Impact": "Targets <input> growth",
+                "Why": "Use summaries & filters",
+                "Source": "Largest jump > 10k",
+            }
+        ]
+    )
+
+    rendered = playbook_html(playbook)
+
+    assert 'class="co-playbook"' in rendered
+    assert 'class="co-playbook-step"' in rendered
+    assert "Gate &lt;context&gt;" in rendered
+    assert "Targets &lt;input&gt; growth" in rendered
+    assert "Use summaries &amp; filters" in rendered
+    assert "Largest jump &gt; 10k" in rendered
+    assert "Gate <context>" not in rendered
+
+
+def test_playbook_html_returns_empty_string_for_no_rows() -> None:
+    assert playbook_html(pd.DataFrame()) == ""

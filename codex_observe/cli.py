@@ -1,45 +1,2796 @@
 from __future__ import annotations
 
 import argparse
+import textwrap
+import json
+import re
+import shutil
+import sqlite3
 import subprocess
 import sys
 from pathlib import Path
 
+from . import __version__
+from .demo import DEFAULT_DEMO_DB, DEFAULT_DEMO_SESSIONS, create_demo_database
 from .parser import ingest
+from .report import (
+    COMPARISON_SCHEMA_VERSION,
+    REPORT_SCHEMA_VERSION,
+    build_report,
+    compare_reports,
+    comparison_json,
+    comparison_markdown,
+    load_report_json,
+    report_json,
+    report_markdown,
+    session_report_hint,
+    session_summaries,
+    session_summary_lines,
+)
+
+
+VISUAL_MANIFEST = Path(".artifacts/visual/visual-qa-manifest.json")
+VISUAL_MANIFEST_SCHEMA_VERSION = "codex-observe.visual-manifest.v1"
+VISUAL_MANIFEST_RECOVERY = (
+    "run `python scripts/visual_qa.py`, then "
+    f"`python scripts/visual_qa.py --verify-manifest {VISUAL_MANIFEST.as_posix()}`"
+)
+EXPECTED_VISUAL_RISK_LABELS = {"High risk", "Low risk"}
+EXPECTED_VISUAL_METRICS = {
+    "Threads": "3",
+    "Largest thread": "33.2k tokens (57.7%)",
+    "Uncached input": "22.7k tokens (39.5%)",
+}
+EXPECTED_VISUAL_SUCCESS_TARGET = {
+    "metric": "largest_thread_share_pct",
+    "current": "57.7%",
+    "target": "below 50.0%",
+}
+
+EXPECTED_VISUAL_TABS = [
+    "Overview",
+    "Agent detail",
+    "Timeline & jumps",
+    "Tools",
+    "Duplication",
+    "Raw tables",
+]
+EXPECTED_VISUAL_VIEWPORTS = {
+    "desktop": {"width": 1440, "height": 1000},
+    "narrow": {"width": 390, "height": 900},
+}
+EXPECTED_VISUAL_SCREENSHOTS = {
+    "desktop": "dashboard-desktop.png",
+    "narrow": "dashboard-narrow.png",
+}
+SESSIONS_SCHEMA_VERSION = "codex-observe.sessions.v1"
+DOCTOR_SCHEMA_VERSION = "codex-observe.doctor.v1"
+AUDIT_SCHEMA_VERSION = "codex-observe.audit.v1"
+REPORT_FAILURE_SCHEMA_VERSION = "codex-observe.report-failure.v1"
+COMPARISON_FAILURE_SCHEMA_VERSION = "codex-observe.comparison-failure.v1"
+TOUR_SCHEMA_VERSION = "codex-observe.tour.v1"
+DEMO_SCHEMA_VERSION = "codex-observe.demo.v1"
+INGEST_SCHEMA_VERSION = "codex-observe.ingest.v1"
+EVIDENCE_BUNDLE_SCHEMA_VERSION = "codex-observe.evidence-bundle.v1"
+RELEASE_REQUIRED_FILES = [
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "docs/RELEASE.md",
+    "docs/DISTRIBUTION.md",
+    "docs/LIMITATIONS.md",
+    "docs/PUBLIC_TOUR_FEEDBACK.md",
+    "docs/CURRENT.md",
+    ".github/workflows/ci.yml",
+]
+
+RELEASE_REQUIRED_COMMANDS = [
+    "ruff check",
+    "ruff format --check",
+    "pytest -q",
+    "python scripts/clean_install_smoke.py --extra dev",
+    "codex-observe demo --sessions .artifacts/demo/sessions --keep-sessions --json",
+    "codex-observe ingest .artifacts/demo/sessions --db .artifacts/demo/ingest-contract.sqlite --json",
+    "python scripts/visual_qa.py",
+    "python scripts/visual_qa.py --verify-manifest .artifacts/visual/visual-qa-manifest.json",
+    "codex-observe evidence-bundle --out .artifacts/public-evidence",
+    "codex-observe audit --json",
+]
+
+BACKLOG_DRAFT_DIR = Path(".github/backlog")
+RETIRED_BACKLOG_DRAFTS = {
+    ".github/backlog/001-first-run-demo.md",
+    ".github/backlog/002-diagnostics-summary.md",
+    ".github/backlog/003-visual-regression.md",
+    ".github/backlog/004-log-shape-resilience.md",
+    ".github/backlog/005-package-for-real-users.md",
+    ".github/backlog/006-release-candidate-ux-evidence.md",
+    ".github/backlog/007-real-log-parser-feedback-loop.md",
+    ".github/backlog/008-public-readme-tour.md",
+    ".github/backlog/009-public-evidence-bundle.md",
+}
+BACKLOG_FORBIDDEN_PATTERNS = [
+    r"sample_from_uploaded\.sqlite",
+    r"\.codex[\\/]+sessions",
+    r"synthetic output line",
+    r"Analyze why this Codex run",
+]
+DOCTOR_TABLES = [
+    "files",
+    "conversations",
+    "threads",
+    "events",
+    "usage_snapshots",
+    "tool_calls",
+    "messages",
+    "prompt_blocks",
+]
+
+
+def doctor_next_commands(db: Path, status: str) -> list[str]:
+    if status == "ok":
+        return [
+            f"codex-observe sessions --db {db}",
+            f"codex-observe serve --db {db}",
+        ]
+    if status == "empty":
+        return [
+            f"codex-observe ingest ~/.codex/sessions --db {db}",
+            f"codex-observe demo --db {db}",
+        ]
+    if status in {"missing", "invalid schema"}:
+        return [
+            f"codex-observe demo --db {db}",
+            f"codex-observe ingest ~/.codex/sessions --db {db}",
+        ]
+    if status == "unreadable":
+        return [f"codex-observe demo --db {db}"]
+    return []
+
+
+def doctor_report(db_path: str) -> tuple[int, dict]:
+    db = Path(db_path).expanduser()
+    report = {
+        "schema_version": DOCTOR_SCHEMA_VERSION,
+        "database": str(db),
+        "status": "ok",
+        "tables": {},
+        "totals": {
+            "total_tokens": 0,
+            "uncached_input_tokens": 0,
+            "cached_input_tokens": 0,
+        },
+        "missing_tables": [],
+        "next": "run `codex-observe serve --db <this-db>` to inspect the dashboard.",
+        "next_commands": [],
+    }
+    if not db.exists():
+        report.update(
+            {
+                "status": "missing",
+                "next_commands": doctor_next_commands(db, "missing"),
+                "next": (
+                    f"run `codex-observe demo --db {db}` for synthetic data or "
+                    f"`codex-observe ingest ~/.codex/sessions --db {db}` for your logs."
+                ),
+            }
+        )
+        return 2, report
+
+    try:
+        with sqlite3.connect(db) as conn:
+            conn.row_factory = sqlite3.Row
+            existing = {
+                row["name"]
+                for row in conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                )
+            }
+            missing = [table for table in DOCTOR_TABLES if table not in existing]
+            if missing:
+                report.update(
+                    {
+                        "status": "invalid schema",
+                        "missing_tables": missing,
+                        "next_commands": doctor_next_commands(db, "invalid schema"),
+                        "next": (
+                            "this file does not look like a Codex Observe database; "
+                            f"run `codex-observe demo --db {db}` for synthetic data "
+                            f"or `codex-observe ingest ~/.codex/sessions --db {db}` after moving this file aside."
+                        ),
+                    }
+                )
+                return 1, report
+
+            counts = {
+                table: int(conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0])
+                for table in DOCTOR_TABLES
+            }
+            totals = conn.execute(
+                """
+                SELECT
+                  COALESCE(SUM(total_tokens), 0) AS total_tokens,
+                  COALESCE(SUM(total_uncached_input_tokens), 0) AS uncached_input,
+                  COALESCE(SUM(total_cached_input_tokens), 0) AS cached_input
+                FROM conversations
+                """
+            ).fetchone()
+    except sqlite3.DatabaseError as exc:
+        report.update(
+            {
+                "status": "unreadable",
+                "error": str(exc),
+                "next_commands": doctor_next_commands(db, "unreadable"),
+                "next": (
+                    "check the database path or regenerate it with "
+                    f"`codex-observe demo --db {db}`."
+                ),
+            }
+        )
+        return 1, report
+
+    report["tables"] = counts
+    report["totals"] = {
+        "total_tokens": int(totals["total_tokens"]),
+        "uncached_input_tokens": int(totals["uncached_input"]),
+        "cached_input_tokens": int(totals["cached_input"]),
+    }
+    if counts["conversations"] == 0:
+        report["next"] = (
+            f"no conversations found; run `codex-observe ingest ~/.codex/sessions --db {db}` "
+            f"or `codex-observe demo --db {db}`."
+        )
+        report["next_commands"] = doctor_next_commands(db, "empty")
+    else:
+        report["next"] = (
+            f"run `codex-observe sessions --db {db}` to choose a reportable conversation, "
+            f"or `codex-observe serve --db {db}` to inspect the dashboard."
+        )
+        report["next_commands"] = doctor_next_commands(db, "ok")
+    return 0, report
+
+
+def doctor_lines(db_path: str) -> tuple[int, list[str]]:
+    status, report = doctor_report(db_path)
+    lines = [f"Database: {report['database']}", f"Status: {report['status']}"]
+    if report["status"] == "invalid schema":
+        lines.append("Missing tables: " + ", ".join(report["missing_tables"]))
+    if report["status"] == "unreadable" and report.get("error"):
+        lines.append(f"SQLite error: {report['error']}")
+    if report["status"] == "ok":
+        for table in DOCTOR_TABLES:
+            lines.append(f"{table}: {report['tables'][table]}")
+        lines.extend(
+            [
+                f"total_tokens: {report['totals']['total_tokens']}",
+                f"uncached_input_tokens: {report['totals']['uncached_input_tokens']}",
+                f"cached_input_tokens: {report['totals']['cached_input_tokens']}",
+            ]
+        )
+    lines.append(f"Next: {report['next']}")
+    return status, lines
+
+
+def pyproject_version(root: Path | None = None) -> str:
+    root = root or Path.cwd()
+    pyproject = root / "pyproject.toml"
+    if not pyproject.exists():
+        return ""
+    for line in pyproject.read_text(encoding="utf-8").splitlines():
+        if line.strip().startswith("version ="):
+            return line.split("=", 1)[1].strip().strip('"')
+    return ""
+
+
+def active_backlog_drafts(root: Path | None = None) -> list[Path]:
+    root = root or Path.cwd()
+    draft_dir = root / BACKLOG_DRAFT_DIR
+    if not draft_dir.exists():
+        return []
+    return [
+        path
+        for path in sorted(draft_dir.glob("*.md"))
+        if path.relative_to(root).as_posix() not in RETIRED_BACKLOG_DRAFTS
+    ]
+
+
+def backlog_draft_failures(root: Path | None = None) -> list[str]:
+    root = root or Path.cwd()
+    failures: list[str] = []
+    backlog_path = root / "docs/BACKLOG.md"
+    next_wave_path = root / "docs/NEXT_WAVE.md"
+    publisher_path = root / "scripts/backlog_publish_plan.py"
+
+    if not publisher_path.exists():
+        failures.append("missing scripts/backlog_publish_plan.py")
+    else:
+        publisher = publisher_path.read_text(encoding="utf-8")
+        for required in [
+            "LangFelixAT/codex-observe",
+            "--repo",
+            "--label",
+            "--json",
+            "BACKLOG_PUBLISH_SCHEMA_VERSION",
+            'plan_payload("failed", failures)',
+            '"failures"',
+            "requires explicit approval",
+        ]:
+            if required not in publisher:
+                failures.append(f"scripts/backlog_publish_plan.py missing {required}")
+
+    if backlog_path.exists():
+        backlog = backlog_path.read_text(encoding="utf-8")
+        if "python scripts/backlog_publish_plan.py" not in backlog:
+            failures.append("docs/BACKLOG.md does not require the dry-run publisher")
+        if "python scripts/backlog_publish_plan.py --json" not in backlog:
+            failures.append("docs/BACKLOG.md does not document publisher JSON output")
+        if "draft files were deleted" not in backlog:
+            failures.append("docs/BACKLOG.md does not record retired draft closeout")
+    else:
+        failures.append("missing docs/BACKLOG.md")
+
+    next_wave = (
+        next_wave_path.read_text(encoding="utf-8") if next_wave_path.exists() else ""
+    )
+    if not next_wave:
+        failures.append("missing docs/NEXT_WAVE.md")
+
+    for retired in sorted(RETIRED_BACKLOG_DRAFTS):
+        if (root / retired).exists():
+            failures.append(f"retired draft still exists: {retired}")
+
+    for path in active_backlog_drafts(root):
+        relative = path.relative_to(root).as_posix()
+        body = path.read_text(encoding="utf-8")
+        title = ""
+        for line in body.splitlines():
+            if line.startswith("# "):
+                title = line[2:].strip()
+                break
+        if relative not in next_wave or (title and title not in next_wave):
+            failures.append(
+                f"docs/NEXT_WAVE.md does not reference active draft {relative}"
+            )
+        for section in ["## What to build", "## Acceptance criteria", "## Blocked by"]:
+            if section not in body:
+                failures.append(f"{relative} missing {section}")
+        for pattern in BACKLOG_FORBIDDEN_PATTERNS:
+            if re.search(pattern, body):
+                failures.append(
+                    f"{relative} contains private or local-only pattern {pattern}"
+                )
+    return failures
+
+
+def dev_tooling_failures(root: Path | None = None) -> list[str]:
+    root = root or Path.cwd()
+    failures: list[str] = []
+    pyproject = root / "pyproject.toml"
+    ci = root / ".github/workflows/ci.yml"
+    contributing = root / "CONTRIBUTING.md"
+    release = root / "docs/RELEASE.md"
+    distribution = root / "docs/DISTRIBUTION.md"
+
+    pyproject_text = pyproject.read_text(encoding="utf-8") if pyproject.exists() else ""
+    for required in [
+        "dev = [",
+        '"pillow>=10"',
+        '"playwright"',
+        '"pytest"',
+        '"ruff"',
+        "visual = [",
+    ]:
+        if required not in pyproject_text:
+            failures.append(f"pyproject.toml missing {required}")
+
+    expected_by_file = {
+        ci: [
+            'python -m pip install -e ".[dev]"',
+            "ruff check",
+            "ruff format --check",
+            "pytest -q",
+            "python scripts/clean_install_smoke.py --extra dev",
+            "codex-observe audit --json",
+            "codex-observe demo --sessions .artifacts/demo/sessions --keep-sessions --json",
+            "codex-observe ingest .artifacts/demo/sessions --db .artifacts/demo/ingest-contract.sqlite --json",
+            "codex-observe report --db .artifacts/demo/codex_observe_demo.sqlite --out .artifacts/demo/run-report.md",
+            "codex-observe report --db .artifacts/demo/codex_observe_demo.sqlite --format json --out .artifacts/demo/run-report.json",
+            "codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --out .artifacts/demo/run-comparison.md",
+            "codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --format json --out .artifacts/demo/run-comparison.json",
+            "python scripts/visual_qa.py",
+            "python scripts/visual_qa.py --verify-manifest .artifacts/visual/visual-qa-manifest.json",
+            "aggregate-run-report",
+            "visual-qa-evidence",
+            "codex-observe evidence-bundle --out .artifacts/public-evidence",
+            "public-evidence-bundle",
+            ".artifacts/public-evidence/**",
+            ".artifacts/demo/run-report.md",
+            ".artifacts/demo/run-report.json",
+            ".artifacts/demo/run-comparison.md",
+            ".artifacts/demo/run-comparison.json",
+            ".artifacts/visual/*.png",
+            ".artifacts/visual/visual-qa-manifest.json",
+        ],
+        contributing: [
+            'python -m pip install -e ".[dev]"',
+            "ruff check",
+            "ruff format --check",
+            "pytest -q",
+        ],
+        release: [
+            'python -m pip install -e ".[dev]"',
+            "Playwright plus Pillow",
+            "ruff check",
+            "ruff format --check",
+            "pytest -q",
+        ],
+        distribution: [
+            'python -m pip install -e ".[dev]"',
+            'python -m pip install -e ".[visual]"',
+            "Playwright and Pillow",
+        ],
+    }
+    for path, required_values in expected_by_file.items():
+        if not path.exists():
+            failures.append(f"missing {path.relative_to(root).as_posix()}")
+            continue
+        body = path.read_text(encoding="utf-8")
+        for required in required_values:
+            if required not in body:
+                failures.append(
+                    f"{path.relative_to(root).as_posix()} missing {required}"
+                )
+    return failures
+
+
+def issue_template_failures(root: Path | None = None) -> list[str]:
+    root = root or Path.cwd()
+    templates = {
+        "implementation_slice.yml": [
+            "Implementation slice",
+            "codex-observe audit --json",
+            "python scripts/visual_qa.py --verify-manifest .artifacts/visual/visual-qa-manifest.json",
+            "codex-observe evidence-bundle --out .artifacts/public-evidence",
+            "docs/LIMITATIONS.md",
+        ],
+        "visual_polish.yml": [
+            "Visual/UI polish",
+            "python scripts/visual_qa.py --verify-manifest .artifacts/visual/visual-qa-manifest.json",
+            "codex-observe evidence-bundle --out .artifacts/public-evidence",
+            "layout review",
+            "expected high-risk metric card evidence",
+        ],
+        "parser_gap.yml": [
+            "Parser/log shape gap",
+            "docs/REAL_LOG_FEEDBACK.md",
+            "redaction manifest/privacy review",
+            "events.payload_json",
+            "codex-observe audit --json",
+        ],
+        "public_tour_feedback.yml": [
+            "Public tour feedback",
+            "codex-observe tour",
+            "codex-observe evidence-bundle --out .artifacts/public-evidence",
+            "docs/PUBLIC_TOUR_FEEDBACK.md",
+            "docs/LIMITATIONS.md",
+            "Do not paste private prompts",
+        ],
+    }
+    failures: list[str] = []
+    for filename, required_values in templates.items():
+        relative = f".github/ISSUE_TEMPLATE/{filename}"
+        path = root / relative
+        if not path.exists():
+            failures.append(f"missing {relative}")
+            continue
+        body = path.read_text(encoding="utf-8")
+        for required in required_values:
+            if required not in body:
+                failures.append(f"{relative} missing {required}")
+    return failures
+
+
+def ci_evidence_bundle_failures(root: Path | None = None) -> list[str]:
+    root = root or Path.cwd()
+    workflow = root / ".github" / "workflows" / "ci.yml"
+    if not workflow.exists():
+        return ["missing .github/workflows/ci.yml"]
+    body = workflow.read_text(encoding="utf-8")
+    required = [
+        "Generate reviewer evidence bundle",
+        "codex-observe evidence-bundle --out .artifacts/public-evidence",
+        "Upload reviewer evidence bundle",
+        "public-evidence-bundle",
+        ".artifacts/public-evidence/**",
+    ]
+    return [f"ci workflow missing {item}" for item in required if item not in body]
+
+
+def public_evidence_bundle_artifact_failures(
+    root: Path | None = None,
+    bundle_dir: Path | None = None,
+) -> list[str]:
+    root = root or Path.cwd()
+    bundle_dir = bundle_dir or root / ".artifacts" / "public-evidence"
+    manifest_path = bundle_dir / "evidence-bundle.json"
+    if not manifest_path.exists():
+        try:
+            label = manifest_path.relative_to(root).as_posix()
+        except ValueError:
+            label = str(manifest_path)
+        return [f"missing {label}"]
+
+    failures: list[str] = []
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return [f"invalid evidence bundle manifest JSON: {exc.msg}"]
+
+    if manifest.get("schema_version") != EVIDENCE_BUNDLE_SCHEMA_VERSION:
+        failures.append("evidence bundle manifest schema_version mismatch")
+    if manifest.get("status") != "ok":
+        failures.append("evidence bundle manifest status is not ok")
+    privacy = manifest.get("privacy")
+    if (
+        not isinstance(privacy, dict)
+        or privacy.get("private_log_required") is not False
+    ):
+        failures.append(
+            "evidence bundle privacy metadata missing synthetic local-only contract"
+        )
+    artifacts = manifest.get("artifacts")
+    if not isinstance(artifacts, dict):
+        return [*failures, "evidence bundle manifest missing artifacts"]
+
+    expected_artifacts = {
+        "bundle_readme": "README.md",
+        "limitations_markdown": "LIMITATIONS.md",
+        "report_markdown": "demo/run-report.md",
+        "comparison_markdown": "demo/run-comparison.md",
+        "audit_json": "audit/audit.json",
+    }
+    for key, expected in expected_artifacts.items():
+        value = artifacts.get(key)
+        if value != expected:
+            failures.append(
+                f"evidence bundle {key} expected {expected}, got {value or 'missing'}"
+            )
+            continue
+        artifact_path = bundle_dir / expected
+        if not artifact_path.exists():
+            failures.append(f"evidence bundle missing {expected}")
+
+    readme_path = bundle_dir / "README.md"
+    if readme_path.exists():
+        readme = readme_path.read_text(encoding="utf-8")
+        for required in [
+            "# Codex Observe Evidence Bundle",
+            "LIMITATIONS.md",
+            "private Codex logs",
+            "External publishing or attachment still requires explicit human approval",
+        ]:
+            if required not in readme:
+                failures.append(f"evidence bundle README missing {required}")
+
+    limitations_path = bundle_dir / "LIMITATIONS.md"
+    if limitations_path.exists():
+        limitations = limitations_path.read_text(encoding="utf-8")
+        for required in [
+            "# Limitations and Next Work",
+            "approval-gated",
+            "human-approved private input path",
+            "explicit human approval",
+        ]:
+            if required not in limitations:
+                failures.append(f"evidence bundle LIMITATIONS.md missing {required}")
+
+    return failures
+
+
+def private_artifact_ignore_failures(root: Path | None = None) -> list[str]:
+    root = root or Path.cwd()
+    gitignore = root / ".gitignore"
+    if not gitignore.exists():
+        return ["missing .gitignore"]
+    ignored = set(gitignore.read_text(encoding="utf-8").splitlines())
+    required = {
+        "__pycache__/",
+        "*.pyc",
+        "*.sqlite",
+        "*.sqlite-*",
+        ".env",
+        ".venv/",
+        "dist/",
+        "build/",
+        "*.egg-info/",
+        ".artifacts/",
+    }
+    return [f".gitignore missing {pattern}" for pattern in sorted(required - ignored)]
+
+
+RELEASE_WORKFLOW_DOC_REQUIREMENTS = {
+    "README.md": [
+        "docs/REAL_LOG_FEEDBACK.md",
+        "privacy_review",
+        "manifest metadata",
+        "--verify-only",
+        "--json",
+        "machine-readable generation status",
+        "error codes",
+        "privacy-safe validation failures",
+        "validates the selected input path before touching output",
+        "manifest source/output paths",
+        "source-derived candidate filenames",
+        "refuses to overwrite arbitrary existing directories",
+        "layout overflow/clipping checks",
+        "validated manifest evidence",
+        "--verify-manifest",
+        "aggregate triage assessment",
+        "next-run success target",
+        "success_target",
+        "schema_version",
+        "recommended_session",
+        "required_commands",
+        "failed_checks",
+        "Failed checks",
+        "plain-text output",
+        ".artifacts/visual/visual-qa-manifest.json",
+        "metric card evidence",
+        "referenced screenshots",
+        "layout review",
+        "path-safe",
+    ],
+    "CONTRIBUTING.md": [
+        "docs/REAL_LOG_FEEDBACK.md",
+        "privacy_review",
+        "manifest metadata",
+        "--verify-only",
+        "--json",
+        "machine-readable generation status",
+        "error codes",
+        "privacy-safe validation failures",
+        "validates the selected input path before touching output",
+        "manifest source/output paths",
+        "source-derived candidate filenames",
+        "refuses to overwrite arbitrary existing directories",
+        "recommended_session",
+        "python scripts/visual_qa.py",
+        "python scripts/visual_qa.py --verify-manifest .artifacts/visual/visual-qa-manifest.json",
+        "failed_checks",
+        "Failed checks",
+        "metric card evidence",
+        "screenshot metadata",
+        "layout review",
+    ],
+    "docs/RELEASE.md": [
+        "docs/REAL_LOG_FEEDBACK.md",
+        "privacy_review",
+        "manifest metadata",
+        "--verify-only",
+        "--json",
+        "machine-readable generation status",
+        "error codes",
+        "privacy-safe validation failures",
+        "validates the selected input path before touching output",
+        "manifest source/output paths",
+        "source-derived candidate filenames",
+        "refuses to overwrite arbitrary existing directories",
+        "visual QA",
+        "aggregate triage assessment",
+        "schema_version",
+        "recommended_session",
+        "required_commands",
+        "failed_checks",
+        "plain-text required command list",
+        "plain-text `Failed checks` section",
+        "validated manifest evidence",
+        "success-target evidence",
+        "path-safe visual QA manifest",
+        "referenced screenshots",
+        "layout review",
+        "metric card evidence",
+        "docs/CURRENT.md",
+    ],
+    "docs/REAL_LOG_FEEDBACK.md": [
+        "human explicitly selects",
+        "privacy_review",
+        "manifest metadata",
+        "--verify-only",
+        "--json",
+        "machine-readable generation status",
+        "error codes",
+        "privacy-safe validation failures",
+        "validates the selected input path before touching output",
+        "manifest source/output paths",
+        "source-derived candidate filenames",
+        "refuses to overwrite arbitrary existing directories",
+        "tests/fixtures/redacted/",
+        "no new parser shape found",
+        "candidate discarded during human privacy review",
+    ],
+    "docs/CURRENT.md": [
+        "Current Project State",
+        "docs/AMAZING.md",
+        "docs/RELEASE.md",
+        "docs/LIMITATIONS.md",
+        "codex-observe tour",
+        "codex-observe demo --serve --host 127.0.0.1 --port 8501",
+        "ruff check",
+        "ruff format --check",
+        "pytest -q",
+        "codex-observe audit --json",
+        "codex-observe sessions --json",
+        "recommended_session",
+        "aggregate triage assessment",
+        "next-run success target",
+        "required_commands",
+        "failed_checks",
+        "Failed checks",
+        "triage",
+        "plain `codex-observe audit` prints",
+        "python scripts/visual_qa.py",
+        "python scripts/visual_qa.py --verify-manifest .artifacts/visual/visual-qa-manifest.json",
+        "metric card evidence",
+        "screenshot metadata",
+        "layout review",
+        "codex-observe evidence-bundle",
+        "codex-observe.evidence-bundle.v1",
+        "There is currently no publishable local issue draft",
+        "attaching generated artifacts externally still requires explicit human approval",
+        "human-approved private input path",
+    ],
+    "docs/LIMITATIONS.md": [
+        "source checkout plus editable install",
+        "approval-gated",
+        "human-approved private input path",
+        "docs/REAL_LOG_FEEDBACK.md",
+        "reviewer evidence bundle",
+        "explicit human approval",
+        "Fresh GitHub issues",
+    ],
+    "CHANGELOG.md": [
+        "privacy review verifier",
+        "--verify-only",
+        "--json",
+        "machine-readable generation status",
+        "error codes",
+        "privacy-safe validation failures",
+        "validates the selected input path before touching output",
+        "manifest source/output paths",
+        "source-derived candidate filenames",
+        "refuses to overwrite arbitrary existing directories",
+        "recommended_session",
+        "schema_version",
+        "visual QA",
+        "validated manifest evidence",
+        "path-safe visual QA manifest",
+        "referenced screenshots",
+        "layout review",
+        "metric card evidence",
+        "required_commands",
+        "failed_checks",
+    ],
+    ".github/PULL_REQUEST_TEMPLATE.md": [
+        "## Linked issue",
+        "`ruff check`",
+        "`ruff format --check`",
+        "`pytest -q`",
+        "`codex-observe audit`",
+        "`codex-observe demo --sessions .artifacts/demo/sessions --keep-sessions --json`",
+        "`codex-observe ingest .artifacts/demo/sessions --db .artifacts/demo/ingest-contract.sqlite --json`",
+        "`codex-observe sessions --db .artifacts/demo/codex_observe_demo.sqlite --json`",
+        "recommended_session",
+        "schema_version",
+        "`codex-observe report --db .artifacts/demo/codex_observe_demo.sqlite --out .artifacts/demo/run-report.md`",
+        "`codex-observe report --db .artifacts/demo/codex_observe_demo.sqlite --format json --out .artifacts/demo/run-report.json`",
+        "`codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --out .artifacts/demo/run-comparison.md`",
+        "`codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --format json --out .artifacts/demo/run-comparison.json`",
+        "`python scripts/visual_qa.py`",
+        "## Visual QA evidence",
+        ".artifacts/visual/visual-qa-manifest.json",
+        "metric card evidence",
+        "referenced screenshot files",
+        "layout review",
+        "path-safe",
+        "validated manifest evidence",
+        "Aggregate report artifacts",
+        "## Data/privacy review",
+        "New external network writes, telemetry, publishing, or hosted behavior are absent or explicitly approved.",
+    ],
+}
+
+
+def release_workflow_doc_failures(root: Path | None = None) -> list[str]:
+    root = root or Path.cwd()
+    failures: list[str] = []
+    for relative, required_values in RELEASE_WORKFLOW_DOC_REQUIREMENTS.items():
+        path = root / relative
+        if not path.exists():
+            failures.append(f"missing {relative}")
+            continue
+        body = path.read_text(encoding="utf-8")
+        for required in required_values:
+            if required not in body:
+                failures.append(f"{relative} missing {required}")
+        for artifact in ["\\n", "\\r\\n"]:
+            if artifact in body:
+                failures.append(f"{relative} contains literal newline artifact")
+                break
+    return failures
+
+
+def redaction_cli_privacy_failures(root: Path | None = None) -> list[str]:
+    root = root or Path.cwd()
+    script = root / "scripts" / "redact_fixtures.py"
+    if not script.exists():
+        return ["missing scripts/redact_fixtures.py"]
+
+    private_input = (
+        root / ".artifacts" / "private-redaction-audit" / "missing-private-source.jsonl"
+    )
+    output_dir = root / ".artifacts" / "redaction-audit-output"
+    try:
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(script),
+                str(private_input),
+                "--out",
+                str(output_dir),
+                "--json",
+            ],
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return ["redaction --json validation check could not run"]
+
+    failures: list[str] = []
+    combined_output = f"{result.stdout}\n{result.stderr}"
+    for forbidden in [
+        str(private_input),
+        "missing-private-source.jsonl",
+        "private-redaction-audit",
+    ]:
+        if forbidden in combined_output:
+            failures.append(
+                "redaction --json validation failure leaked input path details"
+            )
+            break
+
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return failures + ["redaction --json validation failure was not JSON"]
+
+    expected = {
+        "status": "failed",
+        "error_code": "missing_input",
+        "error": "input path does not exist",
+        "output_dir": "[redacted-path]",
+    }
+    for key, value in expected.items():
+        if payload.get(key) != value:
+            failures.append(f"redaction --json validation failure missing {key}")
+    if result.returncode != 2:
+        failures.append("redaction --json validation failure exit code was not 2")
+    if output_dir.exists():
+        failures.append("redaction --json validation touched output directory")
+    return failures
+
+
+def png_dimensions(path: Path) -> tuple[int, int] | None:
+    try:
+        with path.open("rb") as handle:
+            header = handle.read(24)
+    except OSError:
+        return None
+    if len(header) < 24 or header[:8] != b"\x89PNG\r\n\x1a\n":
+        return None
+    return int.from_bytes(header[16:20], "big"), int.from_bytes(header[20:24], "big")
+
+
+def visual_manifest_evidence_failures(root: Path) -> list[str]:
+    manifest_path = root / VISUAL_MANIFEST
+    if not manifest_path.exists():
+        return [f"missing {VISUAL_MANIFEST.as_posix()}; {VISUAL_MANIFEST_RECOVERY}"]
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return [f"visual QA manifest is not valid JSON: {exc.msg}"]
+    if not isinstance(manifest, dict):
+        return ["visual QA manifest must be an object"]
+
+    failures: list[str] = []
+    if manifest.get("schema_version") != VISUAL_MANIFEST_SCHEMA_VERSION:
+        failures.append("visual QA manifest schema_version is missing or unsupported")
+    checks = manifest.get("checks")
+    if not isinstance(checks, dict):
+        failures.append("visual QA manifest checks must be an object")
+        checks = {}
+    if checks.get("tabs_expected") != EXPECTED_VISUAL_TABS:
+        failures.append(
+            "visual QA manifest tabs_expected does not match dashboard tabs"
+        )
+    expected_checks = {
+        "streamlit_exception_text": "not found",
+        "screenshot_quality": "passed",
+        "layout_review": "passed",
+    }
+    for key, expected in expected_checks.items():
+        if checks.get(key) != expected:
+            failures.append(f"visual QA manifest check {key} must be {expected}")
+
+    viewports = manifest.get("viewports")
+    if not isinstance(viewports, dict):
+        return failures + ["visual QA manifest missing viewport evidence"]
+
+    for viewport_name, expected_viewport in EXPECTED_VISUAL_VIEWPORTS.items():
+        viewport = viewports.get(viewport_name)
+        if not isinstance(viewport, dict):
+            failures.append(f"visual QA manifest missing {viewport_name} evidence")
+            continue
+        if viewport.get("viewport") != expected_viewport:
+            failures.append(
+                f"visual QA manifest {viewport_name} viewport size does not match expected"
+            )
+        if viewport.get("tabs_exercised") != EXPECTED_VISUAL_TABS:
+            failures.append(
+                f"visual QA manifest {viewport_name} tabs_exercised incomplete"
+            )
+        if viewport.get("agent_detail_selector_exercised") is not True:
+            failures.append(
+                f"visual QA manifest {viewport_name} agent detail selector was not exercised"
+            )
+
+        screenshot = viewport.get("screenshot")
+        if not isinstance(screenshot, dict):
+            failures.append(
+                f"visual QA manifest {viewport_name} missing screenshot metadata"
+            )
+        else:
+            filename = screenshot.get("filename")
+            if not isinstance(filename, str) or not filename:
+                failures.append(
+                    f"visual QA manifest {viewport_name} screenshot filename missing"
+                )
+            elif Path(filename).name != filename:
+                failures.append(
+                    f"visual QA manifest {viewport_name} screenshot filename must be basename-only"
+                )
+            else:
+                screenshot_path = manifest_path.parent / filename
+                if not screenshot_path.exists():
+                    failures.append(
+                        f"visual QA manifest {viewport_name} screenshot file missing: {filename}"
+                    )
+                else:
+                    dimensions = png_dimensions(screenshot_path)
+                    if dimensions is None:
+                        failures.append(
+                            f"visual QA manifest {viewport_name} screenshot file is not a readable PNG"
+                        )
+                    else:
+                        width, height = dimensions
+                        if screenshot.get("width") != width:
+                            failures.append(
+                                f"visual QA manifest {viewport_name} screenshot width does not match file"
+                            )
+                        if screenshot.get("height") != height:
+                            failures.append(
+                                f"visual QA manifest {viewport_name} screenshot height does not match file"
+                            )
+                        if width != expected_viewport["width"]:
+                            failures.append(
+                                f"visual QA manifest {viewport_name} screenshot width mismatch"
+                            )
+                        if height < min(600, expected_viewport["height"]):
+                            failures.append(
+                                f"visual QA manifest {viewport_name} screenshot height too small"
+                            )
+                    if (
+                        int(screenshot.get("bytes") or 0) <= 0
+                        or screenshot_path.stat().st_size <= 0
+                    ):
+                        failures.append(
+                            f"visual QA manifest {viewport_name} screenshot is empty"
+                        )
+
+        layout = viewport.get("layout_review")
+        if not isinstance(layout, dict):
+            failures.append(f"visual QA manifest {viewport_name} missing layout review")
+        else:
+            viewport_width = int(layout.get("viewport_width") or 0)
+            document_width = int(layout.get("document_width") or 0)
+            if viewport_width and document_width > viewport_width + 2:
+                failures.append(
+                    f"visual QA manifest {viewport_name} layout review contains overflow"
+                )
+            if layout.get("overflowing_elements"):
+                failures.append(
+                    f"visual QA manifest {viewport_name} layout review contains overflowing elements"
+                )
+            if layout.get("clipped_text_elements"):
+                failures.append(
+                    f"visual QA manifest {viewport_name} layout review contains clipped text"
+                )
+
+        labels = viewport.get("sidebar_risk_labels")
+        if not isinstance(labels, list):
+            failures.append(
+                f"visual QA manifest missing {viewport_name} sidebar risk labels"
+            )
+        else:
+            missing = EXPECTED_VISUAL_RISK_LABELS - {str(label) for label in labels}
+            if missing:
+                failures.append(
+                    f"visual QA manifest {viewport_name} missing risk labels: {', '.join(sorted(missing))}"
+                )
+        metric_cards = viewport.get("metric_cards")
+        if not isinstance(metric_cards, list):
+            failures.append(f"visual QA manifest missing {viewport_name} metric cards")
+            continue
+        metrics = {
+            str(card.get("label") or ""): str(card.get("value") or "")
+            for card in metric_cards
+            if isinstance(card, dict)
+        }
+        for label, expected in EXPECTED_VISUAL_METRICS.items():
+            actual = metrics.get(label)
+            if actual != expected:
+                failures.append(
+                    f"visual QA manifest {viewport_name} {label} expected {expected}, got {actual or 'missing'}"
+                )
+        success_targets = viewport.get("success_targets")
+        if not isinstance(success_targets, list) or not success_targets:
+            failures.append(
+                f"visual QA manifest missing {viewport_name} success target evidence"
+            )
+            continue
+        success_target = success_targets[0]
+        if not isinstance(success_target, dict):
+            failures.append(
+                f"visual QA manifest {viewport_name} success target evidence is invalid"
+            )
+            continue
+        for key, expected in EXPECTED_VISUAL_SUCCESS_TARGET.items():
+            actual = str(success_target.get(key) or "")
+            if actual != expected:
+                failures.append(
+                    f"visual QA manifest {viewport_name} success target {key} expected {expected}, got {actual or 'missing'}"
+                )
+    return failures
+
+
+def failed_audit_checks(checks: list[dict[str, object]]) -> list[dict[str, str]]:
+    return [
+        {
+            "name": str(check["name"]),
+            "detail": str(check.get("detail") or ""),
+        }
+        for check in checks
+        if not bool(check["ok"])
+    ]
+
+
+def release_audit_next_message(ok: bool, failed_checks: list[dict[str, str]]) -> str:
+    if ok:
+        quoted = [f"`{command}`" for command in RELEASE_REQUIRED_COMMANDS]
+        return f"run {', '.join(quoted[:-1])}, and {quoted[-1]} before release."
+    if not failed_checks:
+        return "fix failed checks, then rerun `codex-observe audit`."
+    summary = "; ".join(
+        f"{check['name']}: {check['detail']}" if check["detail"] else check["name"]
+        for check in failed_checks[:3]
+    )
+    if len(failed_checks) > 3:
+        summary += f"; and {len(failed_checks) - 3} more"
+    return f"fix failed checks ({summary}), then rerun `codex-observe audit`."
+
+
+def release_audit_report(
+    db_path: str = DEFAULT_DEMO_DB,
+    sessions_path: str = DEFAULT_DEMO_SESSIONS,
+    report_out: str = ".artifacts/demo/run-report.md",
+    *,
+    public_evidence_dir: str | Path | None = None,
+    check_public_evidence_bundle: bool = True,
+) -> tuple[int, dict]:
+    root = Path.cwd()
+    checks: list[dict[str, object]] = []
+
+    def add(name: str, ok: bool, detail: str = "") -> None:
+        checks.append({"name": name, "ok": bool(ok), "detail": detail})
+
+    actual_db_path = db_path
+    try:
+        result = create_demo_database(
+            actual_db_path, sessions_path, keep_sessions=False
+        )
+        demo_detail = f"{result.files_imported} files, {result.threads} threads, {result.events} events"
+    except PermissionError:
+        requested = Path(db_path).expanduser()
+        fallback = requested.with_name(
+            f"{requested.stem}-audit{requested.suffix or '.sqlite'}"
+        )
+        actual_db_path = str(fallback)
+        result = create_demo_database(
+            actual_db_path, sessions_path, keep_sessions=False
+        )
+        demo_detail = f"{result.files_imported} files, {result.threads} threads, {result.events} events; requested DB was locked, used {actual_db_path}"
+    add(
+        "demo database",
+        result.files_imported > 0 and Path(actual_db_path).exists(),
+        demo_detail,
+    )
+
+    demo_payload = demo_success_payload(actual_db_path, sessions_path, result)
+    demo_json_ok = (
+        demo_payload.get("schema_version") == DEMO_SCHEMA_VERSION
+        and demo_payload.get("status") == "ok"
+        and demo_payload.get("database") == actual_db_path
+        and demo_payload.get("counts", {}).get("jsonl_files") == result.files_imported
+        and demo_payload.get("counts", {}).get("threads") == result.threads
+        and demo_payload.get("counts", {}).get("events") == result.events
+        and demo_payload.get("next_commands") == demo_next_commands(actual_db_path)
+    )
+    add(
+        "demo JSON",
+        demo_json_ok,
+        "schema, counts, database, and next commands verified"
+        if demo_json_ok
+        else "demo JSON schema_version, counts, database, or next_commands missing",
+    )
+
+    doctor_status, doctor = doctor_report(actual_db_path)
+    doctor_has_schema = doctor.get("schema_version") == DOCTOR_SCHEMA_VERSION
+    doctor_ok = (
+        doctor_status == 0
+        and doctor.get("status") == "ok"
+        and doctor_has_schema
+        and doctor.get("next_commands")
+        == doctor_next_commands(Path(actual_db_path), "ok")
+    )
+    add(
+        "database doctor",
+        doctor_ok,
+        "ok; schema and next commands verified"
+        if doctor_ok
+        else (
+            str(doctor.get("status"))
+            if doctor_has_schema
+            else "doctor schema_version or next_commands missing"
+        ),
+    )
+
+    try:
+        sessions_payload = sessions_json_payload(actual_db_path)
+        sessions = sessions_payload["sessions"]
+        sessions_have_risk = bool(sessions) and all(
+            session.get("triage_risk")
+            for session in sessions
+            if isinstance(session, dict)
+        )
+        sessions_has_schema = (
+            sessions_payload.get("schema_version") == SESSIONS_SCHEMA_VERSION
+        )
+        sessions_has_status = sessions_payload.get("status") == "ok"
+        sessions_has_recommendation = bool(sessions_payload.get("recommended_session"))
+        recommended_session = sessions_payload.get("recommended_session")
+        recommended_session_id = (
+            str(recommended_session.get("session_id"))
+            if isinstance(recommended_session, dict)
+            and recommended_session.get("session_id")
+            else None
+        )
+        sessions_has_next_commands = sessions_payload.get(
+            "next_commands"
+        ) == sessions_next_commands(actual_db_path, recommended_session_id)
+        recommendation_detail = sessions_payload.get("recommendation_detail")
+        sessions_has_recommendation_detail = (
+            isinstance(recommendation_detail, dict)
+            and recommendation_detail.get("target") == recommended_session_id
+            and recommendation_detail.get("ranked_by") == ["triage_risk", "last_seen"]
+            and isinstance(recommendation_detail.get("drivers"), dict)
+        )
+        session_listing_ok = (
+            sessions_have_risk
+            and sessions_has_schema
+            and sessions_has_status
+            and sessions_has_recommendation
+            and sessions_has_next_commands
+            and sessions_has_recommendation_detail
+        )
+        add(
+            "session listing",
+            session_listing_ok,
+            f"{len(sessions)} sessions; triage risk, status, schema, recommendation detail, and next commands verified"
+            if session_listing_ok
+            else "session listing missing aggregate triage risk, status, schema_version, recommended_session, recommendation_detail, or next_commands",
+        )
+    except FileNotFoundError as exc:
+        sessions = []
+        add("session listing", False, str(exc))
+    try:
+        report = build_report(
+            actual_db_path, sessions[0]["session_id"] if sessions else None
+        )
+        out_path = Path(report_out).expanduser()
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        report_markdown_text = report_markdown(report)
+        report_json_text = report_json(report)
+        out_path.write_text(report_markdown_text, encoding="utf-8")
+        json_out_path = out_path.with_suffix(".json")
+        json_out_path.write_text(report_json_text, encoding="utf-8")
+        report_payload = json.loads(report_json_text)
+        summary = report.get("summary", {})
+        triage = report.get("triage", {})
+        report_has_cost_profile = (
+            out_path.exists()
+            and out_path.stat().st_size > 0
+            and json_out_path.exists()
+            and json_out_path.stat().st_size > 0
+            and report_payload.get("schema_version") == REPORT_SCHEMA_VERSION
+            and "## Cost Profile" in report_markdown_text
+            and "## Opportunity Stack" in report_markdown_text
+            and "## Next Run Success Target" in report_markdown_text
+            and "Target: below" in report_markdown_text
+            and "Scale: " in report_markdown_text
+            and "Largest thread share" in report_markdown_text
+            and "## Triage" in report_markdown_text
+            and "Risk level:" in report_markdown_text
+            and "largest_thread_share_pct" in summary
+            and "repeated_prompt_share_pct" in summary
+            and "uncached_input_share_pct" in summary
+            and triage.get("risk_level")
+            and triage.get("next_action")
+            and report_payload.get("next_action_detail", {}).get("action")
+            and report_payload.get("success_target", {}).get("metric")
+            and report_payload.get("success_target", {}).get("target_value") is not None
+            and report_payload.get("opportunities", [{}])[0].get("Driver")
+            and '"opportunities"' in report_json_text
+            and '"next_action_detail"' in report_json_text
+            and '"success_target"' in report_json_text
+        )
+        add(
+            "aggregate report",
+            report_has_cost_profile,
+            f"{out_path}; {json_out_path}; cost profile, opportunity stack, success target, triage, structured next action, and schema verified",
+        )
+        comparison = compare_reports(report, report)
+        comparison_out = out_path.with_name("run-comparison.md")
+        comparison_json_out = out_path.with_name("run-comparison.json")
+        comparison_markdown_text = comparison_markdown(comparison)
+        comparison_json_text = comparison_json(comparison)
+        comparison_out.write_text(comparison_markdown_text, encoding="utf-8")
+        comparison_json_out.write_text(comparison_json_text, encoding="utf-8")
+        comparison_payload = json.loads(comparison_json_text)
+        comparison_has_quick_read = (
+            comparison.get("verdict") == "unchanged"
+            and comparison_out.exists()
+            and comparison_out.stat().st_size > 0
+            and comparison_json_out.exists()
+            and comparison_json_out.stat().st_size > 0
+            and comparison_payload.get("schema_version") == COMPARISON_SCHEMA_VERSION
+            and "## Quick Read" in comparison_markdown_text
+            and "Verdict: unchanged" in comparison_markdown_text
+            and "## Triage Risk" in comparison_markdown_text
+            and "Direction: unchanged" in comparison_markdown_text
+            and "## Opportunity Change" in comparison_markdown_text
+            and "diagnostics" in comparison_markdown_text
+            and "| Metric | Before | After | Delta | % change | Direction |"
+            in comparison_markdown_text
+            and "Recommended next step:" in comparison_markdown_text
+            and comparison.get("recommendation")
+            and comparison.get("recommendation_detail", {}).get("action")
+            and '"verdict": "unchanged"' in comparison_json_text
+            and '"recommendation"' in comparison_json_text
+            and '"recommendation_detail"' in comparison_json_text
+            and '"opportunity_change"' in comparison_json_text
+            and comparison_payload.get("opportunity_change", {}).get("summary")
+            and '"delta_pct"' in comparison_json_text
+        )
+        add(
+            "aggregate comparison",
+            comparison_has_quick_read,
+            f"{comparison_out}; {comparison_json_out}; quick read, triage risk, opportunity change, structured recommendation, and schema verified",
+        )
+    except (FileNotFoundError, ValueError, KeyError) as exc:
+        add("aggregate report", False, str(exc))
+
+    for relative in RELEASE_REQUIRED_FILES:
+        path = root / relative
+        add(
+            f"required file: {relative}",
+            path.exists() and path.stat().st_size > 0,
+            relative,
+        )
+
+    project_version = pyproject_version(root)
+    add(
+        "version metadata",
+        bool(project_version) and project_version == __version__,
+        f"pyproject={project_version or 'missing'}, package={__version__}",
+    )
+
+    try:
+        version_result = subprocess.run(
+            [sys.executable, "-m", "codex_observe.cli", "--version"],
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        version_output = version_result.stdout.strip()
+        add(
+            "CLI version command",
+            version_result.returncode == 0
+            and version_output == f"codex-observe {__version__}",
+            version_output
+            or version_result.stderr.strip()
+            or f"exit {version_result.returncode}",
+        )
+    except OSError as exc:
+        add("CLI version command", False, str(exc))
+
+    try:
+        report_help = subprocess.run(
+            [sys.executable, "-m", "codex_observe.cli", "report", "--help"],
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        compare_help = subprocess.run(
+            [sys.executable, "-m", "codex_observe.cli", "compare", "--help"],
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        help_text = report_help.stdout + compare_help.stdout
+        help_errors = report_help.stderr + compare_help.stderr
+        help_ok = (
+            report_help.returncode == 0
+            and compare_help.returncode == 0
+            and "ranked opportunity stack" in report_help.stdout
+            and "opportunity-change movement" in compare_help.stdout
+        )
+        add(
+            "CLI help product concepts",
+            help_ok,
+            "report opportunity stack and compare opportunity-change help verified"
+            if help_ok
+            else (help_errors.strip() or help_text.strip() or "help output missing"),
+        )
+    except OSError as exc:
+        add("CLI help product concepts", False, str(exc))
+    readme = (
+        (root / "README.md").read_text(encoding="utf-8")
+        if (root / "README.md").exists()
+        else ""
+    )
+    add(
+        "README distribution link",
+        "docs/DISTRIBUTION.md" in readme,
+        "docs/DISTRIBUTION.md",
+    )
+    add(
+        "README privacy commands",
+        all(
+            cmd in readme
+            for cmd in [
+                "codex-observe tour",
+                "codex-observe doctor",
+                "codex-observe sessions",
+                "codex-observe report",
+                "codex-observe compare",
+            ]
+        ),
+        "tour/doctor/sessions/report/compare",
+    )
+
+    tour_payload = public_tour_payload(actual_db_path)
+    tour_commands = tour_payload.get("next_commands")
+    tour_evidence = [
+        evidence
+        for step in tour_payload.get("steps", [])
+        if isinstance(step, dict)
+        for evidence in step.get("evidence", [])
+        if isinstance(evidence, str)
+    ]
+    tour_ok = (
+        tour_payload.get("schema_version") == TOUR_SCHEMA_VERSION
+        and tour_payload.get("database") == actual_db_path
+        and tour_payload.get("privacy", {}).get("private_log_required") is False
+        and isinstance(tour_commands, list)
+        and f"codex-observe doctor --db {actual_db_path} --json" in tour_commands
+        and f"codex-observe sessions --db {actual_db_path} --json" in tour_commands
+        and "python scripts/visual_qa.py --verify-manifest .artifacts/visual/visual-qa-manifest.json"
+        in tour_commands
+        and "codex-observe evidence-bundle --out .artifacts/public-evidence"
+        in tour_commands
+        and any("ranked opportunity stack" in item for item in tour_evidence)
+        and any("opportunity-change" in item for item in tour_evidence)
+        and any("docs/PUBLIC_TOUR_FEEDBACK.md" in item for item in tour_evidence)
+        and any("reviewed-redacted" in item for item in tour_evidence)
+    )
+    add(
+        "public tour JSON",
+        tour_ok,
+        "schema, privacy, database, evidence bundle, evidence, and next commands verified"
+        if tour_ok
+        else "tour JSON schema_version, privacy, database, evidence bundle, feedback evidence, or next_commands missing",
+    )
+
+    ignore_failures = private_artifact_ignore_failures(root)
+    add(
+        "private artifact ignores",
+        not ignore_failures,
+        "sqlite, artifacts, env, cache, and build outputs ignored"
+        if not ignore_failures
+        else "; ".join(ignore_failures[:3]),
+    )
+
+    dev_failures = dev_tooling_failures(root)
+    add(
+        "dev tooling metadata",
+        not dev_failures,
+        "dev extra, CI, docs, and evidence artifacts aligned"
+        if not dev_failures
+        else "; ".join(dev_failures[:3]),
+    )
+
+    ci_bundle_failures = ci_evidence_bundle_failures(root)
+    add(
+        "CI reviewer evidence bundle",
+        not ci_bundle_failures,
+        "CI generates and uploads reviewer public evidence bundle"
+        if not ci_bundle_failures
+        else "; ".join(ci_bundle_failures[:3]),
+    )
+
+    if check_public_evidence_bundle:
+        public_bundle_dir = (
+            Path(public_evidence_dir).expanduser()
+            if public_evidence_dir is not None
+            else root / ".artifacts" / "public-evidence"
+        )
+        public_bundle_failures = public_evidence_bundle_artifact_failures(
+            root, public_bundle_dir
+        )
+        add(
+            "public evidence bundle artifacts",
+            not public_bundle_failures,
+            "manifest, reviewer README, limitations doc, aggregate reports, and audit artifact verified"
+            if not public_bundle_failures
+            else "; ".join(public_bundle_failures[:3]),
+        )
+
+    issue_template_drift = issue_template_failures(root)
+    add(
+        "issue templates",
+        not issue_template_drift,
+        "issue templates require demoable evidence, visual QA, public-tour feedback, privacy review, and limitations checks"
+        if not issue_template_drift
+        else "; ".join(issue_template_drift[:3]),
+    )
+
+    workflow_doc_failures = release_workflow_doc_failures(root)
+    add(
+        "release workflow docs",
+        not workflow_doc_failures,
+        "real-log feedback, visual QA evidence, and text hygiene aligned"
+        if not workflow_doc_failures
+        else "; ".join(workflow_doc_failures[:3]),
+    )
+
+    visual_manifest_failures = visual_manifest_evidence_failures(root)
+    add(
+        "visual QA manifest evidence",
+        not visual_manifest_failures,
+        f"{VISUAL_MANIFEST.as_posix()}; "
+        f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['desktop']).as_posix()}; "
+        f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['narrow']).as_posix()}; "
+        "visual manifest schema and contract, screenshots, layout review, risk labels, metric cards, and success target verified"
+        if not visual_manifest_failures
+        else "; ".join(visual_manifest_failures[:3]),
+    )
+    redaction_privacy_failures = redaction_cli_privacy_failures(root)
+    add(
+        "redaction validation privacy",
+        not redaction_privacy_failures,
+        "privacy-safe JSON failure uses error codes and does not touch output"
+        if not redaction_privacy_failures
+        else "; ".join(redaction_privacy_failures[:3]),
+    )
+
+    backlog_failures = backlog_draft_failures(root)
+    add(
+        "planning backlog",
+        not backlog_failures,
+        f"{len(active_backlog_drafts(root))} current draft records validated; completed local drafts retired"
+        if not backlog_failures
+        else "; ".join(backlog_failures[:3]),
+    )
+
+    ok = all(bool(check["ok"]) for check in checks)
+    failed_checks = failed_audit_checks(checks)
+    required_commands = list(RELEASE_REQUIRED_COMMANDS) if ok else []
+    audit = {
+        "schema_version": AUDIT_SCHEMA_VERSION,
+        "status": "ok" if ok else "failed",
+        "database": actual_db_path,
+        "report": report_out,
+        "checks": checks,
+        "failed_checks": failed_checks,
+        "required_commands": required_commands,
+        "next": release_audit_next_message(ok, failed_checks),
+    }
+    return (0 if ok else 1), audit
+
+
+def release_audit_lines(
+    db_path: str = DEFAULT_DEMO_DB,
+    sessions_path: str = DEFAULT_DEMO_SESSIONS,
+    report_out: str = ".artifacts/demo/run-report.md",
+    *,
+    public_evidence_dir: str | Path | None = None,
+) -> tuple[int, list[str]]:
+    status, audit = release_audit_report(
+        db_path,
+        sessions_path,
+        report_out,
+        public_evidence_dir=public_evidence_dir,
+    )
+    lines = [f"Status: {audit['status']}"]
+    for check in audit["checks"]:
+        marker = "OK" if check["ok"] else "FAIL"
+        detail = f" - {check['detail']}" if check.get("detail") else ""
+        lines.append(f"[{marker}] {check['name']}{detail}")
+    if audit.get("failed_checks"):
+        lines.append("Failed checks:")
+        for check in audit["failed_checks"]:
+            detail = f" - {check['detail']}" if check.get("detail") else ""
+            lines.append(f"- {check['name']}{detail}")
+    if audit.get("required_commands"):
+        lines.append("Required commands:")
+        lines.extend(f"- {command}" for command in audit["required_commands"])
+    lines.append(f"Next: {audit['next']}")
+    return status, lines
+
+
+def sessions_missing_json_payload(db_path: str) -> dict[str, object]:
+    return {
+        "schema_version": SESSIONS_SCHEMA_VERSION,
+        "database": db_path,
+        "status": "missing",
+        "sessions": [],
+        "recommended_session": None,
+        "recommendation_detail": None,
+        "next": (
+            f"run `codex-observe demo --db {db_path}` for synthetic data or "
+            f"`codex-observe ingest ~/.codex/sessions --db {db_path}` for local logs."
+        ),
+        "next_commands": sessions_next_commands(db_path),
+    }
+
+
+def session_recommendation_detail(recommended: dict[str, object]) -> dict[str, object]:
+    return {
+        "action": "export_recommended_session_report",
+        "target_type": "session",
+        "target": recommended.get("session_id"),
+        "reason": "Highest aggregate triage risk, with latest run used as the tie-breaker.",
+        "ranked_by": ["triage_risk", "last_seen"],
+        "risk": recommended.get("triage_risk"),
+        "drivers": {
+            "largest_thread_share_pct": recommended.get("largest_thread_share_pct"),
+            "repeated_prompt_share_pct": recommended.get("repeated_prompt_share_pct"),
+            "uncached_input_share_pct": recommended.get("uncached_input_share_pct"),
+        },
+    }
+
+
+def sessions_json_payload(db_path: str) -> dict[str, object]:
+    summaries = session_summaries(db_path)
+    payload: dict[str, object] = {
+        "schema_version": SESSIONS_SCHEMA_VERSION,
+        "database": db_path,
+        "status": "ok" if summaries else "empty",
+        "sessions": summaries,
+    }
+    if summaries:
+        recommended = summaries[0]
+        payload["recommended_session"] = recommended
+        payload["recommendation_detail"] = session_recommendation_detail(recommended)
+        payload["next"] = session_report_hint(db_path, str(recommended["session_id"]))
+        payload["next_commands"] = sessions_next_commands(
+            db_path, str(recommended["session_id"])
+        )
+    else:
+        payload["recommended_session"] = None
+        payload["recommendation_detail"] = None
+        payload["next"] = (
+            f"run `codex-observe ingest ~/.codex/sessions --db {db_path}` or `codex-observe demo --db {db_path}`."
+        )
+        payload["next_commands"] = sessions_next_commands(db_path)
+    return payload
+
+
+def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]:
+    return [
+        {
+            "title": "Create demo data and open the dashboard",
+            "evidence": [
+                "synthetic data path requires no private logs",
+                "dashboard opens with representative high- and low-risk runs",
+            ],
+            "commands": [
+                "codex-observe demo --serve --host 127.0.0.1 --port 8501",
+                "codex-observe demo --json",
+            ],
+        },
+        {
+            "title": "Verify the demo database contract",
+            "evidence": [
+                "doctor JSON includes schema_version and structured next_commands",
+                "recovery hints preserve the selected database path",
+            ],
+            "commands": [f"codex-observe doctor --db {db_path} --json"],
+        },
+        {
+            "title": "List aggregate-only sessions and the recommended high-risk run",
+            "evidence": [
+                "recommended_session chooses the highest-risk run",
+                "recommendation_detail explains the risk and recency tie-breakers",
+            ],
+            "commands": [f"codex-observe sessions --db {db_path} --json"],
+        },
+        {
+            "title": "Export shareable aggregate reports",
+            "evidence": [
+                "reports include quick-read, triage, and ranked opportunity stack",
+                "JSON includes schema_version, opportunities, success_target, and next_action_detail",
+            ],
+            "commands": [
+                f"codex-observe report --db {db_path} --out .artifacts/demo/run-report.md",
+                f"codex-observe report --db {db_path} --format json --out .artifacts/demo/run-report.json",
+            ],
+        },
+        {
+            "title": "Compare reports without exposing prompts or tool output",
+            "evidence": [
+                "comparison highlights triage-risk and opportunity-change movement",
+                "recommendation_detail targets persisted or regressed aggregate drivers",
+            ],
+            "commands": [
+                "codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --out .artifacts/demo/run-comparison.md",
+                "codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --format json --out .artifacts/demo/run-comparison.json",
+            ],
+        },
+        {
+            "title": "Capture and verify UI evidence",
+            "evidence": [
+                "visual manifest records desktop and narrow screenshots",
+                "layout review, sidebar risk labels, metric cards, and success target are verified",
+            ],
+            "commands": [
+                "python scripts/visual_qa.py",
+                "python scripts/visual_qa.py --verify-manifest .artifacts/visual/visual-qa-manifest.json",
+            ],
+        },
+        {
+            "title": "Create a reviewer-facing evidence bundle",
+            "evidence": [
+                "bundle README gives reviewers a human-readable starting point",
+                "LIMITATIONS.md carries known boundaries and approval-gated work into the bundle",
+                "manifest uses codex-observe.evidence-bundle.v1 and synthetic demo data only",
+            ],
+            "commands": [
+                "codex-observe evidence-bundle --out .artifacts/public-evidence",
+            ],
+        },
+        {
+            "title": "Run the aggregate release audit after visual and bundle evidence exist",
+            "evidence": [
+                "audit JSON lists required_commands and failed_checks",
+                "audit verifies report, comparison, tour, ingest, visual evidence, and public bundle contracts",
+            ],
+            "commands": ["codex-observe audit"],
+        },
+        {
+            "title": "File privacy-safe public-tour feedback",
+            "evidence": [
+                "docs/PUBLIC_TOUR_FEEDBACK.md explains safe feedback sources and what not to collect",
+                ".github/ISSUE_TEMPLATE/public_tour_feedback.yml captures useful, confusing, visual, bundle, and privacy-review notes",
+                "feedback should use synthetic or reviewed-redacted evidence only",
+            ],
+            "commands": [],
+        },
+    ]
+
+
+def public_tour_payload(db_path: str = DEFAULT_DEMO_DB) -> dict[str, object]:
+    steps = public_tour_steps(db_path)
+    return {
+        "schema_version": TOUR_SCHEMA_VERSION,
+        "status": "ok",
+        "database": db_path,
+        "privacy": {
+            "mode": "synthetic-demo",
+            "summary": "this path uses synthetic data and aggregate-only exports",
+            "private_log_required": False,
+        },
+        "steps": steps,
+        "next_commands": [
+            command
+            for step in steps
+            for command in step["commands"]
+            if isinstance(command, str)
+        ],
+    }
+
+
+def public_tour_lines(db_path: str = DEFAULT_DEMO_DB) -> list[str]:
+    lines = [
+        "Codex Observe public tour",
+        "Privacy: this path uses synthetic data and aggregate-only exports.",
+        "",
+    ]
+    for index, step in enumerate(public_tour_steps(db_path), start=1):
+        lines.append(f"{index}. {step['title']}:")
+        for evidence in step.get("evidence", []):
+            lines.append(f"   Evidence: {evidence}")
+        lines.extend(f"   {command}" for command in step["commands"])
+    return lines
+
+
+def demo_next_commands(db_path: str) -> list[str]:
+    return [
+        f"codex-observe doctor --db {db_path} --json",
+        f"codex-observe sessions --db {db_path} --json",
+        f"codex-observe report --db {db_path} --out .artifacts/demo/run-report.md",
+        f"codex-observe serve --db {db_path}",
+    ]
+
+
+def demo_success_payload(
+    db_path: str,
+    sessions_path: str,
+    result,
+    keep_sessions: bool = False,
+    serve: bool = False,
+) -> dict[str, object]:
+    commands = demo_next_commands(db_path)
+    return {
+        "schema_version": DEMO_SCHEMA_VERSION,
+        "status": "ok",
+        "database": db_path,
+        "sessions_path": sessions_path,
+        "keep_sessions": keep_sessions,
+        "serve": serve,
+        "counts": {
+            "jsonl_files": int(result.files_imported),
+            "threads": int(result.threads),
+            "events": int(result.events),
+        },
+        "next": "run the commands in next_commands to verify health, choose a run, export a report, and open the dashboard.",
+        "next_commands": commands,
+    }
+
+
+def demo_success_lines(db_path: str, result, serve: bool = False) -> list[str]:
+    commands = demo_next_commands(db_path)
+    lines = [
+        (
+            f"Created demo database with {result.files_imported} JSONL files, "
+            f"{result.threads} threads, {result.events} events into {db_path}"
+        ),
+        "Next:",
+        f"- Verify database health: {commands[0]}",
+        f"- List reportable runs: {commands[1]}",
+        f"- Export the recommended run: {commands[2]}",
+    ]
+    if serve:
+        lines.append("- Launching dashboard now.")
+    else:
+        lines.append(f"- Open the dashboard: {commands[3]}")
+    return lines
+
+
+def ingest_summary(result) -> str:
+    skipped = []
+    for attr, label in [
+        ("duplicate_files", "duplicates"),
+        ("empty_files", "empty"),
+        ("malformed_files", "malformed"),
+        ("missing_meta_files", "missing session_meta"),
+        ("unreadable_files", "unreadable"),
+    ]:
+        value = int(getattr(result, attr, 0) or 0)
+        if value:
+            skipped.append(f"{value} {label}")
+    skipped_text = ", ".join(skipped) if skipped else "none"
+    malformed_lines = int(getattr(result, "malformed_lines", 0) or 0)
+    malformed_detail = (
+        f", {malformed_lines} malformed lines skipped" if malformed_lines else ""
+    )
+    return (
+        f"Imported {result.files_imported} of {result.files_seen} JSONL files "
+        f"({skipped_text} skipped{malformed_detail}), "
+        f"{result.threads} threads, {result.events} events into"
+    )
+
+
+def ingest_skipped_counts(result) -> dict[str, int]:
+    return {
+        "duplicate_files": int(getattr(result, "duplicate_files", 0) or 0),
+        "empty_files": int(getattr(result, "empty_files", 0) or 0),
+        "malformed_files": int(getattr(result, "malformed_files", 0) or 0),
+        "missing_meta_files": int(getattr(result, "missing_meta_files", 0) or 0),
+        "unreadable_files": int(getattr(result, "unreadable_files", 0) or 0),
+        "malformed_lines": int(getattr(result, "malformed_lines", 0) or 0),
+    }
+
+
+def ingest_status(result) -> str:
+    skipped = ingest_skipped_counts(result)
+    if any(value for value in skipped.values()):
+        return "partial"
+    if int(getattr(result, "files_seen", 0) or 0) == 0:
+        return "empty"
+    return "ok"
+
+
+def ingest_next_commands(db_path: str) -> list[str]:
+    return [
+        f"codex-observe doctor --db {db_path} --json",
+        f"codex-observe sessions --db {db_path} --json",
+        f"codex-observe serve --db {db_path}",
+    ]
+
+
+def ingest_success_payload(
+    sessions_path: str, db_path: str, result, serve: bool = False
+) -> dict[str, object]:
+    return {
+        "schema_version": INGEST_SCHEMA_VERSION,
+        "status": ingest_status(result),
+        "privacy": {
+            "mode": "aggregate-only",
+            "private_log_required": True,
+            "raw_content_included": False,
+        },
+        "source": sessions_path,
+        "database": db_path,
+        "serve": serve,
+        "counts": {
+            "files_seen": int(getattr(result, "files_seen", 0) or 0),
+            "files_imported": int(getattr(result, "files_imported", 0) or 0),
+            "threads": int(getattr(result, "threads", 0) or 0),
+            "events": int(getattr(result, "events", 0) or 0),
+        },
+        "skipped": ingest_skipped_counts(result),
+        "next": "run the commands in next_commands to verify health, choose a run, and open the dashboard.",
+        "next_commands": ingest_next_commands(db_path),
+    }
+
+
+def ingest_success_lines(db_path: str, result, serve: bool = False) -> list[str]:
+    commands = ingest_next_commands(db_path)
+    lines = [
+        f"{ingest_summary(result)} {db_path}",
+        "Next:",
+        f"- Verify database health: {commands[0].removesuffix(' --json')}",
+        f"- List reportable runs: {commands[1].removesuffix(' --json')}",
+    ]
+    if serve:
+        lines.append("- Launching dashboard now.")
+    else:
+        lines.append(f"- Open the dashboard: {commands[2]}")
+    return lines
 
 
 def default_db() -> str:
     return str(Path.home() / ".codex-observe" / "codex_observe.sqlite")
 
 
+def missing_database_hint(db_path: str) -> str:
+    return (
+        f"Run `codex-observe demo` for synthetic data or "
+        f"`codex-observe ingest ~/.codex/sessions --db {db_path}` for local logs."
+    )
+
+
+def sessions_hint(db_path: str) -> str:
+    return (
+        f"Run `codex-observe sessions --db {db_path}` to list aggregate-only session IDs "
+        "and risk, or add `--json` for `recommended_session`."
+    )
+
+
+def sessions_next_commands(db_path: str, session_id: str | None = None) -> list[str]:
+    if session_id:
+        return [
+            f"codex-observe report --db {db_path} --session-id {session_id} --out run-report.md",
+            f"codex-observe report --db {db_path} --session-id {session_id} --format json --out run-report.json",
+        ]
+    return [
+        f"codex-observe ingest ~/.codex/sessions --db {db_path}",
+        f"codex-observe demo --db {db_path}",
+    ]
+
+
+def compare_failure_payload(
+    db_path: str,
+    status: str,
+    error: str,
+    input_mode: str,
+) -> dict[str, object]:
+    if input_mode == "sessions":
+        next_text = sessions_hint(db_path)
+        next_commands = [
+            f"codex-observe sessions --db {db_path}",
+            f"codex-observe sessions --db {db_path} --json",
+        ]
+    else:
+        next_text = report_json_hint(db_path)
+        next_commands = [
+            f"codex-observe report --db {db_path} --format json --out run-report.json"
+        ]
+    return {
+        "schema_version": COMPARISON_FAILURE_SCHEMA_VERSION,
+        "status": status,
+        "input_mode": input_mode,
+        "database": db_path,
+        "error": error,
+        "next": next_text,
+        "next_commands": next_commands,
+    }
+
+
+def comparison_written_lines(path: Path, comparison: dict) -> list[str]:
+    risk = comparison.get("triage_risk", {})
+    direction = str(risk.get("direction") or "unknown")
+    before = str(risk.get("before") or "unknown")
+    after = str(risk.get("after") or "unknown")
+    opportunity = comparison.get("opportunity_change", {})
+    opportunity_summary = ""
+    if isinstance(opportunity, dict):
+        opportunity_summary = str(opportunity.get("summary") or "").strip()
+    recommendation = str(comparison.get("recommendation") or "Inspect the comparison.")
+    lines = [
+        f"Wrote aggregate-only comparison: {path}",
+        f"Verdict: {comparison.get('verdict', 'unknown')}",
+        f"Triage risk: {before} -> {after} ({direction})",
+    ]
+    if opportunity_summary:
+        lines.append(f"Opportunity change: {opportunity_summary}")
+    lines.append(f"Next step: {recommendation}")
+    return lines
+
+
+def report_failure_payload(
+    db_path: str, status: str, error: str, session_id: str | None = None
+) -> dict[str, object]:
+    if status == "missing":
+        next_text = (
+            f"run `codex-observe demo --db {db_path}` for synthetic data or "
+            f"`codex-observe ingest ~/.codex/sessions --db {db_path}` for local logs."
+        )
+        next_commands = sessions_next_commands(db_path)
+    else:
+        next_text = sessions_hint(db_path)
+        next_commands = [
+            f"codex-observe sessions --db {db_path}",
+            f"codex-observe sessions --db {db_path} --json",
+        ]
+    return {
+        "schema_version": REPORT_FAILURE_SCHEMA_VERSION,
+        "database": db_path,
+        "status": status,
+        "error": error,
+        "session_id": session_id,
+        "next": next_text,
+        "next_commands": next_commands,
+    }
+
+
+def report_written_lines(path: Path, report: dict) -> list[str]:
+    triage = report.get("triage", {})
+    risk = str(triage.get("risk_level") or "unknown")
+    driver = str(triage.get("primary_driver") or "No high-signal diagnostic")
+    action = str(triage.get("next_action") or "Inspect the report.")
+    opportunity_line = ""
+    opportunities = report.get("opportunities", [])
+    if isinstance(opportunities, list) and opportunities:
+        first = opportunities[0]
+        if isinstance(first, dict):
+            opportunity_driver = str(first.get("Driver") or "unknown")
+            opportunity_scale = str(first.get("Scale") or "unknown")
+            opportunity_line = (
+                f"Top opportunity: {opportunity_driver}; {opportunity_scale}"
+            )
+    lines = [
+        f"Wrote aggregate-only report: {path}",
+        f"Triage: {risk} risk; {driver}",
+    ]
+    if opportunity_line:
+        lines.append(opportunity_line)
+    lines.append(f"Next action: {action}")
+    return lines
+
+
+def report_json_hint(db_path: str) -> str:
+    return (
+        f"Run `codex-observe report --db {db_path} --format json --out run-report.json` "
+        "to create a comparison input."
+    )
+
+
+def bundle_path_label(path: Path, output_dir: Path) -> str:
+    return path.relative_to(output_dir).as_posix()
+
+
+def write_json_artifact(path: Path, payload: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def evidence_bundle_readme(manifest: dict[str, object]) -> str:
+    artifacts = manifest.get("artifacts", {})
+    checks = manifest.get("checks", {})
+    lines = [
+        "# Codex Observe Evidence Bundle",
+        "",
+        f"Status: {manifest.get('status', 'unknown')}",
+        "",
+        "This bundle uses synthetic demo data only. It does not require private Codex logs, and it does not intentionally include raw prompts, message text, tool commands, tool output, or event payload JSON.",
+        "",
+        "## Start Here",
+        "",
+        "- `evidence-bundle.json` is the machine-readable manifest.",
+        "- `LIMITATIONS.md` records known boundaries, approval-gated work, and next-work sources.",
+    ]
+    if isinstance(artifacts, dict):
+        recommended = [
+            ("limitations_markdown", "Known limitations and next-work sources"),
+            ("report_markdown", "Aggregate run report"),
+            ("comparison_markdown", "Aggregate comparison report"),
+            ("audit_json", "Release audit JSON"),
+            ("visual_manifest", "Visual QA manifest"),
+        ]
+        for key, label in recommended:
+            value = artifacts.get(key)
+            if isinstance(value, str):
+                lines.append(f"- `{value}`: {label}.")
+        screenshots = artifacts.get("visual_screenshots")
+        if isinstance(screenshots, list) and screenshots:
+            joined = ", ".join(f"`{item}`" for item in screenshots)
+            lines.append(f"- {joined}: Dashboard screenshots.")
+
+    lines.extend(["", "## Checks", ""])
+    if isinstance(checks, dict):
+        for key, value in checks.items():
+            status = "unknown"
+            if isinstance(value, dict):
+                status = str(value.get("status", "unknown"))
+            lines.append(f"- {key}: {status}")
+
+    lines.extend(
+        [
+            "",
+            "## Before Sharing",
+            "",
+            "- Review the Markdown reports, audit JSON, manifest, and screenshots when visual QA is included.",
+            "- Do not attach private logs, private SQLite databases, or unreviewed local artifacts.",
+            "- External publishing or attachment still requires explicit human approval.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def sync_visual_evidence_for_audit(source_dir: Path) -> None:
+    target_dir = VISUAL_MANIFEST.parent
+    target_dir.mkdir(parents=True, exist_ok=True)
+    for name in ["visual-qa-manifest.json", *EXPECTED_VISUAL_SCREENSHOTS.values()]:
+        source = source_dir / name
+        if source.exists():
+            shutil.copy2(source, target_dir / name)
+
+
+def public_evidence_bundle(
+    output_dir: str = ".artifacts/public-evidence",
+    *,
+    run_visual: bool = True,
+) -> tuple[int, dict[str, object]]:
+    out = Path(output_dir).expanduser()
+    demo_dir = out / "demo"
+    visual_dir = out / "visual"
+    audit_dir = out / "audit"
+    out.mkdir(parents=True, exist_ok=True)
+    demo_dir.mkdir(parents=True, exist_ok=True)
+    audit_dir.mkdir(parents=True, exist_ok=True)
+
+    db_path = demo_dir / "codex_observe_demo.sqlite"
+    sessions_path = demo_dir / "sessions"
+    report_md = demo_dir / "run-report.md"
+    report_json_path = demo_dir / "run-report.json"
+    comparison_md = demo_dir / "run-comparison.md"
+    comparison_json_path = demo_dir / "run-comparison.json"
+    audit_json_path = audit_dir / "audit.json"
+    manifest_path = out / "evidence-bundle.json"
+    readme_path = out / "README.md"
+    limitations_path = out / "LIMITATIONS.md"
+
+    limitations_source = Path("docs") / "LIMITATIONS.md"
+    if limitations_source.exists():
+        limitations_text = limitations_source.read_text(encoding="utf-8")
+    else:
+        limitations_text = (
+            "# Limitations and Next Work\n\n"
+            "The source repository limitations document was not available "
+            "when this synthetic bundle was generated. Run `codex-observe audit --json` "
+            "from the repository checkout before publishing or attaching artifacts.\n"
+        )
+    limitations_path.write_text(limitations_text, encoding="utf-8")
+
+    commands = [
+        f"codex-observe demo --db {bundle_path_label(db_path, out)} --sessions {bundle_path_label(sessions_path, out)} --keep-sessions",
+        f"codex-observe report --db {bundle_path_label(db_path, out)} --out {bundle_path_label(report_md, out)}",
+        f"codex-observe report --db {bundle_path_label(db_path, out)} --format json --out {bundle_path_label(report_json_path, out)}",
+        f"codex-observe compare --before-report {bundle_path_label(report_json_path, out)} --after-report {bundle_path_label(report_json_path, out)} --out {bundle_path_label(comparison_md, out)}",
+        f"codex-observe compare --before-report {bundle_path_label(report_json_path, out)} --after-report {bundle_path_label(report_json_path, out)} --format json --out {bundle_path_label(comparison_json_path, out)}",
+    ]
+    if run_visual:
+        commands.append(
+            f"python scripts/visual_qa.py --db {bundle_path_label(db_path, out)} --out {bundle_path_label(visual_dir, out)}"
+        )
+    commands.append("codex-observe audit --json")
+
+    statuses: dict[str, object] = {}
+    result = create_demo_database(str(db_path), str(sessions_path), keep_sessions=True)
+    statuses["demo"] = {
+        "status": "ok",
+        "jsonl_files": int(result.files_imported),
+        "threads": int(result.threads),
+        "events": int(result.events),
+    }
+
+    report = build_report(str(db_path))
+    report_md.write_text(report_markdown(report), encoding="utf-8")
+    report_json_path.write_text(report_json(report), encoding="utf-8")
+    statuses["report"] = {"status": "ok", "schema_version": REPORT_SCHEMA_VERSION}
+
+    comparison = compare_reports(report, report)
+    comparison_md.write_text(comparison_markdown(comparison), encoding="utf-8")
+    comparison_json_path.write_text(comparison_json(comparison), encoding="utf-8")
+    statuses["comparison"] = {
+        "status": "ok",
+        "schema_version": COMPARISON_SCHEMA_VERSION,
+    }
+
+    visual_manifest = visual_dir / "visual-qa-manifest.json"
+    if run_visual:
+        visual_command = [
+            sys.executable,
+            str(Path("scripts") / "visual_qa.py"),
+            "--db",
+            str(db_path),
+            "--out",
+            str(visual_dir),
+        ]
+        visual_result = subprocess.run(
+            visual_command,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if visual_result.returncode == 0:
+            sync_visual_evidence_for_audit(visual_dir)
+            statuses["visual_qa"] = {
+                "status": "ok",
+                "manifest": bundle_path_label(visual_manifest, out),
+            }
+        else:
+            statuses["visual_qa"] = {
+                "status": "failed",
+                "returncode": visual_result.returncode,
+                "error": (visual_result.stderr or visual_result.stdout)
+                .strip()
+                .splitlines()[:5],
+            }
+    else:
+        statuses["visual_qa"] = {"status": "skipped"}
+
+    audit_status, audit_payload = release_audit_report(
+        str(audit_dir / "audit-demo.sqlite"),
+        str(audit_dir / "sessions"),
+        str(audit_dir / "audit-run-report.md"),
+        check_public_evidence_bundle=False,
+    )
+    write_json_artifact(audit_json_path, audit_payload)
+    statuses["audit"] = {
+        "status": audit_payload.get("status", "unknown"),
+        "schema_version": audit_payload.get("schema_version"),
+    }
+
+    visual_status = statuses["visual_qa"].get("status")
+    artifacts: dict[str, object] = {
+        "bundle_readme": bundle_path_label(readme_path, out),
+        "limitations_markdown": bundle_path_label(limitations_path, out),
+        "database": bundle_path_label(db_path, out),
+        "sessions_dir": bundle_path_label(sessions_path, out),
+        "report_markdown": bundle_path_label(report_md, out),
+        "report_json": bundle_path_label(report_json_path, out),
+        "comparison_markdown": bundle_path_label(comparison_md, out),
+        "comparison_json": bundle_path_label(comparison_json_path, out),
+        "audit_json": bundle_path_label(audit_json_path, out),
+    }
+    if visual_status == "ok" and visual_manifest.exists():
+        artifacts["visual_manifest"] = bundle_path_label(visual_manifest, out)
+        artifacts["visual_screenshots"] = [
+            bundle_path_label(visual_dir / filename, out)
+            for filename in EXPECTED_VISUAL_SCREENSHOTS.values()
+            if (visual_dir / filename).exists()
+        ]
+
+    status = (
+        "ok" if audit_status == 0 and visual_status in {"ok", "skipped"} else "failed"
+    )
+    next_step = "Start with README.md and LIMITATIONS.md, then review evidence-bundle.json, run-report.md, run-comparison.md, and audit.json before publishing or attaching artifacts."
+    if visual_status == "ok":
+        next_step = "Start with README.md and LIMITATIONS.md, then review evidence-bundle.json, run-report.md, run-comparison.md, audit.json, and visual QA screenshots before publishing or attaching artifacts."
+
+    manifest: dict[str, object] = {
+        "schema_version": EVIDENCE_BUNDLE_SCHEMA_VERSION,
+        "status": status,
+        "privacy": {
+            "mode": "synthetic-demo",
+            "private_log_required": False,
+            "raw_content_included": False,
+        },
+        "commands": commands,
+        "artifacts": artifacts,
+        "checks": statuses,
+        "next": next_step,
+    }
+    write_json_artifact(manifest_path, manifest)
+    readme_path.write_text(evidence_bundle_readme(manifest), encoding="utf-8")
+    return 0 if status == "ok" else 1, manifest
+
+
+def evidence_bundle_lines(output_dir: str, manifest: dict[str, object]) -> list[str]:
+    artifacts = manifest.get("artifacts", {})
+    lines = [
+        f"Evidence bundle: {Path(output_dir).expanduser()}",
+        f"Status: {manifest.get('status', 'unknown')}",
+        "Artifacts:",
+    ]
+    if isinstance(artifacts, dict):
+        for key, value in artifacts.items():
+            if isinstance(value, list):
+                lines.append(f"- {key}: {', '.join(str(item) for item in value)}")
+            else:
+                lines.append(f"- {key}: {value}")
+    lines.append(f"Next: {manifest.get('next', 'Review the bundle artifacts.')}")
+    return lines
+
+
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="codex-observe", description="Offline observability for Codex JSONL session logs")
+    parser = argparse.ArgumentParser(
+        prog="codex-observe",
+        description="Offline observability for Codex JSONL session logs",
+        epilog=textwrap.dedent(
+            """            Start here:
+              codex-observe tour
+              codex-observe demo --serve --host 127.0.0.1 --port 8501
+              codex-observe doctor --db .artifacts/demo/codex_observe_demo.sqlite --json
+              codex-observe sessions --db .artifacts/demo/codex_observe_demo.sqlite --json
+              codex-observe scan-and-serve ~/.codex/sessions
+              codex-observe report --db ~/.codex-observe/codex_observe.sqlite --out run-report.md
+
+            Privacy: doctor, sessions, report, compare, and audit use aggregate-only outputs; dashboard screenshots and copied rows may still reveal private local content.
+            """
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "--version", action="version", version=f"%(prog)s {__version__}"
+    )
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    p_ingest = sub.add_parser("ingest", help="Ingest Codex JSONL files into SQLite")
-    p_ingest.add_argument("sessions_path", nargs="?", default=str(Path.home() / ".codex" / "sessions"))
-    p_ingest.add_argument("--db", default=default_db())
+    p_tour = sub.add_parser(
+        "tour",
+        help="Print the privacy-safe public evaluation path",
+        description="Print a synthetic-data tour that exercises the dashboard, aggregate reports, comparison, visual QA, release audit, and evidence bundle.",
+    )
+    p_tour.add_argument(
+        "--db",
+        default=DEFAULT_DEMO_DB,
+        help="Synthetic SQLite database path to show in commands",
+    )
+    p_tour.add_argument(
+        "--json", action="store_true", help="Emit the tour as schema-versioned JSON"
+    )
+    p_ingest = sub.add_parser(
+        "ingest",
+        help="Ingest Codex JSONL files into SQLite",
+        description="Ingest a Codex sessions directory or JSONL file into a local SQLite database.",
+    )
+    p_ingest.add_argument(
+        "sessions_path",
+        nargs="?",
+        default=str(Path.home() / ".codex" / "sessions"),
+        help="Codex sessions directory or JSONL file; defaults to ~/.codex/sessions",
+    )
+    p_ingest.add_argument("--db", default=default_db(), help="SQLite database path")
+    p_ingest.add_argument(
+        "--json", action="store_true", help="Emit aggregate-only ingest status as JSON"
+    )
 
-    p_serve = sub.add_parser("serve", help="Launch the Streamlit dashboard")
-    p_serve.add_argument("--db", default=default_db())
-    p_serve.add_argument("--host", default=None)
-    p_serve.add_argument("--port", default=None)
+    p_serve = sub.add_parser(
+        "serve",
+        help="Launch the Streamlit dashboard",
+        description="Launch the Streamlit dashboard for an existing Codex Observe database.",
+    )
+    p_serve.add_argument("--db", default=default_db(), help="SQLite database path")
+    p_serve.add_argument(
+        "--host", default=None, help="Streamlit host, for example 127.0.0.1"
+    )
+    p_serve.add_argument(
+        "--port", default=None, help="Streamlit port, for example 8501"
+    )
 
-    p_scan = sub.add_parser("scan-and-serve", help="Ingest then launch the dashboard")
-    p_scan.add_argument("sessions_path", nargs="?", default=str(Path.home() / ".codex" / "sessions"))
-    p_scan.add_argument("--db", default=default_db())
-    p_scan.add_argument("--host", default=None)
-    p_scan.add_argument("--port", default=None)
+    p_scan = sub.add_parser(
+        "scan-and-serve",
+        help="Ingest then launch the dashboard",
+        description="Ingest local Codex sessions, then launch the Streamlit dashboard.",
+    )
+    p_scan.add_argument(
+        "sessions_path",
+        nargs="?",
+        default=str(Path.home() / ".codex" / "sessions"),
+        help="Codex sessions directory or JSONL file; defaults to ~/.codex/sessions",
+    )
+    p_scan.add_argument("--db", default=default_db(), help="SQLite database path")
+    p_scan.add_argument(
+        "--host", default=None, help="Streamlit host, for example 127.0.0.1"
+    )
+    p_scan.add_argument("--port", default=None, help="Streamlit port, for example 8501")
 
+    p_demo = sub.add_parser(
+        "demo",
+        help="Create a synthetic demo database, optionally launch the dashboard",
+        description="Create representative synthetic data for trying Codex Observe without private logs.",
+        epilog="Example: codex-observe demo --serve --host 127.0.0.1 --port 8501",
+    )
+    p_demo.add_argument(
+        "--db", default=DEFAULT_DEMO_DB, help="Synthetic SQLite database path"
+    )
+    p_demo.add_argument(
+        "--sessions",
+        default=DEFAULT_DEMO_SESSIONS,
+        help="Temporary synthetic sessions directory",
+    )
+    p_demo.add_argument(
+        "--keep-sessions",
+        action="store_true",
+        help="Keep generated synthetic JSONL files",
+    )
+    p_demo.add_argument(
+        "--serve",
+        action="store_true",
+        help="Launch the dashboard after generating demo data",
+    )
+    p_demo.add_argument(
+        "--host", default=None, help="Streamlit host, for example 127.0.0.1"
+    )
+    p_demo.add_argument("--port", default=None, help="Streamlit port, for example 8501")
+    p_demo.add_argument(
+        "--json", action="store_true", help="Emit demo creation status as JSON"
+    )
+
+    p_bundle = sub.add_parser(
+        "evidence-bundle",
+        help="Create a local synthetic public evidence bundle",
+        description="Create synthetic demo, report, comparison, audit, and visual QA evidence in one local bundle directory.",
+    )
+    p_bundle.add_argument(
+        "--out",
+        default=".artifacts/public-evidence",
+        help="Output directory for the local evidence bundle",
+    )
+    p_bundle.add_argument(
+        "--skip-visual",
+        action="store_true",
+        help="Skip browser visual QA generation; intended for fast contract tests",
+    )
+    p_bundle.add_argument(
+        "--json", action="store_true", help="Emit the bundle manifest as JSON"
+    )
+
+    p_audit = sub.add_parser(
+        "audit",
+        help="Run fast release-readiness checks without printing private log content",
+        description="Run aggregate-only release checks using synthetic demo data and repository metadata.",
+    )
+    p_audit.add_argument(
+        "--db", default=DEFAULT_DEMO_DB, help="Synthetic audit database path"
+    )
+    p_audit.add_argument(
+        "--sessions",
+        default=DEFAULT_DEMO_SESSIONS,
+        help="Temporary synthetic sessions directory",
+    )
+    p_audit.add_argument(
+        "--report-out",
+        default=".artifacts/demo/run-report.md",
+        help="Aggregate report path written during audit",
+    )
+    p_audit.add_argument(
+        "--public-evidence-dir",
+        default=".artifacts/public-evidence",
+        help="Generated evidence bundle directory validated during audit",
+    )
+    p_audit.add_argument(
+        "--json", action="store_true", help="Emit aggregate-only JSON for automation"
+    )
+    p_doctor = sub.add_parser(
+        "doctor",
+        help="Check a Codex Observe database without printing private log content",
+    )
+    p_doctor.add_argument("--db", default=default_db(), help="SQLite database path")
+    p_doctor.add_argument(
+        "--json", action="store_true", help="Emit aggregate-only JSON for automation"
+    )
+
+    p_sessions = sub.add_parser(
+        "sessions",
+        help="List imported conversations without printing private log content",
+    )
+    p_sessions.add_argument("--db", default=default_db(), help="SQLite database path")
+    p_sessions.add_argument(
+        "--json", action="store_true", help="Emit aggregate-only JSON for automation"
+    )
+
+    p_compare = sub.add_parser(
+        "compare",
+        help="Compare two privacy-safe run reports or two sessions from one database",
+        description="Compare aggregate-only reports or session summaries and include a verdict, largest-change summary, opportunity-change movement, and diagnostic changes.",
+        epilog=textwrap.dedent(
+            """            Examples:
+              codex-observe compare --before-report before.json --after-report after.json --out run-comparison.md
+              codex-observe compare --db ~/.codex-observe/codex_observe.sqlite --before-session before-run --after-session after-run --format json
+            """
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p_compare.add_argument(
+        "--db",
+        default=default_db(),
+        help="SQLite database path for session-to-session comparison",
+    )
+    p_compare.add_argument(
+        "--before-session", default=None, help="Baseline session id from --db"
+    )
+    p_compare.add_argument(
+        "--after-session", default=None, help="Comparison session id from --db"
+    )
+    p_compare.add_argument(
+        "--before-report",
+        default=None,
+        help="Baseline JSON report from codex-observe report --format json",
+    )
+    p_compare.add_argument(
+        "--after-report",
+        default=None,
+        help="Comparison JSON report from codex-observe report --format json",
+    )
+    p_compare.add_argument(
+        "--format", choices=["md", "json"], default="md", help="Output format"
+    )
+    p_compare.add_argument(
+        "--out", default=None, help="Write comparison to this path instead of stdout"
+    )
+    p_report = sub.add_parser(
+        "report",
+        help="Export a privacy-safe run report for one conversation",
+        description="Export an aggregate-only report with a quick-read headline, ranked opportunity stack, diagnostics, and next-run playbook.",
+        epilog=textwrap.dedent(
+            """            Examples:
+              codex-observe sessions --db ~/.codex-observe/codex_observe.sqlite
+              codex-observe report --db ~/.codex-observe/codex_observe.sqlite --out run-report.md
+              codex-observe report --db ~/.codex-observe/codex_observe.sqlite --session-id <id> --format json --out run-report.json
+            """
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p_report.add_argument("--db", default=default_db(), help="SQLite database path")
+    p_report.add_argument(
+        "--session-id",
+        default=None,
+        help="Conversation/session id to report; defaults to highest triage risk, latest as tie-breaker",
+    )
+    p_report.add_argument(
+        "--format", choices=["md", "json"], default="md", help="Output format"
+    )
+    p_report.add_argument(
+        "--out", default=None, help="Write report to this path instead of stdout"
+    )
     args = parser.parse_args(argv)
+
+    if args.cmd == "tour":
+        if args.json:
+            print(json.dumps(public_tour_payload(args.db), indent=2, sort_keys=True))
+        else:
+            print("\n".join(public_tour_lines(args.db)))
+        return 0
+    if args.cmd == "evidence-bundle":
+        status, manifest = public_evidence_bundle(
+            args.out, run_visual=not args.skip_visual
+        )
+        if args.json:
+            print(json.dumps(manifest, indent=2, sort_keys=True))
+        else:
+            print("\n".join(evidence_bundle_lines(args.out, manifest)))
+        return status
+
+    if args.cmd == "audit":
+        if args.json:
+            status, audit = release_audit_report(
+                args.db,
+                args.sessions,
+                args.report_out,
+                public_evidence_dir=args.public_evidence_dir,
+            )
+            print(json.dumps(audit, indent=2, sort_keys=True))
+            return status
+        status, lines = release_audit_lines(
+            args.db,
+            args.sessions,
+            args.report_out,
+            public_evidence_dir=args.public_evidence_dir,
+        )
+        print("\n".join(lines))
+        return status
+    if args.cmd == "doctor":
+        if args.json:
+            status, report = doctor_report(args.db)
+            print(json.dumps(report, indent=2, sort_keys=True))
+            return status
+        status, lines = doctor_lines(args.db)
+        print("\n".join(lines))
+        return status
+
+    if args.cmd == "sessions":
+        try:
+            if args.json:
+                print(
+                    json.dumps(sessions_json_payload(args.db), indent=2, sort_keys=True)
+                )
+            else:
+                print("\n".join(session_summary_lines(args.db)))
+        except FileNotFoundError:
+            if args.json:
+                print(
+                    json.dumps(
+                        sessions_missing_json_payload(args.db),
+                        indent=2,
+                        sort_keys=True,
+                    )
+                )
+            else:
+                print(f"Database not found: {args.db}", file=sys.stderr)
+                print(missing_database_hint(args.db), file=sys.stderr)
+            return 2
+        return 0
+
+    if args.cmd == "compare":
+        has_report_inputs = bool(args.before_report or args.after_report)
+        has_session_inputs = bool(args.before_session or args.after_session)
+        if has_report_inputs and has_session_inputs:
+            error = "Use either --before-report/--after-report or --before-session/--after-session, not both."
+            if args.format == "json":
+                print(
+                    json.dumps(
+                        compare_failure_payload(
+                            args.db, "invalid_input", error, "mixed"
+                        ),
+                        indent=2,
+                        sort_keys=True,
+                    )
+                )
+            else:
+                print(error, file=sys.stderr)
+            return 1
+        try:
+            if has_report_inputs:
+                if not args.before_report or not args.after_report:
+                    error = "Both --before-report and --after-report are required for report comparison."
+                    if args.format == "json":
+                        print(
+                            json.dumps(
+                                compare_failure_payload(
+                                    args.db, "incomplete_input", error, "reports"
+                                ),
+                                indent=2,
+                                sort_keys=True,
+                            )
+                        )
+                    else:
+                        print(error, file=sys.stderr)
+                        print(report_json_hint(args.db), file=sys.stderr)
+                    return 1
+                before = load_report_json(args.before_report)
+                after = load_report_json(args.after_report)
+            else:
+                if not args.before_session or not args.after_session:
+                    error = "Both --before-session and --after-session are required for session comparison."
+                    if args.format == "json":
+                        print(
+                            json.dumps(
+                                compare_failure_payload(
+                                    args.db, "incomplete_input", error, "sessions"
+                                ),
+                                indent=2,
+                                sort_keys=True,
+                            )
+                        )
+                    else:
+                        print(error, file=sys.stderr)
+                        print(sessions_hint(args.db), file=sys.stderr)
+                    return 1
+                before = build_report(args.db, args.before_session)
+                after = build_report(args.db, args.after_session)
+        except FileNotFoundError as exc:
+            if args.format == "json":
+                if has_session_inputs:
+                    payload = compare_failure_payload(
+                        args.db,
+                        "missing",
+                        f"database not found: {args.db}",
+                        "sessions",
+                    )
+                else:
+                    payload = compare_failure_payload(
+                        args.db, "missing", f"file not found: {exc}", "reports"
+                    )
+                print(json.dumps(payload, indent=2, sort_keys=True))
+            elif has_session_inputs:
+                print(f"Database not found: {args.db}", file=sys.stderr)
+                print(missing_database_hint(args.db), file=sys.stderr)
+            else:
+                print(f"File not found: {exc}", file=sys.stderr)
+                print(report_json_hint(args.db), file=sys.stderr)
+            return 2
+        except (ValueError, json.JSONDecodeError) as exc:
+            if args.format == "json":
+                input_mode = "sessions" if has_session_inputs else "reports"
+                print(
+                    json.dumps(
+                        compare_failure_payload(
+                            args.db, "unavailable", str(exc), input_mode
+                        ),
+                        indent=2,
+                        sort_keys=True,
+                    )
+                )
+            else:
+                print(str(exc), file=sys.stderr)
+                if has_session_inputs:
+                    print(sessions_hint(args.db), file=sys.stderr)
+                else:
+                    print(report_json_hint(args.db), file=sys.stderr)
+            return 1
+
+        comparison = compare_reports(before, after)
+        output = (
+            comparison_json(comparison)
+            if args.format == "json"
+            else comparison_markdown(comparison)
+        )
+        if args.out:
+            out_path = Path(args.out).expanduser()
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path.write_text(output, encoding="utf-8")
+            print("\n".join(comparison_written_lines(out_path, comparison)))
+        else:
+            print(output)
+        return 0
+    if args.cmd == "report":
+        try:
+            report = build_report(args.db, args.session_id)
+        except FileNotFoundError:
+            if args.format == "json":
+                print(
+                    json.dumps(
+                        report_failure_payload(
+                            args.db,
+                            "missing",
+                            f"database not found: {args.db}",
+                            args.session_id,
+                        ),
+                        indent=2,
+                        sort_keys=True,
+                    )
+                )
+            else:
+                print(f"Database not found: {args.db}", file=sys.stderr)
+                print(missing_database_hint(args.db), file=sys.stderr)
+            return 2
+        except ValueError as exc:
+            if args.format == "json":
+                print(
+                    json.dumps(
+                        report_failure_payload(
+                            args.db, "unavailable", str(exc), args.session_id
+                        ),
+                        indent=2,
+                        sort_keys=True,
+                    )
+                )
+            else:
+                print(str(exc), file=sys.stderr)
+                print(sessions_hint(args.db), file=sys.stderr)
+            return 1
+        output = (
+            report_json(report) if args.format == "json" else report_markdown(report)
+        )
+        if args.out:
+            out_path = Path(args.out).expanduser()
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path.write_text(output, encoding="utf-8")
+            print("\n".join(report_written_lines(out_path, report)))
+        else:
+            print(output)
+        return 0
+    if args.cmd == "demo":
+        Path(args.db).expanduser().parent.mkdir(parents=True, exist_ok=True)
+        result = create_demo_database(
+            args.db, args.sessions, keep_sessions=args.keep_sessions
+        )
+        if args.json:
+            print(
+                json.dumps(
+                    demo_success_payload(
+                        args.db,
+                        args.sessions,
+                        result,
+                        keep_sessions=args.keep_sessions,
+                        serve=args.serve,
+                    ),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+        else:
+            print("\n".join(demo_success_lines(args.db, result, args.serve)))
+        if not args.serve:
+            return 0
+
     if args.cmd in {"ingest", "scan-and-serve"}:
         Path(args.db).expanduser().parent.mkdir(parents=True, exist_ok=True)
         result = ingest(args.sessions_path, args.db)
-        print(
-            f"Imported {result.files_imported} JSONL files "
-            f"({result.duplicate_files} duplicates skipped), "
-            f"{result.threads} threads, {result.events} events into {args.db}"
-        )
+        if args.cmd == "ingest" and args.json:
+            print(
+                json.dumps(
+                    ingest_success_payload(args.sessions_path, args.db, result),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+        else:
+            print(
+                "\n".join(
+                    ingest_success_lines(args.db, result, args.cmd == "scan-and-serve")
+                )
+            )
         if args.cmd == "ingest":
             return 0
 
@@ -55,4 +2806,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

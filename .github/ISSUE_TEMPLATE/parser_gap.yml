@@ -1,0 +1,33 @@
+name: Parser/log shape gap
+description: A Codex JSONL shape that should be parsed or normalized better
+title: "[Parser] "
+labels: ["area: parser", "type: slice", "status: ready"]
+body:
+  - type: textarea
+    id: shape
+    attributes:
+      label: Observed log shape
+      description: Paste a redacted minimal JSONL payload or describe the fields. Use docs/REAL_LOG_FEEDBACK.md before deriving fixtures from real logs. Do not include private conversation content.
+      placeholder: '{"type":"event","payload":{...}}'
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: Which table, derived value, or dashboard view should reflect this shape?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      value: |
+        - [ ] A redacted fixture or synthetic equivalent covers the shape.
+        - [ ] If derived from real logs, `docs/REAL_LOG_FEEDBACK.md` was followed and the redaction manifest/privacy review is recorded.
+        - [ ] Unknown payloads remain inspectable in `events.payload_json`.
+        - [ ] Re-import behavior stays deterministic.
+        - [ ] `ruff check`, `ruff format --check`, and `pytest -q` pass.
+        - [ ] `codex-observe audit --json` passes when the parser slice affects release evidence.
+    validations:
+      required: true

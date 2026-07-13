@@ -1,0 +1,110 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    name: Tests and visual QA
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install package and visual QA dependencies
+        run: python -m pip install -e ".[dev]"
+
+      - name: Run clean-install smoke gate
+        run: python scripts/clean_install_smoke.py --extra dev
+
+      - name: Install Playwright Chromium
+        run: python -m playwright install --with-deps chromium
+
+      - name: Run Ruff lint
+        run: ruff check
+
+      - name: Run Ruff format check
+        run: ruff format --check
+
+      - name: Run regression suite
+        run: pytest -q
+
+      - name: Generate synthetic demo database
+        run: codex-observe demo
+
+      - name: Verify synthetic demo JSON contract
+        run: codex-observe demo --sessions .artifacts/demo/sessions --keep-sessions --json
+
+      - name: Verify aggregate ingest JSON contract
+        run: codex-observe ingest .artifacts/demo/sessions --db .artifacts/demo/ingest-contract.sqlite --json
+
+      - name: List aggregate-only sessions
+        run: codex-observe sessions --db .artifacts/demo/codex_observe_demo.sqlite --json
+
+      - name: Run database doctor
+        run: codex-observe doctor --db .artifacts/demo/codex_observe_demo.sqlite --json
+
+      - name: Export aggregate-only run report
+        run: codex-observe report --db .artifacts/demo/codex_observe_demo.sqlite --out .artifacts/demo/run-report.md
+
+      - name: Export aggregate-only run report JSON
+        run: codex-observe report --db .artifacts/demo/codex_observe_demo.sqlite --format json --out .artifacts/demo/run-report.json
+
+      - name: Compare aggregate-only reports
+        run: codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --out .artifacts/demo/run-comparison.md
+
+      - name: Compare aggregate-only reports JSON
+        run: codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --format json --out .artifacts/demo/run-comparison.json
+
+      - name: Run visual QA
+        run: python scripts/visual_qa.py
+
+      - name: Verify visual QA manifest
+        run: python scripts/visual_qa.py --verify-manifest .artifacts/visual/visual-qa-manifest.json
+
+      - name: Generate reviewer evidence bundle
+        run: codex-observe evidence-bundle --out .artifacts/public-evidence
+
+      - name: Run final release audit
+        run: codex-observe audit --json
+
+      - name: Upload aggregate-only run report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aggregate-run-report
+          path: |
+            .artifacts/demo/run-report.md
+            .artifacts/demo/run-report.json
+            .artifacts/demo/run-comparison.md
+            .artifacts/demo/run-comparison.json
+          if-no-files-found: warn
+
+      - name: Upload visual QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-qa-evidence
+          path: |
+            .artifacts/visual/*.png
+            .artifacts/visual/visual-qa-manifest.json
+          if-no-files-found: warn
+
+      - name: Upload reviewer evidence bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-evidence-bundle
+          path: .artifacts/public-evidence/**
+          if-no-files-found: warn

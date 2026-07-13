@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import argparse
 import datetime as dt
 import hashlib
 import json
-import os
 import re
 import sqlite3
 from dataclasses import dataclass
@@ -27,7 +25,9 @@ def sha256_file(path: Path) -> str:
 
 
 def stable_event_pk(thread_id: str, idx: int, raw: str) -> str:
-    return hashlib.sha256(f"{thread_id}:{idx}:".encode() + raw.encode("utf-8", "replace")).hexdigest()
+    return hashlib.sha256(
+        f"{thread_id}:{idx}:".encode() + raw.encode("utf-8", "replace")
+    ).hexdigest()
 
 
 def approx_tokens(text: str) -> int:
@@ -82,25 +82,53 @@ def extract_agent(meta: dict[str, Any]) -> tuple[str | None, str | None]:
     if isinstance(src, dict):
         sub = src.get("subagent")
         if isinstance(sub, dict):
-            spawn = sub.get("thread_spawn") if isinstance(sub.get("thread_spawn"), dict) else {}
-            role = spawn.get("agent_role") or sub.get("agent_role") or sub.get("role") or sub.get("other")
-            nick = spawn.get("agent_nickname") or sub.get("agent_nickname") or sub.get("nickname")
+            spawn = (
+                sub.get("thread_spawn")
+                if isinstance(sub.get("thread_spawn"), dict)
+                else {}
+            )
+            role = (
+                spawn.get("agent_role")
+                or sub.get("agent_role")
+                or sub.get("role")
+                or sub.get("other")
+            )
+            nick = (
+                spawn.get("agent_nickname")
+                or sub.get("agent_nickname")
+                or sub.get("nickname")
+            )
     return role, nick or ""
 
 
-def read_jsonl(path: Path) -> list[tuple[int, dict[str, Any], str]]:
+@dataclass
+class JsonlReadResult:
+    rows: list[tuple[int, dict[str, Any], str]]
+    blank_lines: int = 0
+    malformed_lines: int = 0
+
+
+def read_jsonl(path: Path) -> JsonlReadResult:
     rows = []
+    blank_lines = 0
+    malformed_lines = 0
     with path.open("r", encoding="utf-8", errors="replace") as f:
         for idx, raw in enumerate(f):
             raw = raw.rstrip("\n")
+            if idx == 0:
+                raw = raw.lstrip("\ufeff")
             if not raw.strip():
+                blank_lines += 1
                 continue
             try:
                 rows.append((idx, json.loads(raw), raw))
             except json.JSONDecodeError:
                 # Keep going; schema drift / partial writes should not kill ingestion.
+                malformed_lines += 1
                 continue
-    return rows
+    return JsonlReadResult(
+        rows=rows, blank_lines=blank_lines, malformed_lines=malformed_lines
+    )
 
 
 def text_from_content(content: Any) -> str:
@@ -125,7 +153,9 @@ def extract_message_text(payload: dict[str, Any]) -> tuple[str | None, str]:
     if pt == "message":
         return payload.get("role"), text_from_content(payload.get("content"))
     if pt in {"user_message", "agent_message"}:
-        return ("user" if pt == "user_message" else "assistant"), payload.get("message") or ""
+        return ("user" if pt == "user_message" else "assistant"), payload.get(
+            "message"
+        ) or ""
     return None, ""
 
 
@@ -133,25 +163,73 @@ def usage_from_payload(payload: dict[str, Any]) -> dict[str, int] | None:
     if payload.get("type") != "token_count":
         return None
     info = payload.get("info") or {}
-    total = info.get("total_token_usage") or {}
-    last = info.get("last_token_usage") or {}
-    def g(d: dict[str, Any], key: str) -> int:
-        v = d.get(key, 0)
-        return int(v or 0)
+    total = (
+        info.get("total_token_usage")
+        or payload.get("total_token_usage")
+        or info.get("usage")
+        or payload.get("usage")
+        or {}
+    )
+    last = info.get("last_token_usage") or payload.get("last_token_usage") or {}
+
+    def g(d: dict[str, Any], key: str, *aliases: str) -> int:
+        for candidate in (key, *aliases):
+            if candidate in d:
+                try:
+                    return int(d.get(candidate) or 0)
+                except (TypeError, ValueError):
+                    return 0
+        return 0
+
+    def nested_g(
+        d: dict[str, Any], container: str, key: str, *container_aliases: str
+    ) -> int:
+        for name in (container, *container_aliases):
+            nested = d.get(name)
+            if isinstance(nested, dict):
+                return g(nested, key)
+        return 0
+
+    def cached(d: dict[str, Any]) -> int:
+        return g(d, "cached_input_tokens") or nested_g(
+            d, "input_token_details", "cached_tokens", "input_tokens_details"
+        )
+
+    def reasoning(d: dict[str, Any]) -> int:
+        return g(d, "reasoning_output_tokens", "reasoning_tokens") or nested_g(
+            d, "output_token_details", "reasoning_tokens", "output_tokens_details"
+        )
+
+    total_input = g(total, "input_tokens")
+    total_cached = cached(total)
+    total_output = g(total, "output_tokens")
+    total_reasoning = reasoning(total)
+    total_tokens = (
+        g(total, "total_tokens") or total_input + total_output + total_reasoning
+    )
+
+    last_input = g(last, "input_tokens")
+    last_cached = cached(last)
+    last_output = g(last, "output_tokens")
+    last_reasoning = reasoning(last)
+    last_total = g(last, "total_tokens") or last_input + last_output + last_reasoning
+
     return {
-        "input_tokens": g(total, "input_tokens"),
-        "cached_input_tokens": g(total, "cached_input_tokens"),
-        "uncached_input_tokens": max(0, g(total, "input_tokens") - g(total, "cached_input_tokens")),
-        "output_tokens": g(total, "output_tokens"),
-        "reasoning_tokens": g(total, "reasoning_output_tokens"),
-        "total_tokens": g(total, "total_tokens"),
-        "last_input_tokens": g(last, "input_tokens"),
-        "last_cached_input_tokens": g(last, "cached_input_tokens"),
-        "last_uncached_input_tokens": max(0, g(last, "input_tokens") - g(last, "cached_input_tokens")),
-        "last_output_tokens": g(last, "output_tokens"),
-        "last_reasoning_tokens": g(last, "reasoning_output_tokens"),
-        "last_total_tokens": g(last, "total_tokens"),
-        "model_context_window": int(info.get("model_context_window") or 0),
+        "input_tokens": total_input,
+        "cached_input_tokens": total_cached,
+        "uncached_input_tokens": max(0, total_input - total_cached),
+        "output_tokens": total_output,
+        "reasoning_tokens": total_reasoning,
+        "total_tokens": total_tokens,
+        "last_input_tokens": last_input,
+        "last_cached_input_tokens": last_cached,
+        "last_uncached_input_tokens": max(0, last_input - last_cached),
+        "last_output_tokens": last_output,
+        "last_reasoning_tokens": last_reasoning,
+        "last_total_tokens": last_total,
+        "model_context_window": int(
+            info.get("model_context_window") or payload.get("model_context_window") or 0
+        ),
     }
 
 
@@ -163,7 +241,9 @@ def parse_tool_call(payload: dict[str, Any]) -> dict[str, Any] | None:
         args_raw = payload.get("arguments") or "{}"
         args = {}
         try:
-            args = json.loads(args_raw) if isinstance(args_raw, str) else (args_raw or {})
+            args = (
+                json.loads(args_raw) if isinstance(args_raw, str) else (args_raw or {})
+            )
         except json.JSONDecodeError:
             args = {"_raw": args_raw}
         return {
@@ -178,7 +258,12 @@ def parse_tool_call(payload: dict[str, Any]) -> dict[str, Any] | None:
 
     if ptype == "custom_tool_call":
         name = payload.get("name") or payload.get("tool_name") or "custom_tool"
-        inp = payload.get("input") or payload.get("arguments") or payload.get("content") or ""
+        inp = (
+            payload.get("input")
+            or payload.get("arguments")
+            or payload.get("content")
+            or ""
+        )
         args = {"input": inp}
         return {
             "call_id": payload.get("call_id") or payload.get("id"),
@@ -191,7 +276,9 @@ def parse_tool_call(payload: dict[str, Any]) -> dict[str, Any] | None:
         }
 
     if ptype == "tool_search_call":
-        args = {k: payload.get(k) for k in ["query", "queries", "pattern"] if k in payload}
+        args = {
+            k: payload.get(k) for k in ["query", "queries", "pattern"] if k in payload
+        }
         return {
             "call_id": payload.get("call_id") or payload.get("id"),
             "tool_name": payload.get("name") or "tool_search",
@@ -213,10 +300,16 @@ def prompt_blocks_for_message(text: str) -> list[tuple[str, str]]:
 
     # Known Codex/Codex-guardian wrappers.
     patterns = [
-        ("AGENTS.md", r"# AGENTS\.md instructions.*?(?=\n(?:The following is|>>> TRANSCRIPT START|\[\d+\] |$))"),
+        (
+            "AGENTS.md",
+            r"# AGENTS\.md instructions.*?(?=\n(?:The following is|>>> TRANSCRIPT START|\[\d+\] |$))",
+        ),
         ("transcript", r">>> TRANSCRIPT START\n.*?(?=\n>>> TRANSCRIPT END|$)"),
         ("permissions", r"<permissions instructions>.*?</permissions instructions>"),
-        ("guardian_preamble", r"The following is the Codex agent history.*?(?=>>> TRANSCRIPT START|$)"),
+        (
+            "guardian_preamble",
+            r"The following is the Codex agent history.*?(?=>>> TRANSCRIPT START|$)",
+        ),
     ]
     for label, pat in patterns:
         for m in re.finditer(pat, text, flags=re.DOTALL):
@@ -235,6 +328,11 @@ class IngestResult:
     files_seen: int = 0
     files_imported: int = 0
     duplicate_files: int = 0
+    empty_files: int = 0
+    malformed_files: int = 0
+    malformed_lines: int = 0
+    missing_meta_files: int = 0
+    unreadable_files: int = 0
     threads: int = 0
     events: int = 0
 
@@ -259,10 +357,20 @@ class CodexIngestor:
             elif root.is_dir():
                 paths.extend(root.rglob("*.jsonl"))
         for path in sorted(set(paths)):
-            r = self.ingest_file(path)
+            try:
+                r = self.ingest_file(path)
+            except OSError:
+                result.files_seen += 1
+                result.unreadable_files += 1
+                continue
             result.files_seen += 1
             result.files_imported += r.files_imported
             result.duplicate_files += r.duplicate_files
+            result.empty_files += r.empty_files
+            result.malformed_files += r.malformed_files
+            result.malformed_lines += r.malformed_lines
+            result.missing_meta_files += r.missing_meta_files
+            result.unreadable_files += r.unreadable_files
             result.threads += r.threads
             result.events += r.events
         self.recompute_rollups()
@@ -270,7 +378,13 @@ class CodexIngestor:
         return result
 
     def _delete_thread_rows(self, thread_id: str) -> None:
-        for table in ["events", "usage_snapshots", "tool_calls", "messages", "prompt_blocks"]:
+        for table in [
+            "events",
+            "usage_snapshots",
+            "tool_calls",
+            "messages",
+            "prompt_blocks",
+        ]:
             self.conn.execute(f"DELETE FROM {table} WHERE thread_id=?", (thread_id,))
         self.conn.execute("DELETE FROM threads WHERE thread_id=?", (thread_id,))
 
@@ -280,17 +394,32 @@ class CodexIngestor:
         path_key = str(path)
         stat = path.stat()
         digest = sha256_file(path)
-        path_row = self.conn.execute("SELECT path, sha256, thread_id, is_duplicate, duplicate_of FROM files WHERE path=?", (path_key,)).fetchone()
+        path_row = self.conn.execute(
+            "SELECT path, sha256, thread_id, is_duplicate, duplicate_of FROM files WHERE path=?",
+            (path_key,),
+        ).fetchone()
         canonical = self.conn.execute(
             "SELECT path, thread_id FROM files WHERE sha256=? AND path<>? AND is_duplicate=0 ORDER BY path LIMIT 1",
             (digest, path_key),
         ).fetchone()
         if canonical:
-            if path_row and path_row["thread_id"] and path_row["thread_id"] != canonical["thread_id"]:
+            if (
+                path_row
+                and path_row["thread_id"]
+                and path_row["thread_id"] != canonical["thread_id"]
+            ):
                 self._delete_thread_rows(path_row["thread_id"])
             self.conn.execute(
                 "INSERT OR REPLACE INTO files(path,sha256,size_bytes,mtime,imported_at,thread_id,is_duplicate,duplicate_of) VALUES(?,?,?,?,?,?,1,?)",
-                (path_key, digest, stat.st_size, stat.st_mtime, utc_now(), canonical["thread_id"], canonical["path"]),
+                (
+                    path_key,
+                    digest,
+                    stat.st_size,
+                    stat.st_mtime,
+                    utc_now(),
+                    canonical["thread_id"],
+                    canonical["path"],
+                ),
             )
             result.duplicate_files = 1
             return result
@@ -302,11 +431,20 @@ class CodexIngestor:
             result.duplicate_files = 1
             return result
 
-        rows = read_jsonl(path)
+        read_result = read_jsonl(path)
+        rows = read_result.rows
+        result.malformed_lines = read_result.malformed_lines
+        if read_result.malformed_lines:
+            result.malformed_files = 1
         if not rows:
+            if not read_result.malformed_lines:
+                result.empty_files = 1
             return result
-        meta_obj = next((o for _, o, _ in rows if o.get("type") == "session_meta"), None)
+        meta_obj = next(
+            (o for _, o, _ in rows if o.get("type") == "session_meta"), None
+        )
         if not meta_obj:
+            result.missing_meta_files = 1
             return result
         meta = meta_obj.get("payload") or {}
         thread_id = meta.get("id") or path.stem
@@ -330,9 +468,22 @@ class CodexIngestor:
                 thread_id,session_id,parent_thread_id,file_path,thread_source,source_kind,agent_role,agent_nickname,cwd,cli_version,model_provider,base_instruction_chars,created_at,first_seen,last_seen,event_count
             ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
-                thread_id, session_id, parent_thread_id, str(path), meta.get("thread_source"), skind, role, nick,
-                meta.get("cwd"), meta.get("cli_version"), meta.get("model_provider"), len(base_text or ""), meta.get("timestamp"),
-                first_seen, last_seen, len(rows)
+                thread_id,
+                session_id,
+                parent_thread_id,
+                str(path),
+                meta.get("thread_source"),
+                skind,
+                role,
+                nick,
+                meta.get("cwd"),
+                meta.get("cli_version"),
+                meta.get("model_provider"),
+                len(base_text or ""),
+                meta.get("timestamp"),
+                first_seen,
+                last_seen,
+                len(rows),
             ),
         )
         self.conn.execute(
@@ -341,7 +492,13 @@ class CodexIngestor:
         )
 
         # Clear previous event-derived rows for this thread before reimporting.
-        for table in ["events", "usage_snapshots", "tool_calls", "messages", "prompt_blocks"]:
+        for table in [
+            "events",
+            "usage_snapshots",
+            "tool_calls",
+            "messages",
+            "prompt_blocks",
+        ]:
             self.conn.execute(f"DELETE FROM {table} WHERE thread_id=?", (thread_id,))
 
         for idx, obj, raw in rows:
@@ -355,7 +512,16 @@ class CodexIngestor:
             event_pk = stable_event_pk(thread_id, idx, raw)
             self.conn.execute(
                 "INSERT OR REPLACE INTO events(event_pk,thread_id,idx,timestamp,type,payload_type,turn_id,payload_json) VALUES(?,?,?,?,?,?,?,?)",
-                (event_pk, thread_id, idx, ts, typ, ptype, turn_id, json_dumps(payload)),
+                (
+                    event_pk,
+                    thread_id,
+                    idx,
+                    ts,
+                    typ,
+                    ptype,
+                    turn_id,
+                    json_dumps(payload),
+                ),
             )
 
             if isinstance(payload, dict):
@@ -363,21 +529,61 @@ class CodexIngestor:
                 if usage:
                     self.conn.execute(
                         """INSERT OR REPLACE INTO usage_snapshots VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                        (event_pk, thread_id, idx, ts, turn_id, usage["input_tokens"], usage["cached_input_tokens"], usage["uncached_input_tokens"], usage["output_tokens"], usage["reasoning_tokens"], usage["total_tokens"], usage["last_input_tokens"], usage["last_cached_input_tokens"], usage["last_uncached_input_tokens"], usage["last_output_tokens"], usage["last_reasoning_tokens"], usage["last_total_tokens"], usage["model_context_window"]),
+                        (
+                            event_pk,
+                            thread_id,
+                            idx,
+                            ts,
+                            turn_id,
+                            usage["input_tokens"],
+                            usage["cached_input_tokens"],
+                            usage["uncached_input_tokens"],
+                            usage["output_tokens"],
+                            usage["reasoning_tokens"],
+                            usage["total_tokens"],
+                            usage["last_input_tokens"],
+                            usage["last_cached_input_tokens"],
+                            usage["last_uncached_input_tokens"],
+                            usage["last_output_tokens"],
+                            usage["last_reasoning_tokens"],
+                            usage["last_total_tokens"],
+                            usage["model_context_window"],
+                        ),
                     )
 
                 role_msg, text = extract_message_text(payload)
                 if text:
                     self.conn.execute(
                         "INSERT OR REPLACE INTO messages(event_pk,thread_id,timestamp,turn_id,role,source,text,char_count,approx_tokens) VALUES(?,?,?,?,?,?,?,?,?)",
-                        (event_pk, thread_id, ts, turn_id, role_msg, ptype or typ, text, len(text), approx_tokens(text)),
+                        (
+                            event_pk,
+                            thread_id,
+                            ts,
+                            turn_id,
+                            role_msg,
+                            ptype or typ,
+                            text,
+                            len(text),
+                            approx_tokens(text),
+                        ),
                     )
                     for label, chunk in prompt_blocks_for_message(text):
                         normalized = re.sub(r"\s+", " ", chunk).strip()
-                        bh = hashlib.sha256(normalized.encode("utf-8", "replace")).hexdigest()
+                        bh = hashlib.sha256(
+                            normalized.encode("utf-8", "replace")
+                        ).hexdigest()
                         self.conn.execute(
                             "INSERT OR REPLACE INTO prompt_blocks(block_hash,thread_id,event_pk,timestamp,label,char_count,approx_tokens,preview) VALUES(?,?,?,?,?,?,?,?)",
-                            (bh, thread_id, event_pk, ts, label, len(chunk), approx_tokens(chunk), chunk[:300].replace("\n", " ")),
+                            (
+                                bh,
+                                thread_id,
+                                event_pk,
+                                ts,
+                                label,
+                                len(chunk),
+                                approx_tokens(chunk),
+                                chunk[:300].replace("\n", " "),
+                            ),
                         )
 
                 call = parse_tool_call(payload)
@@ -385,9 +591,27 @@ class CodexIngestor:
                     tool_count += 1
                     self.conn.execute(
                         """INSERT OR REPLACE INTO tool_calls(call_id,thread_id,turn_id,timestamp,tool_name,arguments_json,command,workdir,timeout_ms,output,success,duration_ms,output_chars) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                        (call["call_id"], thread_id, call.get("turn_id"), ts, sqlite_scalar(call.get("tool_name")), sqlite_scalar(call.get("arguments_json")), sqlite_scalar(call.get("command")), sqlite_scalar(call.get("workdir")), sqlite_scalar(call.get("timeout_ms")), None, None, None, None),
+                        (
+                            call["call_id"],
+                            thread_id,
+                            call.get("turn_id"),
+                            ts,
+                            sqlite_scalar(call.get("tool_name")),
+                            sqlite_scalar(call.get("arguments_json")),
+                            sqlite_scalar(call.get("command")),
+                            sqlite_scalar(call.get("workdir")),
+                            sqlite_scalar(call.get("timeout_ms")),
+                            None,
+                            None,
+                            None,
+                            None,
+                        ),
                     )
-                elif payload.get("type") in {"function_call_output", "custom_tool_call_output", "tool_search_output"}:
+                elif payload.get("type") in {
+                    "function_call_output",
+                    "custom_tool_call_output",
+                    "tool_search_output",
+                }:
                     cid = payload.get("call_id") or payload.get("id")
                     out = ""
                     for key in ("output", "content", "result"):
@@ -397,7 +621,12 @@ class CodexIngestor:
                     out_text = sqlite_scalar(out)
                     self.conn.execute(
                         "UPDATE tool_calls SET output=?, output_chars=? WHERE call_id=? AND thread_id=?",
-                        (out_text, len(str(out_text if out_text is not None else "")), cid, thread_id),
+                        (
+                            out_text,
+                            len(str(out_text if out_text is not None else "")),
+                            cid,
+                            thread_id,
+                        ),
                     )
                 elif payload.get("type") == "patch_apply_end":
                     cid = payload.get("call_id")
@@ -405,10 +634,19 @@ class CodexIngestor:
                     out_text = sqlite_scalar(out)
                     self.conn.execute(
                         "UPDATE tool_calls SET output=?, output_chars=?, success=? WHERE call_id=? AND thread_id=?",
-                        (out_text, len(str(out_text if out_text is not None else "")), 1 if payload.get("success") else 0, cid, thread_id),
+                        (
+                            out_text,
+                            len(str(out_text if out_text is not None else "")),
+                            1 if payload.get("success") else 0,
+                            cid,
+                            thread_id,
+                        ),
                     )
 
-        self.conn.execute("UPDATE threads SET turn_count=?, tool_call_count=? WHERE thread_id=?", (len(turn_ids), tool_count, thread_id))
+        self.conn.execute(
+            "UPDATE threads SET turn_count=?, tool_call_count=? WHERE thread_id=?",
+            (len(turn_ids), tool_count, thread_id),
+        )
         self._update_thread_final_usage(thread_id)
         result.files_imported = 1
         result.threads = 1
@@ -417,13 +655,22 @@ class CodexIngestor:
 
     def _update_thread_final_usage(self, thread_id: str) -> None:
         row = self.conn.execute(
-            "SELECT * FROM usage_snapshots WHERE thread_id=? ORDER BY idx DESC LIMIT 1", (thread_id,)
+            "SELECT * FROM usage_snapshots WHERE thread_id=? ORDER BY idx DESC LIMIT 1",
+            (thread_id,),
         ).fetchone()
         if not row:
             return
         self.conn.execute(
             """UPDATE threads SET final_input_tokens=?, final_cached_input_tokens=?, final_uncached_input_tokens=?, final_output_tokens=?, final_reasoning_tokens=?, final_total_tokens=? WHERE thread_id=?""",
-            (row["input_tokens"], row["cached_input_tokens"], row["uncached_input_tokens"], row["output_tokens"], row["reasoning_tokens"], row["total_tokens"], thread_id),
+            (
+                row["input_tokens"],
+                row["cached_input_tokens"],
+                row["uncached_input_tokens"],
+                row["output_tokens"],
+                row["reasoning_tokens"],
+                row["total_tokens"],
+                thread_id,
+            ),
         )
 
     def recompute_rollups(self) -> None:
@@ -443,5 +690,3 @@ def ingest(sessions_path: str, db_path: str) -> IngestResult:
         return ing.ingest_paths([Path(sessions_path).expanduser()])
     finally:
         ing.close()
-
-

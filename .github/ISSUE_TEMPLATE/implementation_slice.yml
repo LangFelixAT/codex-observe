@@ -1,0 +1,54 @@
+name: Implementation slice
+description: A demoable vertical slice for Codex Observe
+title: "[Slice] "
+labels: ["type: slice", "status: ready"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for independently-grabbable work that should be demoable on its own.
+  - type: textarea
+    id: what
+    attributes:
+      label: What to build
+      description: Describe the end-to-end behavior, not just layer-specific tasks.
+      placeholder: A user can...
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Work mode
+      options:
+        - AFK - can be implemented without human interaction
+        - HITL - needs human decision or review before completion
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Include tests, visual QA, docs, and closeout evidence where relevant.
+      value: |
+        - [ ] Behavior is implemented end to end.
+        - [ ] Focused tests cover the important logic.
+        - [ ] `ruff check`, `ruff format --check`, and `pytest -q` pass.
+        - [ ] `codex-observe audit --json` passes after relevant evidence exists.
+        - [ ] UI changes run `codex-observe demo`, `python scripts/visual_qa.py`, and `python scripts/visual_qa.py --verify-manifest .artifacts/visual/visual-qa-manifest.json` against synthetic data and record screenshot evidence.
+        - [ ] Reviewer-facing changes run `codex-observe evidence-bundle --out .artifacts/public-evidence` and review the generated README/manifest before sharing.
+        - [ ] Docs are updated when user workflow changes, including `docs/LIMITATIONS.md` if limitations, approval-gated behavior, or next-work sources change.
+    validations:
+      required: true
+  - type: textarea
+    id: blocked_by
+    attributes:
+      label: Blocked by
+      description: Link blockers or write "None".
+      value: None
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes and evidence
+      description: Add synthetic/redacted evidence, screenshots, evidence-bundle notes, limitations impact, or diagnostic findings that should guide the implementation. Do not include private log content.

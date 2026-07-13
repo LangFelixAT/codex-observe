@@ -1,0 +1,32 @@
+name: Visual/UI polish
+description: Improve dashboard usability, layout, or visual quality
+title: "[UI] "
+labels: ["area: dashboard", "type: slice", "status: ready"]
+body:
+  - type: textarea
+    id: user_problem
+    attributes:
+      label: User problem
+      description: What is hard to understand, ugly, noisy, or inefficient in the current dashboard?
+    validations:
+      required: true
+  - type: textarea
+    id: target
+    attributes:
+      label: Target experience
+      description: What should the user be able to see or do after this slice?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      value: |
+        - [ ] The improvement is visible in the dashboard against `.artifacts/demo/codex_observe_demo.sqlite` or another explicitly synthetic/redacted database.
+        - [ ] Text does not overlap at desktop or narrow widths.
+        - [ ] `ruff check`, `ruff format --check`, and `pytest -q` pass.
+        - [ ] `codex-observe demo`, `python scripts/visual_qa.py`, and `python scripts/visual_qa.py --verify-manifest .artifacts/visual/visual-qa-manifest.json` pass.
+        - [ ] Screenshot filenames, visual QA manifest path, sidebar risk labels, expected high-risk metric card evidence, and layout review are recorded in the closeout.
+        - [ ] `codex-observe evidence-bundle --out .artifacts/public-evidence` is regenerated when reviewer-facing UI evidence is needed.
+    validations:
+      required: true

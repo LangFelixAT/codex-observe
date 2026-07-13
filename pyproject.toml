@@ -6,7 +6,21 @@ build-backend = "setuptools.build_meta"
 name = "codex-observe"
 version = "0.3.0"
 description = "Offline observability dashboard for Codex JSONL session logs"
+readme = "README.md"
+license = "MIT"
 requires-python = ">=3.10"
+keywords = ["codex", "observability", "streamlit", "sqlite", "developer-tools"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Framework :: Streamlit",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Software Development :: Quality Assurance",
+]
 dependencies = [
   "pandas>=2.0",
   "streamlit>=1.35",
@@ -18,3 +32,20 @@ codex-observe = "codex_observe.cli:main"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["codex_observe*"]
+
+[project.optional-dependencies]
+visual = [
+  "pillow>=10",
+  "playwright",
+]
+dev = [
+  "pillow>=10",
+  "playwright",
+  "pytest",
+  "ruff",
+]
+
+[project.urls]
+Repository = "https://github.com/LangFelixAT/codex-observe"
+Issues = "https://github.com/LangFelixAT/codex-observe/issues"
+Changelog = "https://github.com/LangFelixAT/codex-observe/blob/main/CHANGELOG.md"
