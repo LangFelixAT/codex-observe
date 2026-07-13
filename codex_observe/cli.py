@@ -1688,6 +1688,12 @@ def release_audit_report(
         report_payload = json.loads(report_json_text)
         summary = report.get("summary", {})
         triage = report.get("triage", {})
+        report_written_text = "\n".join(report_written_lines(out_path, report))
+        report_confirmation_has_success_target = (
+            "Success target:" in report_written_text
+            and str(report_payload.get("success_target", {}).get("metric"))
+            in report_written_text
+        )
         report_has_cost_profile = (
             out_path.exists()
             and out_path.stat().st_size > 0
@@ -1716,6 +1722,7 @@ def release_audit_report(
             and report_payload.get("next_action_detail", {}).get("action")
             and report_payload.get("success_target", {}).get("metric")
             and report_payload.get("success_target", {}).get("target_value") is not None
+            and report_confirmation_has_success_target
             and any(
                 str(command).startswith("codex-observe sessions --db ")
                 and str(command).endswith(" --json")
@@ -1735,7 +1742,7 @@ def release_audit_report(
         add(
             "aggregate report",
             report_has_cost_profile,
-            f"{out_path}; {json_out_path}; recommended action, cost profile, opportunity stack, success target, triage, follow-up commands, structured next action, and schema verified",
+            f"{out_path}; {json_out_path}; recommended action, cost profile, opportunity stack, terminal success target, triage, follow-up commands, structured next action, and schema verified",
         )
         comparison = compare_reports(report, report)
         comparison_out = out_path.with_name("run-comparison.md")
@@ -2531,6 +2538,13 @@ def report_written_lines(path: Path, report: dict) -> list[str]:
     if opportunity_line:
         lines.append(opportunity_line)
     lines.append(f"Next action: {action}")
+    success_target = report.get("success_target", {})
+    if isinstance(success_target, dict) and success_target.get("metric"):
+        current = str(success_target.get("current") or "unknown")
+        target = str(success_target.get("target") or "unknown")
+        lines.append(
+            f"Success target: {success_target['metric']}: {current} -> {target}"
+        )
     return lines
 
 

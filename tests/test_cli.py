@@ -738,6 +738,11 @@ def test_report_and_comparison_written_lines_include_actionable_drivers(
                 "next_action": "Set a stop condition",
             },
             "opportunities": [{"Driver": "Largest thread", "Scale": "33.2k tokens"}],
+            "success_target": {
+                "metric": "largest_thread_share_pct",
+                "current": "57.7%",
+                "target": "below 50.0%",
+            },
         },
     )
     comparison_lines = cli.comparison_written_lines(
@@ -757,6 +762,9 @@ def test_report_and_comparison_written_lines_include_actionable_drivers(
     assert f"Wrote aggregate-only report: {report_path}" in report_lines
     assert "Top opportunity: Largest thread; 33.2k tokens" in report_lines
     assert "Next action: Set a stop condition" in report_lines
+    assert (
+        "Success target: largest_thread_share_pct: 57.7% -> below 50.0%" in report_lines
+    )
     assert "Triage risk: high -> moderate (improved)" in comparison_lines
     assert "Opportunity change: Largest thread improved." in comparison_lines
     assert "Next step: Keep the change." in comparison_lines
