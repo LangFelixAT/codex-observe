@@ -28,6 +28,7 @@ sidebar_risk_label_failures = visual_qa.sidebar_risk_label_failures
 operator_briefing_failures = visual_qa.operator_briefing_failures
 download_control_failures = visual_qa.download_control_failures
 comparison_preview_failures = visual_qa.comparison_preview_failures
+comparison_delta_failures = visual_qa.comparison_delta_failures
 visual_empty_state_failures = visual_qa.visual_empty_state_failures
 
 
@@ -192,6 +193,32 @@ def test_comparison_preview_failures_require_quick_read_contract() -> None:
     assert "narrow: comparison preview card not rendered" in failures
 
 
+def test_comparison_delta_failures_require_metric_delta_cards() -> None:
+    assert (
+        comparison_delta_failures(
+            [
+                {"label": "Total tokens", "delta": "regressed: 49.1k (584.6%)"},
+                {
+                    "label": "Largest thread tokens",
+                    "delta": "regressed: 30.3k (1044.8%)",
+                },
+            ],
+            "desktop",
+        )
+        == []
+    )
+
+    failures = comparison_delta_failures(
+        [{"label": "Total tokens", "delta": "improved: -49.1k (-85.4%)"}],
+        "narrow",
+    )
+
+    assert (
+        "narrow: comparison delta Total tokens missing direction: regressed" in failures
+    )
+    assert "narrow: comparison delta not found: Largest thread tokens" in failures
+
+
 def test_operator_briefing_failures_require_briefing_contract() -> None:
     assert (
         operator_briefing_failures(
@@ -270,6 +297,18 @@ def complete_viewport_results(tmp_path: Path) -> dict[str, dict[str, object]]:
                     "label": "Comparison quick read: regressed",
                     "body": "Comparison quick read: regressed Verdict: regressed; largest change: Total tokens +49.1k (regressed). Triage movement: regressed Next step: Inspect new diagnostic first: Repeated prompt blocks.",
                 }
+            ],
+            "comparison_deltas": [
+                {
+                    "label": "Total tokens",
+                    "before_after": "8.4k -> 57.5k",
+                    "delta": "regressed: 49.1k (584.6%)",
+                },
+                {
+                    "label": "Largest thread tokens",
+                    "before_after": "2.9k -> 33.2k",
+                    "delta": "regressed: 30.3k (1044.8%)",
+                },
             ],
             "layout_review": {
                 "viewport_width": viewport["width"],
@@ -385,6 +424,11 @@ def test_visual_manifest_records_review_evidence(tmp_path: Path) -> None:
     assert loaded["viewports"]["desktop"]["comparison_previews"][0]["label"] == (
         "Comparison quick read: regressed"
     )
+    assert loaded["viewports"]["desktop"]["comparison_deltas"][0] == {
+        "label": "Total tokens",
+        "before_after": "8.4k -> 57.5k",
+        "delta": "regressed: 49.1k (584.6%)",
+    }
     assert loaded["viewports"]["desktop"]["layout_review"]["document_width"] == 1440
     assert (
         loaded["empty_states"]["missing_database"]["viewports"]["desktop"]["title"]
@@ -421,6 +465,7 @@ def test_visual_manifest_failures_rejects_incomplete_evidence(tmp_path: Path) ->
                 "download_controls": ["Download report MD"],
                 "operator_briefings": [],
                 "comparison_previews": [],
+                "comparison_deltas": [],
                 "layout_review": {
                     "viewport_width": 390,
                     "document_width": 430,
@@ -445,6 +490,7 @@ def test_visual_manifest_failures_rejects_incomplete_evidence(tmp_path: Path) ->
     assert "manifest desktop success target card not rendered" in failures
     assert "manifest desktop operator briefing card not rendered" in failures
     assert "manifest desktop comparison preview card not rendered" in failures
+    assert "manifest desktop comparison delta cards not rendered" in failures
     assert (
         "manifest desktop report download control not found: Download report JSON"
         in failures

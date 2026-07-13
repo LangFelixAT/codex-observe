@@ -15,6 +15,7 @@ from codex_observe.analysis import (
     thread_kind,
 )
 from codex_observe.dashboard import (
+    comparison_delta_cards_html,
     comparison_download_payloads,
     comparison_preview_html,
     conversation_button_label,
@@ -524,6 +525,8 @@ def test_dashboard_css_contains_polish_hooks_without_viewport_scaled_type() -> N
     assert ".co-empty-actions" in css
     assert ".co-empty-action" in css
     assert ".co-comparison-preview" in css
+    assert ".co-comparison-deltas" in css
+    assert ".co-comparison-delta" in css
     assert ".co-thread-brief" in css
     assert ".co-tool-brief" in css
     assert ".co-duplication-brief" in css
@@ -747,6 +750,53 @@ def test_comparison_preview_html_summarizes_and_escapes_quick_read() -> None:
     assert "Top opportunity stayed &lt;largest&gt;." in rendered
     assert "Keep change &amp; compare again." in rendered
     assert "improved <ok>" not in rendered
+
+
+def test_comparison_delta_cards_html_renders_ranked_metric_deltas_and_escapes() -> None:
+    rendered = comparison_delta_cards_html(
+        {
+            "metrics": [
+                {
+                    "label": "Total <tokens>",
+                    "before": 57510,
+                    "after": 8400,
+                    "delta": -49110,
+                    "delta_pct": -85.4,
+                    "direction": "improved",
+                },
+                {
+                    "label": "Largest tool output chars",
+                    "before": 4000,
+                    "after": 12000,
+                    "delta": 8000,
+                    "delta_pct": 200.0,
+                    "direction": "regressed",
+                },
+                {
+                    "label": "Tool calls",
+                    "before": 4,
+                    "after": 4,
+                    "delta": 0,
+                    "delta_pct": 0.0,
+                    "direction": "unchanged",
+                },
+            ]
+        }
+    )
+
+    assert 'class="co-comparison-deltas"' in rendered
+    assert rendered.count('class="co-comparison-delta"') == 2
+    assert rendered.index("Total &lt;tokens&gt;") < rendered.index(
+        "Largest tool output chars"
+    )
+    assert "57.5k -> 8.4k" in rendered
+    assert "improved: -49.1k (-85.4%)" in rendered
+    assert "regressed: 8.0k (200.0%)" in rendered
+    assert "Total <tokens>" not in rendered
+
+
+def test_comparison_delta_cards_html_returns_empty_string_without_metrics() -> None:
+    assert comparison_delta_cards_html({}) == ""
 
 
 def test_success_target_html_escapes_and_renders_target_card() -> None:

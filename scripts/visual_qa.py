@@ -68,6 +68,10 @@ EXPECTED_COMPARISON_PREVIEW = {
     "triage_movement": "regressed",
     "next_step": "Inspect new diagnostic first: Repeated prompt blocks.",
 }
+EXPECTED_COMPARISON_DELTAS = [
+    {"label": "Total tokens", "direction": "regressed"},
+    {"label": "Largest thread tokens", "direction": "regressed"},
+]
 EXPECTED_DEFAULT_METRIC_VALUES = {
     "Threads": "3",
     "Largest thread": "33.2k tokens (57.7%)",
@@ -203,6 +207,45 @@ def comparison_preview_failures(
         if expected not in body:
             failures.append(
                 f"{viewport_name}: comparison preview missing {key}: {expected}"
+            )
+    return failures
+
+
+def collect_comparison_deltas(page) -> list[dict[str, str]]:
+    return page.evaluate(
+        r"""
+() => Array.from(document.querySelectorAll('.co-comparison-delta')).map((card) => {
+  const lines = Array.from(card.querySelectorAll('span')).map((span) => (span.innerText || '').replace(/\s+/g, ' ').trim());
+  return {
+    label: (card.querySelector('strong')?.innerText || '').replace(/\s+/g, ' ').trim(),
+    before_after: lines[0] || '',
+    delta: lines[1] || '',
+  };
+}).filter((item) => item.label || item.delta)
+        """
+    )
+
+
+def comparison_delta_failures(
+    deltas: list[dict[str, str]], viewport_name: str
+) -> list[str]:
+    if not deltas:
+        return [f"{viewport_name}: comparison delta cards not rendered"]
+    failures = []
+    observed = {
+        str(item.get("label") or ""): str(item.get("delta") or "")
+        for item in deltas
+        if isinstance(item, dict)
+    }
+    for expected in EXPECTED_COMPARISON_DELTAS:
+        label = expected["label"]
+        direction = expected["direction"]
+        actual = observed.get(label)
+        if actual is None:
+            failures.append(f"{viewport_name}: comparison delta not found: {label}")
+        elif direction not in actual:
+            failures.append(
+                f"{viewport_name}: comparison delta {label} missing direction: {direction}"
             )
     return failures
 
@@ -446,11 +489,13 @@ def validate_dashboard_page(
     operator_briefings = collect_operator_briefings(page)
     download_controls = collect_download_controls(page)
     comparison_previews = collect_comparison_previews(page)
+    comparison_deltas = collect_comparison_deltas(page)
     page.evaluate("window.scrollTo(0, 0)")
     failures.extend(success_target_failures(success_targets, viewport_name))
     failures.extend(operator_briefing_failures(operator_briefings, viewport_name))
     failures.extend(download_control_failures(download_controls, viewport_name))
     failures.extend(comparison_preview_failures(comparison_previews, viewport_name))
+    failures.extend(comparison_delta_failures(comparison_deltas, viewport_name))
     for metric_label in ["Largest thread", "Uncached input"]:
         if metric_label not in text:
             failures.append(
@@ -513,6 +558,7 @@ def validate_dashboard_page(
         "operator_briefings": operator_briefings,
         "download_controls": download_controls,
         "comparison_previews": comparison_previews,
+        "comparison_deltas": comparison_deltas,
         "layout_review": layout_snapshot,
     }
     return failures, evidence
@@ -941,6 +987,16 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
             failures.extend(
                 failure.replace(f"{name}: ", f"manifest {name} ")
                 for failure in preview_failures
+            )
+
+        comparison_deltas = raw.get("comparison_deltas")
+        if not isinstance(comparison_deltas, list):
+            failures.append(f"manifest {name} missing comparison delta evidence")
+        else:
+            delta_failures = comparison_delta_failures(comparison_deltas, name)
+            failures.extend(
+                failure.replace(f"{name}: ", f"manifest {name} ")
+                for failure in delta_failures
             )
 
         layout = raw.get("layout_review")

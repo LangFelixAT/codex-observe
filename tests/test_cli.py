@@ -198,6 +198,18 @@ def write_valid_visual_manifest(root: Path) -> None:
                     "body": "Comparison quick read: regressed Verdict: regressed; largest change: Total tokens +49.1k (regressed). Triage movement: regressed Next step: Inspect new diagnostic first: Repeated prompt blocks.",
                 }
             ],
+            "comparison_deltas": [
+                {
+                    "label": "Total tokens",
+                    "before_after": "8.4k -> 57.5k",
+                    "delta": "regressed: 49.1k (584.6%)",
+                },
+                {
+                    "label": "Largest thread tokens",
+                    "before_after": "2.9k -> 33.2k",
+                    "delta": "regressed: 30.3k (1044.8%)",
+                },
+            ],
         }
 
     empty_states = {}
@@ -313,6 +325,9 @@ def test_visual_manifest_evidence_failures_validate_saved_sidebar_metric_and_suc
         "Read raw tables"
     )
     payload["viewports"]["desktop"]["download_controls"] = ["Download report MD"]
+    payload["viewports"]["desktop"]["comparison_deltas"] = [
+        {"label": "Total tokens", "delta": "improved: -49.1k (-85.4%)"}
+    ]
     manifest_path.write_text(json.dumps(payload), encoding="utf-8")
 
     failures = cli.visual_manifest_evidence_failures(tmp_path)
@@ -337,6 +352,14 @@ def test_visual_manifest_evidence_failures_validate_saved_sidebar_metric_and_suc
     )
     assert (
         "visual QA manifest desktop missing report download controls: Download comparison JSON, Download comparison MD, Download report JSON"
+        in failures
+    )
+    assert (
+        "visual QA manifest desktop comparison delta Total tokens missing direction: regressed"
+        in failures
+    )
+    assert (
+        "visual QA manifest desktop missing comparison delta: Largest thread tokens"
         in failures
     )
 
@@ -376,6 +399,8 @@ def test_visual_manifest_evidence_rejects_stale_minimal_manifest_shape(
     assert "visual QA manifest desktop missing screenshot metadata" in failures
     assert "visual QA manifest desktop missing layout review" in failures
     assert "visual QA manifest missing desktop operator briefing evidence" in failures
+    assert "visual QA manifest missing desktop comparison preview evidence" in failures
+    assert "visual QA manifest missing desktop comparison delta evidence" in failures
     assert (
         "visual QA manifest narrow agent detail selector was not exercised" in failures
     )
@@ -544,7 +569,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
         == "manifest, reviewer README, limitations doc, aggregate reports, and audit artifact verified"
     )
     assert (
-        "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, metric cards, dashboard quick reads, report and comparison downloads, comparison preview, operator briefing, and success target verified"
+        "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, metric cards, dashboard quick reads, report and comparison downloads, comparison preview and deltas, operator briefing, and success target verified"
         in checks["visual QA manifest evidence"]["detail"]
     )
     report_payload = json.loads(report.with_suffix(".json").read_text(encoding="utf-8"))

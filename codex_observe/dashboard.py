@@ -533,6 +533,36 @@ def dashboard_css() -> str:
   color: var(--co-ink);
 }
 
+.co-comparison-deltas {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  margin-top: 0.75rem;
+}
+
+.co-comparison-delta {
+  background: var(--co-surface);
+  border: 1px solid var(--co-border);
+  border-radius: 8px;
+  min-width: 0;
+  padding: 0.62rem 0.7rem;
+}
+
+.co-comparison-delta strong {
+  display: block;
+  font-size: 0.82rem;
+  line-height: 1.2;
+  margin-bottom: 0.18rem;
+}
+
+.co-comparison-delta span {
+  color: var(--co-muted);
+  display: block;
+  font-size: 0.82rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
 .co-thread-brief {
   background: var(--co-panel);
   border: 1px solid var(--co-border);
@@ -853,6 +883,46 @@ def comparison_download_payloads(
     }
 
 
+def comparison_delta_cards_html(comparison: dict[str, object], limit: int = 4) -> str:
+    cards = []
+    metrics = comparison.get("metrics")
+    if not isinstance(metrics, list):
+        return ""
+    changed_metrics = [
+        metric
+        for metric in metrics
+        if isinstance(metric, dict)
+        and str(metric.get("direction") or "unchanged") != "unchanged"
+    ]
+    ranked = sorted(
+        changed_metrics or [metric for metric in metrics if isinstance(metric, dict)],
+        key=lambda metric: abs(int(metric.get("delta") or 0)),
+        reverse=True,
+    )
+    for metric in ranked[:limit]:
+        label = html.escape(
+            str(metric.get("label") or metric.get("metric") or "Metric")
+        )
+        before = html.escape(fmt_short(metric.get("before", 0)))
+        after = html.escape(fmt_short(metric.get("after", 0)))
+        delta = html.escape(fmt_short(metric.get("delta", 0)))
+        direction = html.escape(str(metric.get("direction") or "unchanged"))
+        delta_pct = metric.get("delta_pct")
+        pct = ""
+        if delta_pct is not None:
+            pct = f" ({html.escape(str(delta_pct))}%)"
+        cards.append(
+            '<div class="co-comparison-delta">'
+            f"<strong>{label}</strong>"
+            f"<span>{before} -> {after}</span>"
+            f"<span>{direction}: {delta}{pct}</span>"
+            "</div>"
+        )
+    if not cards:
+        return ""
+    return '<div class="co-comparison-deltas">' + "".join(cards) + "</div>"
+
+
 def comparison_preview_html(comparison: dict[str, object]) -> str:
     triage = comparison.get("triage_risk", {})
     opportunity = comparison.get("opportunity_change", {})
@@ -885,6 +955,7 @@ def comparison_preview_html(comparison: dict[str, object]) -> str:
             f"  <p><strong>Triage movement:</strong> {triage_direction}</p>",
             f"  <p><strong>Opportunity movement:</strong> {opportunity_summary}</p>",
             f"  <p><strong>Next step:</strong> {recommendation}</p>",
+            comparison_delta_cards_html(comparison),
             "</section>",
         ]
     )
