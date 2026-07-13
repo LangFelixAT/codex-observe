@@ -913,6 +913,7 @@ def test_evidence_bundle_cli_json_and_text_outputs_are_actionable(
     assert "feedback_runbook: PUBLIC_TOUR_FEEDBACK.md" in captured.out
     assert "report_markdown: demo/run-report.md" in captured.out
     assert "Key findings:" in captured.out
+    assert captured.out.index("Key findings:") < captured.out.index("Artifacts:")
     assert "Run triage: high risk - Largest thread drives the run" in captured.out
     assert "Top opportunity: Largest thread - 33.2k tokens" in captured.out
     assert "Next-run target: largest_thread_share_pct" in captured.out
