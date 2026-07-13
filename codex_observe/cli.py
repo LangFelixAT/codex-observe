@@ -12,6 +12,7 @@ import tempfile
 from pathlib import Path
 
 from . import __version__
+from .analysis import fmt_short
 from .demo import DEFAULT_DEMO_DB, DEFAULT_DEMO_SESSIONS, create_demo_database
 from .parser import ingest
 from .report import (
@@ -1663,6 +1664,12 @@ def release_audit_report(
             and recommendation_detail.get("ranked_by") == ["triage_risk", "last_seen"]
             and isinstance(recommendation_detail.get("drivers"), dict)
             and "largest_tool_output_chars" in recommendation_detail["drivers"]
+            and isinstance(recommendation_detail.get("driver_summary"), list)
+            and any(
+                row.get("driver") == "largest_tool_output_chars"
+                for row in recommendation_detail["driver_summary"]
+                if isinstance(row, dict)
+            )
         )
         session_lines_text = "\n".join(session_summary_lines(actual_db_path))
         sessions_text_has_recommended_action = (
@@ -1685,9 +1692,9 @@ def release_audit_report(
         add(
             "session listing",
             session_listing_ok,
-            f"{len(sessions)} sessions; triage risk, status, schema, text recommended action, session table tool-output column, tool-output driver, recommendation detail, and next commands verified"
+            f"{len(sessions)} sessions; triage risk, status, schema, text recommended action, session table tool-output column, tool-output driver, structured driver summary, recommendation detail, and next commands verified"
             if session_listing_ok
-            else "session listing missing aggregate triage risk, status, schema_version, text recommended action, recommended_session, recommendation_detail, session table tool-output column, tool-output driver, or next_commands",
+            else "session listing missing aggregate triage risk, status, schema_version, text recommended action, recommended_session, recommendation_detail, session table tool-output column, tool-output driver, structured driver summary, or next_commands",
         )
     except FileNotFoundError as exc:
         sessions = []
@@ -2119,6 +2126,35 @@ def sessions_missing_json_payload(db_path: str) -> dict[str, object]:
     }
 
 
+def session_driver_summary(recommended: dict[str, object]) -> list[dict[str, object]]:
+    return [
+        {
+            "driver": "largest_thread_share_pct",
+            "label": "Largest thread share",
+            "value": recommended.get("largest_thread_share_pct"),
+            "display": f"{float(recommended.get('largest_thread_share_pct') or 0):.1f}%",
+        },
+        {
+            "driver": "repeated_prompt_share_pct",
+            "label": "Repeated prompt share",
+            "value": recommended.get("repeated_prompt_share_pct"),
+            "display": f"{float(recommended.get('repeated_prompt_share_pct') or 0):.1f}%",
+        },
+        {
+            "driver": "uncached_input_share_pct",
+            "label": "Uncached input share",
+            "value": recommended.get("uncached_input_share_pct"),
+            "display": f"{float(recommended.get('uncached_input_share_pct') or 0):.1f}%",
+        },
+        {
+            "driver": "largest_tool_output_chars",
+            "label": "Largest tool output",
+            "value": recommended.get("largest_tool_output_chars"),
+            "display": f"{fmt_short(recommended.get('largest_tool_output_chars') or 0)} chars",
+        },
+    ]
+
+
 def session_recommendation_detail(recommended: dict[str, object]) -> dict[str, object]:
     return {
         "action": "export_recommended_session_report",
@@ -2133,6 +2169,7 @@ def session_recommendation_detail(recommended: dict[str, object]) -> dict[str, o
             "uncached_input_share_pct": recommended.get("uncached_input_share_pct"),
             "largest_tool_output_chars": recommended.get("largest_tool_output_chars"),
         },
+        "driver_summary": session_driver_summary(recommended),
     }
 
 
@@ -2189,7 +2226,7 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
             "evidence": [
                 "recommended_session chooses the highest-risk run",
                 "plain-text sessions output includes a Tool out column and a recommended-action block with top aggregate drivers, including largest tool output",
-                "recommendation_detail explains the risk, recency tie-breakers, and structured aggregate drivers",
+                "recommendation_detail explains the risk, recency tie-breakers, structured aggregate drivers, and ordered driver_summary display labels",
             ],
             "commands": [f"codex-observe sessions --db {db_path} --json"],
         },
