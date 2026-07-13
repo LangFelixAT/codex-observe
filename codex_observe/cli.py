@@ -1707,6 +1707,31 @@ def release_audit_report(
     )
 
     demo_payload = demo_success_payload(actual_db_path, sessions_path, result)
+    demo_lines_text = "\n".join(demo_success_lines(actual_db_path, result))
+    demo_review_path = demo_payload.get("review_path")
+    demo_has_review_path = (
+        isinstance(demo_review_path, list)
+        and len(demo_review_path) >= 4
+        and all(
+            isinstance(step, dict)
+            and step.get("label")
+            and step.get("command")
+            and step.get("success_check")
+            for step in demo_review_path
+        )
+        and any(
+            "codex-observe doctor" in str(step.get("command"))
+            and "--json" in str(step.get("command"))
+            for step in demo_review_path
+            if isinstance(step, dict)
+        )
+        and any(
+            "codex-observe sessions" in str(step.get("command"))
+            and "--json" in str(step.get("command"))
+            for step in demo_review_path
+            if isinstance(step, dict)
+        )
+    )
     demo_json_ok = (
         demo_payload.get("schema_version") == DEMO_SCHEMA_VERSION
         and demo_payload.get("status") == "ok"
@@ -1715,13 +1740,16 @@ def release_audit_report(
         and demo_payload.get("counts", {}).get("threads") == result.threads
         and demo_payload.get("counts", {}).get("events") == result.events
         and demo_payload.get("next_commands") == demo_next_commands(actual_db_path)
+        and demo_has_review_path
+        and "Review path:" in demo_lines_text
+        and "Verify synthetic database:" in demo_lines_text
     )
     add(
         "demo JSON",
         demo_json_ok,
-        "schema, counts, database, and next commands verified"
+        "schema, counts, database, next commands, text review path, and review path verified"
         if demo_json_ok
-        else "demo JSON schema_version, counts, database, or next_commands missing",
+        else "demo JSON schema_version, counts, database, next_commands, text review path, or review_path missing",
     )
 
     ingest_contract_path = Path(actual_db_path).with_name(
@@ -2745,6 +2773,31 @@ def demo_next_commands(db_path: str) -> list[str]:
     ]
 
 
+def demo_review_path(db_path: str) -> list[dict[str, str]]:
+    return [
+        {
+            "label": "Verify synthetic database",
+            "command": f"codex-observe doctor --db {db_path} --json",
+            "success_check": "doctor JSON status is ok and schema_version is codex-observe.doctor.v1.",
+        },
+        {
+            "label": "Pick the reportable run",
+            "command": f"codex-observe sessions --db {db_path} --json",
+            "success_check": "sessions JSON includes recommended_session, recommendation_detail, and review_path.",
+        },
+        {
+            "label": "Export aggregate report",
+            "command": f"codex-observe report --db {db_path} --out .artifacts/demo/run-report.md",
+            "success_check": "report output includes Recommended Action and Next Run Success Target.",
+        },
+        {
+            "label": "Open dashboard",
+            "command": f"codex-observe serve --db {db_path}",
+            "success_check": "dashboard opens on synthetic high- and low-risk runs without raw private logs.",
+        },
+    ]
+
+
 def demo_success_payload(
     db_path: str,
     sessions_path: str,
@@ -2767,21 +2820,31 @@ def demo_success_payload(
         },
         "next": "run the commands in next_commands to verify health, choose a run, export a report, and open the dashboard.",
         "next_commands": commands,
+        "review_path": demo_review_path(db_path),
     }
 
 
 def demo_success_lines(db_path: str, result, serve: bool = False) -> list[str]:
     commands = demo_next_commands(db_path)
+    review_path = demo_review_path(db_path)
     lines = [
         (
             f"Created demo database with {result.files_imported} JSONL files, "
             f"{result.threads} threads, {result.events} events into {db_path}"
         ),
-        "Next:",
-        f"- Verify database health: {commands[0]}",
-        f"- List reportable runs: {commands[1]}",
-        f"- Export the recommended run: {commands[2]}",
+        "Review path:",
     ]
+    for step in review_path:
+        lines.append(f"- {step['label']}: {step['command']}")
+        lines.append(f"  Success check: {step['success_check']}")
+    lines.extend(
+        [
+            "Next:",
+            f"- Verify database health: {commands[0]}",
+            f"- List reportable runs: {commands[1]}",
+            f"- Export the recommended run: {commands[2]}",
+        ]
+    )
     if serve:
         lines.append("- Launching dashboard now.")
     else:

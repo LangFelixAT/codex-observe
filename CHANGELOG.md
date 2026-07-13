@@ -6,6 +6,7 @@ The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
 
+- Added structured demo review paths so synthetic first-run output guides users through health checks, session selection, report export, and dashboard review.
 - Added structured ingest review paths so fresh imports guide users through health checks, session selection, report export, and dashboard review.
 - Added structured doctor review paths so database health checks guide users toward recovery, session selection, dashboard inspection, and report export.
 - Added a top-level public-tour review path so text and JSON tour output expose the end-to-end evaluation checklist.
@@ -48,7 +49,7 @@ The project follows semantic versioning once release distribution is decided.
 
 ### Added
 
-- Synthetic demo database workflow through `codex-observe demo`, including `--serve` for a one-command first run and `--json` for schema-versioned creation status.
+- Synthetic demo database workflow through `codex-observe demo`, including `--serve` for a one-command first run and `--json` for schema-versioned creation status, structured next commands, and a structured review path.
 - Privacy-safe database health checks through `codex-observe doctor` with text output, JSON `schema_version` metadata, structured `next_commands`, structured `review_path`, and copy-pasteable recovery hints that preserve the selected `--db` path.
 - Privacy-safe session listing through `codex-observe sessions` for choosing reportable conversations without printing prompts or tool output, including `schema_version` and `status` metadata, a machine-readable `recommended_session`, structured `recommendation_detail`, structured `next_commands`, and machine-readable missing-database JSON output.
 - Privacy-safe Markdown/JSON run reports through `codex-observe report`, including `schema_version` metadata, a quick-read headline, cost profile percentages, a ranked aggregate opportunity stack, aggregate diagnostics, structured next-action metadata, schema-versioned JSON failure payloads, and an impact-targeted next-run playbook; comparison inputs with missing or unsupported report schema versions are rejected with a regeneration hint.

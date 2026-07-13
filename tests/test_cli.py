@@ -718,6 +718,38 @@ def test_sessions_missing_json_payload_is_actionable_and_schema_versioned() -> N
     assert payload["review_path"][1]["label"] == "Ingest local logs"
 
 
+def test_demo_payload_and_text_include_review_path() -> None:
+    result = SimpleNamespace(files_imported=6, threads=6, events=34)
+
+    payload = cli.demo_success_payload(
+        "demo.sqlite", "sessions", result, keep_sessions=True
+    )
+    text = "\n".join(cli.demo_success_lines("demo.sqlite", result))
+
+    assert payload["schema_version"] == cli.DEMO_SCHEMA_VERSION
+    assert payload["status"] == "ok"
+    assert payload["keep_sessions"] is True
+    assert payload["next_commands"] == cli.demo_next_commands("demo.sqlite")
+    assert [step["label"] for step in payload["review_path"]] == [
+        "Verify synthetic database",
+        "Pick the reportable run",
+        "Export aggregate report",
+        "Open dashboard",
+    ]
+    assert payload["review_path"][0]["command"] == (
+        "codex-observe doctor --db demo.sqlite --json"
+    )
+    assert payload["review_path"][1]["command"] == (
+        "codex-observe sessions --db demo.sqlite --json"
+    )
+    assert "Review path:" in text
+    assert (
+        "Verify synthetic database: codex-observe doctor --db demo.sqlite --json"
+        in text
+    )
+    assert "Success check: doctor JSON status is ok" in text
+
+
 def test_ingest_payload_and_text_include_review_path() -> None:
     result = SimpleNamespace(
         files_seen=2,
