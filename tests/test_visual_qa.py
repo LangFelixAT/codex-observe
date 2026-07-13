@@ -27,6 +27,7 @@ metric_card_value_failures = visual_qa.metric_card_value_failures
 sidebar_risk_label_failures = visual_qa.sidebar_risk_label_failures
 operator_briefing_failures = visual_qa.operator_briefing_failures
 download_control_failures = visual_qa.download_control_failures
+visual_empty_state_failures = visual_qa.visual_empty_state_failures
 
 
 def test_playwright_install_hint_uses_project_extras() -> None:
@@ -254,6 +255,48 @@ def complete_viewport_results(tmp_path: Path) -> dict[str, dict[str, object]]:
     return results
 
 
+def complete_empty_state_results(tmp_path: Path) -> dict[str, dict[str, object]]:
+    results: dict[str, dict[str, object]] = {}
+    for state_name, title in visual_qa.EMPTY_STATE_CHECKS.items():
+        viewport_results: dict[str, dict[str, object]] = {}
+        for name, viewport in visual_qa.VIEWPORTS.items():
+            screenshot = tmp_path / f"dashboard-{state_name}-{name}.png"
+            Image.new(
+                "RGB", (viewport["width"], viewport["height"]), (248, 250, 249)
+            ).save(screenshot)
+            viewport_results[name] = {
+                "viewport": viewport,
+                "screenshot": screenshot_metadata(screenshot),
+                "title": title,
+                "body": "Use the commands below to continue.",
+                "commands": [
+                    {
+                        "label": "Try synthetic data",
+                        "command": "codex-observe demo --serve --db demo.sqlite --host 127.0.0.1 --port 8501",
+                    },
+                    {
+                        "label": "Ingest private logs locally",
+                        "command": "codex-observe ingest ~/.codex/sessions --db demo.sqlite",
+                    },
+                    {
+                        "label": "Check database health",
+                        "command": "codex-observe doctor --db demo.sqlite",
+                    },
+                ],
+                "layout_review": {
+                    "viewport_width": viewport["width"],
+                    "document_width": viewport["width"],
+                    "overflowing_elements": [],
+                    "clipped_text_elements": [],
+                },
+            }
+        results[state_name] = {
+            "database": f".artifacts/visual/{state_name}.sqlite",
+            "viewports": viewport_results,
+        }
+    return results
+
+
 def test_visual_manifest_records_review_evidence(tmp_path: Path) -> None:
     viewport_results = complete_viewport_results(tmp_path)
 
@@ -262,6 +305,7 @@ def test_visual_manifest_records_review_evidence(tmp_path: Path) -> None:
         db_path=".artifacts/demo/codex_observe_demo.sqlite",
         output_dir=tmp_path,
         viewport_results=viewport_results,
+        empty_state_results=complete_empty_state_results(tmp_path),
     )
     manifest_path = tmp_path / "visual-qa-manifest.json"
     write_visual_manifest(manifest_path, manifest)
@@ -272,6 +316,7 @@ def test_visual_manifest_records_review_evidence(tmp_path: Path) -> None:
     assert loaded["output_dir"] == "[redacted-path]"
     assert loaded["checks"]["tabs_expected"] == list(visual_qa.TAB_CHECKS.keys())
     assert loaded["checks"]["layout_review"] == "passed"
+    assert loaded["checks"]["empty_states"] == "passed"
     assert (
         loaded["viewports"]["desktop"]["screenshot"]["filename"]
         == "dashboard-desktop.png"
@@ -309,6 +354,16 @@ def test_visual_manifest_records_review_evidence(tmp_path: Path) -> None:
         "proof_target": "largest_thread_share_pct: 57.7% -> below 50.0%",
     }
     assert loaded["viewports"]["desktop"]["layout_review"]["document_width"] == 1440
+    assert (
+        loaded["empty_states"]["missing_database"]["viewports"]["desktop"]["title"]
+        == "No database found"
+    )
+    assert (
+        loaded["empty_states"]["empty_database"]["viewports"]["narrow"]["commands"][0][
+            "label"
+        ]
+        == "Try synthetic data"
+    )
     assert visual_manifest_failures(loaded) == []
 
 
@@ -341,6 +396,7 @@ def test_visual_manifest_failures_rejects_incomplete_evidence(tmp_path: Path) ->
                 },
             }
         },
+        empty_state_results={},
     )
 
     failures = visual_manifest_failures(manifest)
@@ -360,6 +416,8 @@ def test_visual_manifest_failures_rejects_incomplete_evidence(tmp_path: Path) ->
     )
     assert "manifest desktop layout review contains failures" in failures
     assert "manifest missing narrow viewport evidence" in failures
+    assert "manifest missing missing_database empty-state evidence" in failures
+    assert "manifest missing empty_database empty-state evidence" in failures
 
 
 def test_verify_visual_manifest_reports_success_and_failures(tmp_path: Path) -> None:
@@ -368,6 +426,7 @@ def test_verify_visual_manifest_reports_success_and_failures(tmp_path: Path) -> 
         db_path=".artifacts/demo/codex_observe_demo.sqlite",
         output_dir=tmp_path,
         viewport_results=complete_viewport_results(tmp_path),
+        empty_state_results=complete_empty_state_results(tmp_path),
     )
     path = tmp_path / "visual-qa-manifest.json"
     write_visual_manifest(path, manifest)
@@ -394,6 +453,7 @@ def test_verify_visual_manifest_checks_referenced_screenshot_files(
         db_path=".artifacts/demo/codex_observe_demo.sqlite",
         output_dir=tmp_path,
         viewport_results=complete_viewport_results(tmp_path),
+        empty_state_results=complete_empty_state_results(tmp_path),
     )
     path = tmp_path / "visual-qa-manifest.json"
     write_visual_manifest(path, manifest)

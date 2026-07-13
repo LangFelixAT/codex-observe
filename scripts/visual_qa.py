@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
+import sqlite3
 import subprocess
 import sys
 import time
@@ -9,6 +11,8 @@ from pathlib import Path
 from urllib.request import urlopen
 
 from PIL import Image
+
+from codex_observe.schema import SCHEMA_SQL
 
 
 VISUAL_MANIFEST_SCHEMA_VERSION = "codex-observe.visual-manifest.v1"
@@ -75,6 +79,21 @@ EXPECTED_OPERATOR_BRIEFING = {
     "scale": "33.2k tokens (57.7% of run)",
     "proof_target": "largest_thread_share_pct: 57.7% -> below 50.0%",
 }
+
+EMPTY_STATE_CHECKS = {
+    "missing_database": "No database found",
+    "empty_database": "No conversations imported yet",
+}
+EXPECTED_EMPTY_STATE_COMMAND_LABELS = [
+    "Try synthetic data",
+    "Ingest private logs locally",
+    "Check database health",
+]
+EXPECTED_EMPTY_STATE_COMMAND_SNIPPETS = [
+    "codex-observe demo --serve --db",
+    "codex-observe ingest ~/.codex/sessions --db",
+    "codex-observe doctor --db",
+]
 
 
 def visible_text_has_error(text: str) -> bool:
@@ -492,12 +511,237 @@ def evidence_path_label(path: str | Path) -> str:
     return relative.as_posix()
 
 
+def collect_empty_state(page) -> dict[str, object]:
+    return page.evaluate(
+        r"""
+() => ({
+  title: (document.querySelector('.co-empty h2')?.innerText || '').replace(/\s+/g, ' ').trim(),
+  body: (document.querySelector('.co-empty p')?.innerText || '').replace(/\s+/g, ' ').trim(),
+  commands: Array.from(document.querySelectorAll('.co-empty-action')).map((card) => ({
+    label: (card.querySelector('strong')?.innerText || '').replace(/\s+/g, ' ').trim(),
+    command: (card.querySelector('code')?.innerText || '').replace(/\s+/g, ' ').trim(),
+  })).filter((item) => item.label || item.command),
+})
+        """
+    )
+
+
+def empty_state_failures(
+    state_name: str, evidence: dict[str, object], viewport_name: str
+) -> list[str]:
+    failures: list[str] = []
+    expected_title = EMPTY_STATE_CHECKS[state_name]
+    if evidence.get("title") != expected_title:
+        failures.append(
+            f"{state_name} {viewport_name}: empty-state title expected {expected_title}"
+        )
+    commands = evidence.get("commands")
+    if not isinstance(commands, list):
+        return failures + [
+            f"{state_name} {viewport_name}: missing empty-state commands"
+        ]
+    labels = {
+        str(command.get("label") or "")
+        for command in commands
+        if isinstance(command, dict)
+    }
+    command_text = "\n".join(
+        str(command.get("command") or "")
+        for command in commands
+        if isinstance(command, dict)
+    )
+    for label in EXPECTED_EMPTY_STATE_COMMAND_LABELS:
+        if label not in labels:
+            failures.append(
+                f"{state_name} {viewport_name}: empty-state command label missing: {label}"
+            )
+    for snippet in EXPECTED_EMPTY_STATE_COMMAND_SNIPPETS:
+        if snippet not in command_text:
+            failures.append(
+                f"{state_name} {viewport_name}: empty-state command missing: {snippet}"
+            )
+    return failures
+
+
+def validate_empty_state_page(
+    page, state_name: str, viewport_name: str
+) -> tuple[list[str], dict[str, object]]:
+    failures: list[str] = []
+    text = page.locator("body").inner_text(timeout=5000)
+    if visible_text_has_error(text):
+        failures.append(f"{state_name} {viewport_name}: Streamlit exception text found")
+    if "Codex Observe" not in text:
+        failures.append(f"{state_name} {viewport_name}: dashboard title not found")
+    evidence = collect_empty_state(page)
+    failures.extend(empty_state_failures(state_name, evidence, viewport_name))
+    layout_snapshot = collect_layout_snapshot(page)
+    failures.extend(
+        layout_review_failures(layout_snapshot, f"{state_name} {viewport_name}")
+    )
+    evidence["layout_review"] = layout_snapshot
+    return failures, evidence
+
+
+def create_empty_database(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(path) as conn:
+        conn.executescript(SCHEMA_SQL)
+
+
+def streamlit_command(app: Path, host: str, port: int, db: Path) -> list[str]:
+    return [
+        sys.executable,
+        "-m",
+        "streamlit",
+        "run",
+        str(app),
+        "--server.address",
+        host,
+        "--server.port",
+        str(port),
+        "--server.headless",
+        "true",
+        "--",
+        "--db",
+        str(db),
+    ]
+
+
+def run_empty_state_check(
+    url: str, output_dir: Path, state_name: str
+) -> tuple[int, dict[str, dict[str, object]]]:
+    try:
+        from playwright.sync_api import sync_playwright
+    except ModuleNotFoundError:
+        print(PLAYWRIGHT_INSTALL_HINT, file=sys.stderr)
+        return 2, {}
+
+    failures: list[str] = []
+    viewport_results: dict[str, dict[str, object]] = {}
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        try:
+            for name, viewport in VIEWPORTS.items():
+                page = browser.new_page(viewport=viewport)
+                page.goto(url, wait_until="networkidle")
+                page.wait_for_timeout(1000)
+                page_failures, evidence = validate_empty_state_page(
+                    page, state_name, name
+                )
+                failures.extend(page_failures)
+                screenshot_path = output_dir / f"dashboard-{state_name}-{name}.png"
+                page.screenshot(path=screenshot_path, full_page=True)
+                failures.extend(
+                    screenshot_quality_failures(
+                        screenshot_path, viewport, f"{state_name} {name}"
+                    )
+                )
+                viewport_results[name] = {
+                    "viewport": viewport,
+                    "screenshot": screenshot_metadata(screenshot_path),
+                    **evidence,
+                }
+                page.close()
+        finally:
+            browser.close()
+
+    if failures:
+        print(f"Visual QA {state_name} failed:", file=sys.stderr)
+        for failure in failures:
+            print(f"- {failure}", file=sys.stderr)
+        return 1, viewport_results
+    return 0, viewport_results
+
+
+def visual_empty_state_failures(
+    empty_states: object, manifest_dir: Path | None = None
+) -> list[str]:
+    failures: list[str] = []
+    if not isinstance(empty_states, dict):
+        return ["manifest missing empty-state evidence"]
+    for state_name in EMPTY_STATE_CHECKS:
+        state = empty_states.get(state_name)
+        if not isinstance(state, dict):
+            failures.append(f"manifest missing {state_name} empty-state evidence")
+            continue
+        viewports = state.get("viewports")
+        if not isinstance(viewports, dict):
+            failures.append(f"manifest {state_name} missing viewport evidence")
+            continue
+        for viewport_name, expected_viewport in VIEWPORTS.items():
+            raw = viewports.get(viewport_name)
+            if not isinstance(raw, dict):
+                failures.append(
+                    f"manifest {state_name} missing {viewport_name} viewport evidence"
+                )
+                continue
+            if raw.get("viewport") != expected_viewport:
+                failures.append(
+                    f"manifest {state_name} {viewport_name} viewport size does not match expected"
+                )
+            failures.extend(
+                failure.replace(
+                    f"{state_name} {viewport_name}: ",
+                    f"manifest {state_name} {viewport_name} ",
+                )
+                for failure in empty_state_failures(state_name, raw, viewport_name)
+            )
+            layout = raw.get("layout_review")
+            if not isinstance(layout, dict):
+                failures.append(
+                    f"manifest {state_name} {viewport_name} missing layout review"
+                )
+            elif layout_review_failures(layout, f"{state_name} {viewport_name}"):
+                failures.append(
+                    f"manifest {state_name} {viewport_name} layout review contains failures"
+                )
+            screenshot = raw.get("screenshot")
+            if not isinstance(screenshot, dict):
+                failures.append(
+                    f"manifest {state_name} {viewport_name} missing screenshot metadata"
+                )
+                continue
+            filename = screenshot.get("filename")
+            if not isinstance(filename, str) or not filename:
+                failures.append(
+                    f"manifest {state_name} {viewport_name} screenshot filename missing"
+                )
+                continue
+            if Path(filename).name != filename:
+                failures.append(
+                    f"manifest {state_name} {viewport_name} screenshot filename must be basename-only"
+                )
+                continue
+            if screenshot.get("width") != expected_viewport["width"]:
+                failures.append(
+                    f"manifest {state_name} {viewport_name} screenshot width mismatch"
+                )
+            if int(screenshot.get("height") or 0) < min(
+                600, expected_viewport["height"]
+            ):
+                failures.append(
+                    f"manifest {state_name} {viewport_name} screenshot height too small"
+                )
+            if int(screenshot.get("bytes") or 0) <= 0:
+                failures.append(
+                    f"manifest {state_name} {viewport_name} screenshot is empty"
+                )
+            if manifest_dir is not None:
+                screenshot_path = manifest_dir / filename
+                if not screenshot_path.exists():
+                    failures.append(
+                        f"manifest {state_name} {viewport_name} screenshot file missing: {filename}"
+                    )
+    return failures
+
+
 def build_visual_manifest(
     *,
     url: str,
     db_path: str,
     output_dir: Path,
     viewport_results: dict[str, dict[str, object]],
+    empty_state_results: dict[str, dict[str, object]],
 ) -> dict[str, object]:
     return {
         "schema_version": VISUAL_MANIFEST_SCHEMA_VERSION,
@@ -505,11 +749,13 @@ def build_visual_manifest(
         "database": evidence_path_label(db_path),
         "output_dir": evidence_path_label(output_dir),
         "viewports": viewport_results,
+        "empty_states": empty_state_results,
         "checks": {
             "tabs_expected": list(TAB_CHECKS.keys()),
             "streamlit_exception_text": "not found",
             "screenshot_quality": "passed",
             "layout_review": "passed",
+            "empty_states": "passed",
         },
     }
 
@@ -529,10 +775,17 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
         checks = {}
     if checks.get("tabs_expected") != list(TAB_CHECKS.keys()):
         failures.append("manifest tabs_expected does not match dashboard tabs")
-    for key in ["streamlit_exception_text", "screenshot_quality", "layout_review"]:
+    for key in [
+        "streamlit_exception_text",
+        "screenshot_quality",
+        "layout_review",
+        "empty_states",
+    ]:
         expected = "not found" if key == "streamlit_exception_text" else "passed"
         if checks.get(key) != expected:
             failures.append(f"manifest check {key} must be {expected}")
+
+    failures.extend(visual_empty_state_failures(manifest.get("empty_states")))
 
     viewports = manifest.get("viewports")
     if not isinstance(viewports, dict):
@@ -658,6 +911,9 @@ def visual_manifest_file_failures(
                 failures.append(f"manifest {name} screenshot {key} does not match file")
         if int(screenshot.get("bytes") or 0) <= 0 or int(actual.get("bytes") or 0) <= 0:
             failures.append(f"manifest {name} screenshot is empty")
+    failures.extend(
+        visual_empty_state_failures(manifest.get("empty_states"), manifest_dir)
+    )
     return failures
 
 
@@ -675,7 +931,12 @@ def verify_visual_manifest(path: Path) -> tuple[int, list[str]]:
     return (0 if not failures else 1), failures
 
 
-def run_visual_check(url: str, output_dir: Path, db_path: str) -> int:
+def run_visual_check(
+    url: str,
+    output_dir: Path,
+    db_path: str,
+    empty_state_results: dict[str, dict[str, object]],
+) -> int:
     try:
         from playwright.sync_api import sync_playwright
     except ModuleNotFoundError:
@@ -726,6 +987,7 @@ def run_visual_check(url: str, output_dir: Path, db_path: str) -> int:
         db_path=db_path,
         output_dir=output_dir,
         viewport_results=viewport_results,
+        empty_state_results=empty_state_results,
     )
     manifest_failures = visual_manifest_failures(manifest)
     if manifest_failures:
@@ -783,31 +1045,55 @@ def main() -> int:
         )
         return 2
 
-    url = f"http://{args.host}:{args.port}"
+    output_dir = Path(args.out)
+    output_dir.mkdir(parents=True, exist_ok=True)
     app = Path(__file__).resolve().parents[1] / "codex_observe" / "dashboard.py"
-    cmd = [
-        sys.executable,
-        "-m",
-        "streamlit",
-        "run",
-        str(app),
-        "--server.address",
-        args.host,
-        "--server.port",
-        str(args.port),
-        "--server.headless",
-        "true",
-        "--",
-        "--db",
-        str(db),
-    ]
+    empty_state_results: dict[str, dict[str, object]] = {}
 
+    state_specs = [
+        ("missing_database", output_dir / "missing-dashboard.sqlite", args.port + 1),
+        ("empty_database", output_dir / "empty-dashboard.sqlite", args.port + 2),
+    ]
+    for state_name, state_db, state_port in state_specs:
+        if state_db.exists():
+            with contextlib.suppress(OSError):
+                state_db.unlink()
+        if state_name == "empty_database":
+            create_empty_database(state_db)
+        url = f"http://{args.host}:{state_port}"
+        process = subprocess.Popen(
+            streamlit_command(app, args.host, state_port, state_db),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        try:
+            wait_for_server(url, args.timeout)
+            state_status, viewport_results = run_empty_state_check(
+                url, output_dir, state_name
+            )
+            if state_status != 0:
+                return state_status
+            empty_state_results[state_name] = {
+                "database": evidence_path_label(state_db),
+                "viewports": viewport_results,
+            }
+        finally:
+            process.terminate()
+            try:
+                process.wait(timeout=10)
+            except subprocess.TimeoutExpired:  # pragma: no cover - cleanup fallback
+                process.kill()
+                process.wait(timeout=10)
+
+    url = f"http://{args.host}:{args.port}"
     process = subprocess.Popen(
-        cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        streamlit_command(app, args.host, args.port, db),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
     )
     try:
         wait_for_server(url, args.timeout)
-        return run_visual_check(url, Path(args.out), str(db))
+        return run_visual_check(url, output_dir, str(db), empty_state_results)
     finally:
         process.terminate()
         try:

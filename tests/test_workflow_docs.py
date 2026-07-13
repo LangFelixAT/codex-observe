@@ -149,6 +149,7 @@ def test_current_state_handoff_covers_gates_evidence_and_remaining_blocker() -> 
         "metric card evidence",
         "operator-briefing evidence",
         "saved manifest schema/contract",
+        "missing/empty database onboarding states",
         "codex-observe evidence-bundle",
         "codex-observe.evidence-bundle.v1",
         "There is currently no publishable local issue draft",
@@ -327,6 +328,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
     assert "triage-risk" in release
     assert "visual QA manifest" in release
     assert "schema/contract evidence" in release
+    assert "missing/empty database onboarding states" in release
     assert "metric cards" in release
     assert (
         "public tour JSON evidence including report/comparison-download evidence"

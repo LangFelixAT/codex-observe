@@ -193,6 +193,54 @@ def write_valid_visual_manifest(root: Path) -> None:
             ],
         }
 
+    empty_states = {}
+    for state_name, title in cli.EXPECTED_VISUAL_EMPTY_STATES.items():
+        state_viewports = {}
+        for name, viewport in viewports.items():
+            screenshot_path = (
+                manifest_path.parent / f"dashboard-{state_name}-{name}.png"
+            )
+            image = Image.new("RGB", (viewport["width"], viewport["height"]), "white")
+            draw = ImageDraw.Draw(image)
+            draw.rectangle((0, 0, viewport["width"], 120), fill=(33, 104, 105))
+            draw.text((36, 180), title, fill=(23, 32, 38))
+            image.save(screenshot_path)
+            state_viewports[name] = {
+                "viewport": viewport,
+                "screenshot": {
+                    "filename": screenshot_path.name,
+                    "width": viewport["width"],
+                    "height": viewport["height"],
+                    "bytes": screenshot_path.stat().st_size,
+                },
+                "title": title,
+                "body": "Use the commands below to continue.",
+                "commands": [
+                    {
+                        "label": "Try synthetic data",
+                        "command": "codex-observe demo --serve --db demo.sqlite --host 127.0.0.1 --port 8501",
+                    },
+                    {
+                        "label": "Ingest private logs locally",
+                        "command": "codex-observe ingest ~/.codex/sessions --db demo.sqlite",
+                    },
+                    {
+                        "label": "Check database health",
+                        "command": "codex-observe doctor --db demo.sqlite",
+                    },
+                ],
+                "layout_review": {
+                    "viewport_width": viewport["width"],
+                    "document_width": viewport["width"],
+                    "overflowing_elements": [],
+                    "clipped_text_elements": [],
+                },
+            }
+        empty_states[state_name] = {
+            "database": f".artifacts/visual/{state_name}.sqlite",
+            "viewports": state_viewports,
+        }
+
     manifest_path.write_text(
         json.dumps(
             {
@@ -201,11 +249,13 @@ def write_valid_visual_manifest(root: Path) -> None:
                 "database": ".artifacts/demo/codex_observe_demo.sqlite",
                 "output_dir": ".artifacts/visual",
                 "viewports": viewport_results,
+                "empty_states": empty_states,
                 "checks": {
                     "tabs_expected": tabs,
                     "streamlit_exception_text": "not found",
                     "screenshot_quality": "passed",
                     "layout_review": "passed",
+                    "empty_states": "passed",
                 },
             },
             indent=2,
@@ -475,7 +525,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
         == "manifest, reviewer README, limitations doc, aggregate reports, and audit artifact verified"
     )
     assert (
-        "visual manifest schema and contract, screenshots, layout review, risk labels, metric cards, report and comparison downloads, operator briefing, and success target verified"
+        "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, metric cards, report and comparison downloads, operator briefing, and success target verified"
         in checks["visual QA manifest evidence"]["detail"]
     )
     report_payload = json.loads(report.with_suffix(".json").read_text(encoding="utf-8"))

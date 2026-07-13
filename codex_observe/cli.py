@@ -76,6 +76,20 @@ EXPECTED_VISUAL_SCREENSHOTS = {
     "desktop": "dashboard-desktop.png",
     "narrow": "dashboard-narrow.png",
 }
+EXPECTED_VISUAL_EMPTY_STATES = {
+    "missing_database": "No database found",
+    "empty_database": "No conversations imported yet",
+}
+EXPECTED_VISUAL_EMPTY_STATE_COMMAND_LABELS = {
+    "Try synthetic data",
+    "Ingest private logs locally",
+    "Check database health",
+}
+EXPECTED_VISUAL_EMPTY_STATE_COMMAND_SNIPPETS = {
+    "codex-observe demo --serve --db",
+    "codex-observe ingest ~/.codex/sessions --db",
+    "codex-observe doctor --db",
+}
 SESSIONS_SCHEMA_VERSION = "codex-observe.sessions.v1"
 DOCTOR_SCHEMA_VERSION = "codex-observe.doctor.v1"
 AUDIT_SCHEMA_VERSION = "codex-observe.audit.v1"
@@ -933,6 +947,146 @@ def png_dimensions(path: Path) -> tuple[int, int] | None:
     return int.from_bytes(header[16:20], "big"), int.from_bytes(header[20:24], "big")
 
 
+def visual_empty_state_evidence_failures(
+    empty_states: object, manifest_dir: Path
+) -> list[str]:
+    failures: list[str] = []
+    if not isinstance(empty_states, dict):
+        return ["visual QA manifest missing empty-state evidence"]
+    for state_name, expected_title in EXPECTED_VISUAL_EMPTY_STATES.items():
+        state = empty_states.get(state_name)
+        if not isinstance(state, dict):
+            failures.append(
+                f"visual QA manifest missing {state_name} empty-state evidence"
+            )
+            continue
+        viewports = state.get("viewports")
+        if not isinstance(viewports, dict):
+            failures.append(
+                f"visual QA manifest {state_name} missing viewport evidence"
+            )
+            continue
+        for viewport_name, expected_viewport in EXPECTED_VISUAL_VIEWPORTS.items():
+            viewport = viewports.get(viewport_name)
+            if not isinstance(viewport, dict):
+                failures.append(
+                    f"visual QA manifest {state_name} missing {viewport_name} evidence"
+                )
+                continue
+            if viewport.get("viewport") != expected_viewport:
+                failures.append(
+                    f"visual QA manifest {state_name} {viewport_name} viewport size does not match expected"
+                )
+            if viewport.get("title") != expected_title:
+                failures.append(
+                    f"visual QA manifest {state_name} {viewport_name} title expected {expected_title}"
+                )
+            commands = viewport.get("commands")
+            if not isinstance(commands, list):
+                failures.append(
+                    f"visual QA manifest {state_name} {viewport_name} missing empty-state commands"
+                )
+            else:
+                labels = {
+                    str(command.get("label") or "")
+                    for command in commands
+                    if isinstance(command, dict)
+                }
+                missing_labels = EXPECTED_VISUAL_EMPTY_STATE_COMMAND_LABELS - labels
+                if missing_labels:
+                    failures.append(
+                        f"visual QA manifest {state_name} {viewport_name} missing empty-state command labels: {', '.join(sorted(missing_labels))}"
+                    )
+                command_text = "\n".join(
+                    str(command.get("command") or "")
+                    for command in commands
+                    if isinstance(command, dict)
+                )
+                missing_commands = [
+                    snippet
+                    for snippet in EXPECTED_VISUAL_EMPTY_STATE_COMMAND_SNIPPETS
+                    if snippet not in command_text
+                ]
+                if missing_commands:
+                    failures.append(
+                        f"visual QA manifest {state_name} {viewport_name} missing empty-state commands: {', '.join(missing_commands)}"
+                    )
+            layout = viewport.get("layout_review")
+            if not isinstance(layout, dict):
+                failures.append(
+                    f"visual QA manifest {state_name} {viewport_name} missing layout review"
+                )
+            else:
+                viewport_width = int(layout.get("viewport_width") or 0)
+                document_width = int(layout.get("document_width") or 0)
+                if viewport_width and document_width > viewport_width + 2:
+                    failures.append(
+                        f"visual QA manifest {state_name} {viewport_name} layout review contains overflow"
+                    )
+                if layout.get("overflowing_elements"):
+                    failures.append(
+                        f"visual QA manifest {state_name} {viewport_name} layout review contains overflowing elements"
+                    )
+                if layout.get("clipped_text_elements"):
+                    failures.append(
+                        f"visual QA manifest {state_name} {viewport_name} layout review contains clipped text"
+                    )
+            screenshot = viewport.get("screenshot")
+            if not isinstance(screenshot, dict):
+                failures.append(
+                    f"visual QA manifest {state_name} {viewport_name} missing screenshot metadata"
+                )
+                continue
+            filename = screenshot.get("filename")
+            if not isinstance(filename, str) or not filename:
+                failures.append(
+                    f"visual QA manifest {state_name} {viewport_name} screenshot filename missing"
+                )
+                continue
+            if Path(filename).name != filename:
+                failures.append(
+                    f"visual QA manifest {state_name} {viewport_name} screenshot filename must be basename-only"
+                )
+                continue
+            screenshot_path = manifest_dir / filename
+            if not screenshot_path.exists():
+                failures.append(
+                    f"visual QA manifest {state_name} {viewport_name} screenshot file missing: {filename}"
+                )
+                continue
+            dimensions = png_dimensions(screenshot_path)
+            if dimensions is None:
+                failures.append(
+                    f"visual QA manifest {state_name} {viewport_name} screenshot file is not a readable PNG"
+                )
+                continue
+            width, height = dimensions
+            if screenshot.get("width") != width:
+                failures.append(
+                    f"visual QA manifest {state_name} {viewport_name} screenshot width does not match file"
+                )
+            if screenshot.get("height") != height:
+                failures.append(
+                    f"visual QA manifest {state_name} {viewport_name} screenshot height does not match file"
+                )
+            if width != expected_viewport["width"]:
+                failures.append(
+                    f"visual QA manifest {state_name} {viewport_name} screenshot width mismatch"
+                )
+            if height < min(600, expected_viewport["height"]):
+                failures.append(
+                    f"visual QA manifest {state_name} {viewport_name} screenshot height too small"
+                )
+            if (
+                int(screenshot.get("bytes") or 0) <= 0
+                or screenshot_path.stat().st_size <= 0
+            ):
+                failures.append(
+                    f"visual QA manifest {state_name} {viewport_name} screenshot is empty"
+                )
+    return failures
+
+
 def visual_manifest_evidence_failures(root: Path) -> list[str]:
     manifest_path = root / VISUAL_MANIFEST
     if not manifest_path.exists():
@@ -963,6 +1117,13 @@ def visual_manifest_evidence_failures(root: Path) -> list[str]:
     for key, expected in expected_checks.items():
         if checks.get(key) != expected:
             failures.append(f"visual QA manifest check {key} must be {expected}")
+    if checks.get("empty_states") != "passed":
+        failures.append("visual QA manifest check empty_states must be passed")
+    failures.extend(
+        visual_empty_state_evidence_failures(
+            manifest.get("empty_states"), manifest_path.parent
+        )
+    )
 
     viewports = manifest.get("viewports")
     if not isinstance(viewports, dict):
@@ -1583,7 +1744,7 @@ def release_audit_report(
         f"{VISUAL_MANIFEST.as_posix()}; "
         f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['desktop']).as_posix()}; "
         f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['narrow']).as_posix()}; "
-        "visual manifest schema and contract, screenshots, layout review, risk labels, metric cards, report and comparison downloads, operator briefing, and success target verified"
+        "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, metric cards, report and comparison downloads, operator briefing, and success target verified"
         if not visual_manifest_failures
         else "; ".join(visual_manifest_failures[:3]),
     )
