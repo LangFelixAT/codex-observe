@@ -16,6 +16,7 @@ The project follows semantic versioning once release distribution is decided.
 - Strengthened visual QA manifests and release audit checks to require structured dashboard quick-read evidence.
 - Strengthened release audit checks for public tour dashboard quick-read guidance.
 - Added dashboard comparison metric delta cards and visual/audit evidence that they render.
+- Updated the public tour to point reviewers at dashboard comparison metric delta cards.
 
 ### Added
 

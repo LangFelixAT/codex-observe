@@ -1754,6 +1754,7 @@ def release_audit_report(
         and any("opportunity-change" in item for item in tour_evidence)
         and any("docs/PUBLIC_TOUR_FEEDBACK.md" in item for item in tour_evidence)
         and any("reviewed-redacted" in item for item in tour_evidence)
+        and any("comparison metric delta cards" in item for item in tour_evidence)
         and any(
             "report and comparison download controls" in item for item in tour_evidence
         )
@@ -1767,7 +1768,7 @@ def release_audit_report(
         tour_ok,
         "schema, privacy, database, evidence bundle, dashboard quick-read evidence, and next commands verified"
         if tour_ok
-        else "tour JSON schema_version, privacy, database, evidence bundle, dashboard quick-read evidence, report/comparison-download evidence, feedback evidence, or next_commands missing",
+        else "tour JSON schema_version, privacy, database, evidence bundle, dashboard quick-read evidence, comparison metric delta evidence, report/comparison-download evidence, feedback evidence, or next_commands missing",
     )
 
     ignore_failures = private_artifact_ignore_failures(root)
@@ -2019,6 +2020,7 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
             "evidence": [
                 "comparison highlights triage-risk and opportunity-change movement",
                 "recommendation_detail targets persisted or regressed aggregate drivers",
+                "dashboard comparison metric delta cards show the largest aggregate changes before downloading artifacts",
             ],
             "commands": [
                 "codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --out .artifacts/demo/run-comparison.md",
@@ -2029,7 +2031,7 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
             "title": "Capture and verify UI evidence",
             "evidence": [
                 "visual manifest records desktop and narrow screenshots",
-                "layout review, sidebar risk labels, metric cards, report and comparison download controls, operator briefing, dashboard quick reads, and success target are verified",
+                "layout review, sidebar risk labels, metric cards, comparison metric delta cards, report and comparison download controls, operator briefing, dashboard quick reads, and success target are verified",
                 "tab checks cover Agent detail thread brief, Timeline quick read, Tools quick read, Duplication quick read, and Raw tables data inventory",
             ],
             "commands": [

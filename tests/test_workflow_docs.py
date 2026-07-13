@@ -86,6 +86,7 @@ def test_pr_template_requires_issue_verification_visual_evidence_and_privacy_rev
         "Duplication quick read",
         "Raw tables data inventory",
         "operator-briefing evidence",
+        "comparison metric delta evidence",
         "report-and-comparison-download-control evidence",
         ".artifacts/demo/codex_observe_demo.sqlite",
         "Aggregate report artifacts",
