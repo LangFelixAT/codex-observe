@@ -20,6 +20,7 @@ from codex_observe.dashboard import (
     risk_marker,
     order_conversations_for_review,
     metric_with_share,
+    operator_briefing_html,
     pct_of_total,
     triage_card_html,
     success_target_html,
@@ -354,6 +355,9 @@ def test_dashboard_css_contains_polish_hooks_without_viewport_scaled_type() -> N
     assert ".co-metric-label" in css
     assert ".co-metric-value" in css
     assert "repeat(auto-fit, minmax(150px, 1fr))" in css
+    assert ".co-briefing" in css
+    assert ".co-briefing-grid" in css
+    assert ".co-briefing-fact" in css
     assert ".co-diagnostics" in css
     assert ".co-diagnostic-action" in css
     assert ".co-playbook" in css
@@ -385,6 +389,38 @@ def test_triage_card_html_escapes_content_and_renders_reasons() -> None:
     assert "Largest &lt;thread&gt;" in rendered
     assert "Set stop &amp; summarize" in rendered
     assert "Tool output &lt;large&gt;" in rendered
+    assert "Largest <thread>" not in rendered
+
+
+def test_operator_briefing_html_summarizes_top_action_and_escapes_content() -> None:
+    rendered = operator_briefing_html(
+        {
+            "risk_level": "high",
+            "primary_driver": "Largest <thread>",
+            "next_action": "Set stop & summarize",
+        },
+        {
+            "metric": "largest_thread_share_pct",
+            "current": "57.7%",
+            "target": "below <50%",
+        },
+        pd.DataFrame(
+            [
+                {
+                    "Habit": "Stop <dominant> worker",
+                    "Scale": "33.2k tokens (57.7% of run)",
+                }
+            ]
+        ),
+    )
+
+    assert 'class="co-briefing"' in rendered
+    assert "Operator briefing" in rendered
+    assert "High risk" in rendered
+    assert "Largest &lt;thread&gt;" in rendered
+    assert "Set stop &amp; summarize" in rendered
+    assert "Stop &lt;dominant&gt; worker" in rendered
+    assert "largest_thread_share_pct: 57.7% -> below &lt;50%" in rendered
     assert "Largest <thread>" not in rendered
 
 

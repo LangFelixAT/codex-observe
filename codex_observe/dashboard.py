@@ -188,6 +188,65 @@ def dashboard_css() -> str:
   margin: 0;
 }
 
+.co-briefing {
+  background: var(--co-panel);
+  border: 1px solid var(--co-border);
+  border-left: 5px solid var(--co-accent);
+  border-radius: 8px;
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  margin: 0.2rem 0 1rem 0;
+  padding: 1rem;
+}
+
+.co-briefing h3 {
+  font-size: 1.06rem;
+  letter-spacing: 0;
+  line-height: 1.25;
+  margin: 0 0 0.38rem 0;
+}
+
+.co-briefing p {
+  color: var(--co-muted);
+  font-size: 0.9rem;
+  margin: 0.22rem 0;
+}
+
+.co-briefing-label {
+  color: var(--co-accent);
+  font-size: 0.76rem;
+  font-weight: 750;
+  letter-spacing: 0;
+  margin-bottom: 0.3rem;
+  text-transform: uppercase;
+}
+
+.co-briefing-grid {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.co-briefing-fact {
+  background: var(--co-surface);
+  border: 1px solid var(--co-border);
+  border-radius: 8px;
+  padding: 0.65rem 0.75rem;
+}
+
+.co-briefing-fact strong {
+  color: var(--co-ink);
+  display: block;
+  font-size: 0.92rem;
+  line-height: 1.22;
+  margin-bottom: 0.16rem;
+}
+
+@media (max-width: 760px) {
+  .co-briefing {
+    grid-template-columns: 1fr;
+  }
+}
 .co-diagnostics {
   display: grid;
   gap: 0.8rem;
@@ -450,6 +509,53 @@ def triage_card_html(triage: dict[str, object]) -> str:
         f"<p><strong>Next action:</strong> {action}</p>"
         f"<ul>{reason_items}</ul>"
         "</section>"
+    )
+
+
+def operator_briefing_html(
+    triage: dict[str, object],
+    success_target: dict[str, object],
+    opportunities: pd.DataFrame,
+) -> str:
+    risk = html.escape(str(triage.get("risk_level") or "unknown").capitalize())
+    driver = html.escape(
+        str(triage.get("primary_driver") or "No high-signal diagnostic")
+    )
+    action = html.escape(
+        str(triage.get("next_action") or "Inspect the largest thread.")
+    )
+    metric = html.escape(str(success_target.get("metric") or "total_tokens"))
+    current = html.escape(str(success_target.get("current") or "unknown"))
+    target = html.escape(str(success_target.get("target") or "unknown"))
+    if opportunities.empty:
+        opportunity = "No aggregate opportunity crossed review thresholds."
+        scale = "Keep collecting evidence until a cost driver emerges."
+    else:
+        first = opportunities.iloc[0]
+        opportunity = html.escape(str(first.get("Habit") or "Inspect the top driver."))
+        scale = html.escape(str(first.get("Scale") or "No scale available."))
+
+    return "\n".join(
+        [
+            '<section class="co-briefing">',
+            "  <div>",
+            '    <div class="co-briefing-label">Operator briefing</div>',
+            f"    <h3>{risk} risk: {driver}</h3>",
+            f"    <p>{action}</p>",
+            "  </div>",
+            '  <div class="co-briefing-grid">',
+            '    <div class="co-briefing-fact">',
+            "      <strong>Best next habit</strong>",
+            f"      <p>{opportunity}</p>",
+            f"      <p>{scale}</p>",
+            "    </div>",
+            '    <div class="co-briefing-fact">',
+            "      <strong>Proof target</strong>",
+            f"      <p>{metric}: {current} -> {target}</p>",
+            "    </div>",
+            "  </div>",
+            "</section>",
+        ]
     )
 
 
@@ -952,6 +1058,10 @@ def main() -> None:
     )
 
     with tab_overview:
+        st.markdown(
+            operator_briefing_html(triage, success_target, opportunities),
+            unsafe_allow_html=True,
+        )
         st.markdown(triage_card_html(triage), unsafe_allow_html=True)
         st.subheader("Next run success target")
         st.markdown(success_target_html(success_target), unsafe_allow_html=True)
