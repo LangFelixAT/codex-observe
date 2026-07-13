@@ -272,7 +272,7 @@ def test_visual_manifest_evidence_failures_validate_saved_sidebar_metric_and_suc
         in failures
     )
     assert (
-        "visual QA manifest desktop missing report download controls: Download report JSON"
+        "visual QA manifest desktop missing report download controls: Download comparison JSON, Download comparison MD, Download report JSON"
         in failures
     )
 
@@ -475,7 +475,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
         == "manifest, reviewer README, limitations doc, aggregate reports, and audit artifact verified"
     )
     assert (
-        "visual manifest schema and contract, screenshots, layout review, risk labels, metric cards, report downloads, operator briefing, and success target verified"
+        "visual manifest schema and contract, screenshots, layout review, risk labels, metric cards, report and comparison downloads, operator briefing, and success target verified"
         in checks["visual QA manifest evidence"]["detail"]
     )
     report_payload = json.loads(report.with_suffix(".json").read_text(encoding="utf-8"))
@@ -577,7 +577,7 @@ def test_public_tour_payload_is_private_log_free_and_points_to_visual_verificati
     assert any("reviewed-redacted" in item for item in evidence)
     assert any("success_target" in item for item in evidence)
     assert any("success target" in item for item in evidence)
-    assert any("report download controls" in item for item in evidence)
+    assert any("report and comparison download controls" in item for item in evidence)
 
 
 def test_report_and_comparison_written_lines_include_actionable_drivers(

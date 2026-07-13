@@ -49,7 +49,12 @@ TAB_CHECKS = {
 
 EXPECTED_METRIC_CARDS = ["Threads", "Largest thread", "Uncached input"]
 EXPECTED_SIDEBAR_RISK_LABELS = ["High risk", "Low risk"]
-EXPECTED_DOWNLOAD_CONTROLS = ["Download report MD", "Download report JSON"]
+EXPECTED_DOWNLOAD_CONTROLS = [
+    "Download report MD",
+    "Download report JSON",
+    "Download comparison MD",
+    "Download comparison JSON",
+]
 EXPECTED_DEFAULT_METRIC_VALUES = {
     "Threads": "3",
     "Largest thread": "33.2k tokens (57.7%)",
@@ -133,7 +138,7 @@ def collect_download_controls(page) -> list[str]:
         r"""
 () => {
   const text = document.body.innerText || '';
-  return ['Download report MD', 'Download report JSON'].filter((label) => text.includes(label));
+  return ['Download report MD', 'Download report JSON', 'Download comparison MD', 'Download comparison JSON'].filter((label) => text.includes(label));
 }
         """
     )

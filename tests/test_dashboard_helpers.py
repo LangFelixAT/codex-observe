@@ -15,6 +15,7 @@ from codex_observe.analysis import (
     thread_kind,
 )
 from codex_observe.dashboard import (
+    comparison_download_payloads,
     conversation_button_label,
     dashboard_css,
     risk_marker,
@@ -485,6 +486,49 @@ def test_report_download_payloads_match_cli_report_contract() -> None:
     )
     assert payloads["json"]["mime"] == "application/json"
     assert '"schema_version": "codex-observe.report.v1"' in payloads["json"]["data"]
+    assert '"mode": "aggregate-only"' in payloads["json"]["data"]
+
+
+def test_comparison_download_payloads_match_cli_comparison_contract() -> None:
+    comparison = {
+        "schema_version": "codex-observe.comparison.v1",
+        "privacy": {"mode": "aggregate-only"},
+        "before": {"session_id": "before/session"},
+        "after": {"session_id": "after session"},
+        "summary": "After run improved total tokens.",
+        "verdict": "improved",
+        "largest_change": "Total tokens improved by 10.0%.",
+        "recommendation": "Keep the improved habit.",
+        "triage_risk": {"before": "high", "after": "low", "direction": "improved"},
+        "opportunity_change": {"summary": "Top opportunity improved."},
+        "recommendation_detail": {"action": "keep_change"},
+        "metrics": [
+            {
+                "label": "Total tokens",
+                "before": 1000,
+                "after": 900,
+                "delta": -100,
+                "delta_pct": -10.0,
+                "direction": "improved",
+            }
+        ],
+        "diagnostics": {"resolved": [], "new": [], "persisted": []},
+    }
+
+    payloads = comparison_download_payloads(comparison)
+
+    assert (
+        payloads["markdown"]["filename"]
+        == "codex-observe-before-session-to-after-session-comparison.md"
+    )
+    assert payloads["markdown"]["mime"] == "text/markdown"
+    assert "# Codex Observe Run Comparison" in payloads["markdown"]["data"]
+    assert (
+        payloads["json"]["filename"]
+        == "codex-observe-before-session-to-after-session-comparison.json"
+    )
+    assert payloads["json"]["mime"] == "application/json"
+    assert '"schema_version": "codex-observe.comparison.v1"' in payloads["json"]["data"]
     assert '"mode": "aggregate-only"' in payloads["json"]["data"]
 
 

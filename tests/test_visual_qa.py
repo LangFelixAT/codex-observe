@@ -156,7 +156,13 @@ def test_sidebar_risk_label_failures_require_high_and_low_risk_labels() -> None:
 def test_download_control_failures_require_report_exports() -> None:
     assert (
         download_control_failures(
-            ["Download report MD", "Download report JSON"], "desktop"
+            [
+                "Download report MD",
+                "Download report JSON",
+                "Download comparison MD",
+                "Download comparison JSON",
+            ],
+            "desktop",
         )
         == []
     )
@@ -222,7 +228,12 @@ def complete_viewport_results(tmp_path: Path) -> dict[str, dict[str, object]]:
                     "target": "below 50.0%",
                 }
             ],
-            "download_controls": ["Download report MD", "Download report JSON"],
+            "download_controls": [
+                "Download report MD",
+                "Download report JSON",
+                "Download comparison MD",
+                "Download comparison JSON",
+            ],
             "operator_briefings": [
                 {
                     "label": "Operator briefing",
@@ -286,6 +297,8 @@ def test_visual_manifest_records_review_evidence(tmp_path: Path) -> None:
     assert loaded["viewports"]["desktop"]["download_controls"] == [
         "Download report MD",
         "Download report JSON",
+        "Download comparison MD",
+        "Download comparison JSON",
     ]
     assert loaded["viewports"]["desktop"]["operator_briefings"][0] == {
         "label": "Operator briefing",

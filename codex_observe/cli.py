@@ -36,7 +36,12 @@ VISUAL_MANIFEST_RECOVERY = (
     f"`python scripts/visual_qa.py --verify-manifest {VISUAL_MANIFEST.as_posix()}`"
 )
 EXPECTED_VISUAL_RISK_LABELS = {"High risk", "Low risk"}
-EXPECTED_VISUAL_DOWNLOAD_CONTROLS = {"Download report MD", "Download report JSON"}
+EXPECTED_VISUAL_DOWNLOAD_CONTROLS = {
+    "Download report MD",
+    "Download report JSON",
+    "Download comparison MD",
+    "Download comparison JSON",
+}
 EXPECTED_VISUAL_METRICS = {
     "Threads": "3",
     "Largest thread": "33.2k tokens (57.7%)",
@@ -1489,14 +1494,16 @@ def release_audit_report(
         and any("opportunity-change" in item for item in tour_evidence)
         and any("docs/PUBLIC_TOUR_FEEDBACK.md" in item for item in tour_evidence)
         and any("reviewed-redacted" in item for item in tour_evidence)
-        and any("report download controls" in item for item in tour_evidence)
+        and any(
+            "report and comparison download controls" in item for item in tour_evidence
+        )
     )
     add(
         "public tour JSON",
         tour_ok,
         "schema, privacy, database, evidence bundle, evidence, and next commands verified"
         if tour_ok
-        else "tour JSON schema_version, privacy, database, evidence bundle, report-download evidence, feedback evidence, or next_commands missing",
+        else "tour JSON schema_version, privacy, database, evidence bundle, report/comparison-download evidence, feedback evidence, or next_commands missing",
     )
 
     ignore_failures = private_artifact_ignore_failures(root)
@@ -1576,7 +1583,7 @@ def release_audit_report(
         f"{VISUAL_MANIFEST.as_posix()}; "
         f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['desktop']).as_posix()}; "
         f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['narrow']).as_posix()}; "
-        "visual manifest schema and contract, screenshots, layout review, risk labels, metric cards, report downloads, operator briefing, and success target verified"
+        "visual manifest schema and contract, screenshots, layout review, risk labels, metric cards, report and comparison downloads, operator briefing, and success target verified"
         if not visual_manifest_failures
         else "; ".join(visual_manifest_failures[:3]),
     )
@@ -1757,7 +1764,7 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
             "title": "Capture and verify UI evidence",
             "evidence": [
                 "visual manifest records desktop and narrow screenshots",
-                "layout review, sidebar risk labels, metric cards, report download controls, operator briefing, and success target are verified",
+                "layout review, sidebar risk labels, metric cards, report and comparison download controls, operator briefing, and success target are verified",
             ],
             "commands": [
                 "python scripts/visual_qa.py",

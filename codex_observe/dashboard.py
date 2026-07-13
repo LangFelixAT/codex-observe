@@ -30,6 +30,9 @@ from codex_observe.analysis import (
 )
 from codex_observe.report import (
     build_report,
+    compare_reports,
+    comparison_json,
+    comparison_markdown,
     report_json,
     report_markdown,
     report_success_target,
@@ -577,14 +580,20 @@ def pct_of_total(value: object, total: object) -> float:
     return round(numerator / denominator * 100, 1)
 
 
+def safe_download_stem(value: object, fallback: str) -> str:
+    raw_value = str(value or fallback)
+    safe_value = "".join(
+        char if char.isalnum() or char in {"-", "_"} else "-" for char in raw_value
+    ).strip("-")
+    return safe_value or fallback
+
+
 def report_download_payloads(report: dict[str, object]) -> dict[str, dict[str, str]]:
     session = report.get("session", {})
-    raw_session_id = str(session.get("session_id") or "selected-session")
-    safe_session_id = "".join(
-        char if char.isalnum() or char in {"-", "_"} else "-" for char in raw_session_id
-    ).strip("-")
-    if not safe_session_id:
-        safe_session_id = "selected-session"
+    safe_session_id = safe_download_stem(
+        session.get("session_id") if isinstance(session, dict) else None,
+        "selected-session",
+    )
     base = f"codex-observe-{safe_session_id}-report"
     return {
         "markdown": {
@@ -595,6 +604,34 @@ def report_download_payloads(report: dict[str, object]) -> dict[str, dict[str, s
         "json": {
             "filename": f"{base}.json",
             "data": report_json(report),
+            "mime": "application/json",
+        },
+    }
+
+
+def comparison_download_payloads(
+    comparison: dict[str, object],
+) -> dict[str, dict[str, str]]:
+    before = comparison.get("before", {})
+    after = comparison.get("after", {})
+    before_id = safe_download_stem(
+        before.get("session_id") if isinstance(before, dict) else None,
+        "before",
+    )
+    after_id = safe_download_stem(
+        after.get("session_id") if isinstance(after, dict) else None,
+        "after",
+    )
+    base = f"codex-observe-{before_id}-to-{after_id}-comparison"
+    return {
+        "markdown": {
+            "filename": f"{base}.md",
+            "data": comparison_markdown(comparison),
+            "mime": "text/markdown",
+        },
+        "json": {
+            "filename": f"{base}.json",
+            "data": comparison_json(comparison),
             "mime": "application/json",
         },
     }
@@ -1114,6 +1151,51 @@ def main() -> None:
                 width="stretch",
                 key=f"download_report_json_{session_id}",
             )
+        comparison_options = [
+            str(row["session_id"])
+            for _, row in conversations.iterrows()
+            if str(row["session_id"]) != str(session_id)
+        ]
+        if comparison_options:
+            st.subheader("Compare selected run")
+            comparison_labels = {}
+            for _, row in conversations.iterrows():
+                candidate_id = str(row["session_id"])
+                risk = str(row.get("triage_risk") or "unknown").capitalize()
+                last_seen = sidebar_time_label(row.get("last_seen")) or "unknown time"
+                tokens = fmt_short(row.get("total_tokens") or 0)
+                comparison_labels[candidate_id] = (
+                    f"{risk} risk | {last_seen} | {tokens} tokens | {candidate_id}"
+                )
+            baseline_session_id = st.selectbox(
+                "Baseline run",
+                comparison_options,
+                format_func=lambda value: comparison_labels.get(value, value),
+                key=f"comparison_baseline_{session_id}",
+                width="stretch",
+            )
+            baseline_report = build_report(str(db), baseline_session_id)
+            comparison = compare_reports(baseline_report, report)
+            comparison_downloads = comparison_download_payloads(comparison)
+            compare_left, compare_right = st.columns(2)
+            with compare_left:
+                st.download_button(
+                    "Download comparison MD",
+                    comparison_downloads["markdown"]["data"],
+                    file_name=comparison_downloads["markdown"]["filename"],
+                    mime=comparison_downloads["markdown"]["mime"],
+                    width="stretch",
+                    key=f"download_comparison_md_{baseline_session_id}_{session_id}",
+                )
+            with compare_right:
+                st.download_button(
+                    "Download comparison JSON",
+                    comparison_downloads["json"]["data"],
+                    file_name=comparison_downloads["json"]["filename"],
+                    mime=comparison_downloads["json"]["mime"],
+                    width="stretch",
+                    key=f"download_comparison_json_{baseline_session_id}_{session_id}",
+                )
         st.subheader("Next run success target")
         st.markdown(success_target_html(success_target), unsafe_allow_html=True)
         st.subheader("Opportunity stack")
