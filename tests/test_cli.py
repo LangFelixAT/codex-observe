@@ -577,6 +577,7 @@ def test_public_tour_payload_is_private_log_free_and_points_to_visual_verificati
     assert any("reviewed-redacted" in item for item in evidence)
     assert any("success_target" in item for item in evidence)
     assert any("success target" in item for item in evidence)
+    assert any("report download controls" in item for item in evidence)
 
 
 def test_report_and_comparison_written_lines_include_actionable_drivers(

@@ -1489,13 +1489,14 @@ def release_audit_report(
         and any("opportunity-change" in item for item in tour_evidence)
         and any("docs/PUBLIC_TOUR_FEEDBACK.md" in item for item in tour_evidence)
         and any("reviewed-redacted" in item for item in tour_evidence)
+        and any("report download controls" in item for item in tour_evidence)
     )
     add(
         "public tour JSON",
         tour_ok,
         "schema, privacy, database, evidence bundle, evidence, and next commands verified"
         if tour_ok
-        else "tour JSON schema_version, privacy, database, evidence bundle, feedback evidence, or next_commands missing",
+        else "tour JSON schema_version, privacy, database, evidence bundle, report-download evidence, feedback evidence, or next_commands missing",
     )
 
     ignore_failures = private_artifact_ignore_failures(root)
@@ -1756,7 +1757,7 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
             "title": "Capture and verify UI evidence",
             "evidence": [
                 "visual manifest records desktop and narrow screenshots",
-                "layout review, sidebar risk labels, metric cards, operator briefing, and success target are verified",
+                "layout review, sidebar risk labels, metric cards, report download controls, operator briefing, and success target are verified",
             ],
             "commands": [
                 "python scripts/visual_qa.py",

@@ -301,6 +301,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         "regression suite",
         "clean-install smoke gate",
         "aggregate release audit",
+        "report download controls",
         "synthetic demo generation",
         "aggregate-only session listing",
         "database doctor",
@@ -325,6 +326,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
     assert "visual QA manifest" in release
     assert "schema/contract evidence" in release
     assert "metric cards" in release
+    assert "public tour JSON evidence including report-download evidence" in release
     assert "operator briefing" in release
     assert "report download controls" in release
     assert "required_commands" in release
