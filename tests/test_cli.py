@@ -497,6 +497,7 @@ def test_public_evidence_bundle_artifact_failures_require_limitations(
 
     assert status == 0
     assert manifest["artifacts"]["limitations_markdown"] == "LIMITATIONS.md"
+    assert manifest["artifacts"]["feedback_runbook"] == "PUBLIC_TOUR_FEEDBACK.md"
     assert cli.public_evidence_bundle_artifact_failures(Path.cwd(), bundle) == []
 
     (bundle / "LIMITATIONS.md").write_text(
@@ -508,6 +509,14 @@ def test_public_evidence_bundle_artifact_failures_require_limitations(
 
     assert any("approval-gated" in failure for failure in failures)
     assert any("explicit human approval" in failure for failure in failures)
+    (bundle / "PUBLIC_TOUR_FEEDBACK.md").write_text(
+        "# Public Tour Feedback\n",
+        encoding="utf-8",
+    )
+
+    failures = cli.public_evidence_bundle_artifact_failures(Path.cwd(), bundle)
+
+    assert any("Do Not Collect" in failure for failure in failures)
 
     loaded = json.loads((bundle / "evidence-bundle.json").read_text(encoding="utf-8"))
     without_summary = dict(loaded)
@@ -584,7 +593,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     )
     assert (
         checks["public evidence bundle artifacts"]["detail"]
-        == "manifest, reviewer README key findings, review checklist, and reproduce-local commands, limitations doc, aggregate reports, and audit artifact verified"
+        == "manifest, reviewer README key findings, review checklist, feedback runbook, reproduce-local commands, limitations doc, aggregate reports, and audit artifact verified"
     )
     assert (
         "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, metric cards, dashboard quick reads, report and comparison downloads, comparison preview and deltas, operator briefing, and success target verified"
@@ -799,6 +808,7 @@ def test_public_evidence_bundle_writes_privacy_safe_manifest_and_artifacts(
     assert "visual_screenshots" not in artifacts
     for key in [
         "bundle_readme",
+        "feedback_runbook",
         "database",
         "sessions_dir",
         "report_markdown",
@@ -812,6 +822,8 @@ def test_public_evidence_bundle_writes_privacy_safe_manifest_and_artifacts(
     readme = (out / artifacts["bundle_readme"]).read_text(encoding="utf-8")
     assert "# Codex Observe Evidence Bundle" in readme
     assert "LIMITATIONS.md" in readme
+    assert "PUBLIC_TOUR_FEEDBACK.md" in readme
+    assert "File feedback safely" in readme
     assert "demo/run-report.md" in readme
     assert "audit/audit.json" in readme
     assert "## Key Findings" in readme
@@ -838,6 +850,10 @@ def test_public_evidence_bundle_writes_privacy_safe_manifest_and_artifacts(
     )
     assert "codex-observe audit --json" in readme
     assert "private Codex logs" in readme
+    feedback = (out / artifacts["feedback_runbook"]).read_text(encoding="utf-8")
+    assert "# Public Tour Feedback" in feedback
+    assert "Do Not Collect" in feedback
+    assert "Private prompts" in feedback
     limitations = (out / artifacts["limitations_markdown"]).read_text(encoding="utf-8")
     assert "# Limitations and Next Work" in limitations
     assert "approval-gated" in limitations
@@ -873,10 +889,13 @@ def test_evidence_bundle_cli_json_and_text_outputs_are_actionable(
         assert payload["status"] == "ok"
         assert payload["artifacts"]["bundle_readme"] == "README.md"
         assert payload["artifacts"]["limitations_markdown"] == "LIMITATIONS.md"
+        assert payload["artifacts"]["feedback_runbook"] == "PUBLIC_TOUR_FEEDBACK.md"
         assert payload["artifacts"]["report_markdown"] == "demo/run-report.md"
         assert payload["review_summary"][0]["label"] == "Run triage"
         assert payload["review_checklist"][0]["label"] == "Confirm the bundle boundary"
-        assert payload["next"].startswith("Start with README.md and LIMITATIONS.md")
+        assert payload["next"].startswith(
+            "Start with README.md, LIMITATIONS.md, and PUBLIC_TOUR_FEEDBACK.md"
+        )
         assert "visual QA screenshots" not in payload["next"]
         assert str(tmp_path) not in captured.out
 
@@ -891,6 +910,7 @@ def test_evidence_bundle_cli_json_and_text_outputs_are_actionable(
     assert "Status: ok" in captured.out
     assert "bundle_readme: README.md" in captured.out
     assert "limitations_markdown: LIMITATIONS.md" in captured.out
+    assert "feedback_runbook: PUBLIC_TOUR_FEEDBACK.md" in captured.out
     assert "report_markdown: demo/run-report.md" in captured.out
     assert "Key findings:" in captured.out
     assert "Run triage: high risk - Largest thread drives the run" in captured.out

@@ -649,12 +649,14 @@ def public_evidence_bundle_artifact_failures(
             "Check workflow-change evidence",
             "Verify release gates",
             "next validation command",
+            "File feedback safely",
         ]:
             if required not in checklist_text:
                 failures.append(f"evidence bundle review_checklist missing {required}")
     expected_artifacts = {
         "bundle_readme": "README.md",
         "limitations_markdown": "LIMITATIONS.md",
+        "feedback_runbook": "PUBLIC_TOUR_FEEDBACK.md",
         "report_markdown": "demo/run-report.md",
         "comparison_markdown": "demo/run-comparison.md",
         "audit_json": "audit/audit.json",
@@ -693,6 +695,8 @@ def public_evidence_bundle_artifact_failures(
             "codex-observe compare --before-report demo/run-report.json --after-report demo/run-report.json --out demo/run-comparison.md",
             "codex-observe audit --json",
             "LIMITATIONS.md",
+            "PUBLIC_TOUR_FEEDBACK.md",
+            "File feedback safely",
             "private Codex logs",
             "External publishing or attachment still requires explicit human approval",
         ]:
@@ -711,6 +715,20 @@ def public_evidence_bundle_artifact_failures(
             if required not in limitations:
                 failures.append(f"evidence bundle LIMITATIONS.md missing {required}")
 
+    feedback_path = bundle_dir / "PUBLIC_TOUR_FEEDBACK.md"
+    if feedback_path.exists():
+        feedback = feedback_path.read_text(encoding="utf-8")
+        for required in [
+            "# Public Tour Feedback",
+            "Safe Feedback Sources",
+            "Do Not Collect",
+            "Private prompts",
+            "External attachment or publication of generated artifacts still requires explicit human approval",
+        ]:
+            if required not in feedback:
+                failures.append(
+                    f"evidence bundle PUBLIC_TOUR_FEEDBACK.md missing {required}"
+                )
     return failures
 
 
@@ -1867,7 +1885,7 @@ def release_audit_report(
         add(
             "public evidence bundle artifacts",
             not public_bundle_failures,
-            "manifest, reviewer README key findings, review checklist, and reproduce-local commands, limitations doc, aggregate reports, and audit artifact verified"
+            "manifest, reviewer README key findings, review checklist, feedback runbook, reproduce-local commands, limitations doc, aggregate reports, and audit artifact verified"
             if not public_bundle_failures
             else "; ".join(public_bundle_failures[:3]),
         )
@@ -2543,6 +2561,15 @@ def evidence_bundle_review_checklist(
             "look_for": "status=ok, failed_checks=[], and the required command list for reproducing gates.",
         },
     ]
+    checklist.append(
+        {
+            "label": "File feedback safely",
+            "artifact": str(
+                artifacts.get("feedback_runbook", "PUBLIC_TOUR_FEEDBACK.md")
+            ),
+            "look_for": "Safe feedback sources, do-not-collect rules, and approval requirements before publishing artifacts.",
+        }
+    )
     if visual_status == "ok" and isinstance(artifacts.get("visual_manifest"), str):
         checklist.append(
             {
@@ -2574,6 +2601,7 @@ def evidence_bundle_readme(manifest: dict[str, object]) -> str:
     if isinstance(artifacts, dict):
         recommended = [
             ("limitations_markdown", "Known limitations and next-work sources"),
+            ("feedback_runbook", "Privacy-safe feedback runbook"),
             ("report_markdown", "Aggregate run report"),
             ("comparison_markdown", "Aggregate comparison report"),
             ("audit_json", "Release audit JSON"),
@@ -2670,6 +2698,7 @@ def public_evidence_bundle(
     manifest_path = out / "evidence-bundle.json"
     readme_path = out / "README.md"
     limitations_path = out / "LIMITATIONS.md"
+    feedback_path = out / "PUBLIC_TOUR_FEEDBACK.md"
 
     limitations_source = Path("docs") / "LIMITATIONS.md"
     if limitations_source.exists():
@@ -2682,6 +2711,16 @@ def public_evidence_bundle(
             "from the repository checkout before publishing or attaching artifacts.\n"
         )
     limitations_path.write_text(limitations_text, encoding="utf-8")
+
+    feedback_source = Path("docs") / "PUBLIC_TOUR_FEEDBACK.md"
+    if feedback_source.exists():
+        feedback_text = feedback_source.read_text(encoding="utf-8")
+    else:
+        feedback_text = (
+            "# Public Tour Feedback\n\n"
+            "The source repository feedback runbook was not available when this synthetic bundle was generated. Review generated artifacts for private paths or aggregate clues before sharing.\n"
+        )
+    feedback_path.write_text(feedback_text, encoding="utf-8")
 
     commands = [
         f"codex-observe demo --db {bundle_path_label(db_path, out)} --sessions {bundle_path_label(sessions_path, out)} --keep-sessions",
@@ -2767,6 +2806,7 @@ def public_evidence_bundle(
     artifacts: dict[str, object] = {
         "bundle_readme": bundle_path_label(readme_path, out),
         "limitations_markdown": bundle_path_label(limitations_path, out),
+        "feedback_runbook": bundle_path_label(feedback_path, out),
         "database": bundle_path_label(db_path, out),
         "sessions_dir": bundle_path_label(sessions_path, out),
         "report_markdown": bundle_path_label(report_md, out),
@@ -2789,9 +2829,9 @@ def public_evidence_bundle(
     review_summary = evidence_bundle_review_summary(report, comparison, audit_payload)
     review_checklist = evidence_bundle_review_checklist(artifacts, visual_status)
 
-    next_step = "Start with README.md and LIMITATIONS.md, then review evidence-bundle.json, run-report.md, run-comparison.md, and audit.json before publishing or attaching artifacts."
+    next_step = "Start with README.md, LIMITATIONS.md, and PUBLIC_TOUR_FEEDBACK.md, then review evidence-bundle.json, run-report.md, run-comparison.md, and audit.json before publishing or attaching artifacts."
     if visual_status == "ok":
-        next_step = "Start with README.md and LIMITATIONS.md, then review evidence-bundle.json, run-report.md, run-comparison.md, audit.json, and visual QA screenshots before publishing or attaching artifacts."
+        next_step = "Start with README.md, LIMITATIONS.md, and PUBLIC_TOUR_FEEDBACK.md, then review evidence-bundle.json, run-report.md, run-comparison.md, audit.json, and visual QA screenshots before publishing or attaching artifacts."
 
     manifest: dict[str, object] = {
         "schema_version": EVIDENCE_BUNDLE_SCHEMA_VERSION,

@@ -24,6 +24,7 @@ The project follows semantic versioning once release distribution is decided.
 - Added reviewer key findings to the public evidence bundle manifest, README, and audit validation.
 - Added reviewer key findings to the public evidence bundle text output.
 - Updated the public tour and audit contract to require evidence bundle key-findings guidance.
+- Bundled the privacy-safe public-tour feedback runbook in reviewer evidence bundles.
 
 ### Added
 
