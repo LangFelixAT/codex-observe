@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 import sys
+from types import SimpleNamespace
 from pathlib import Path
 from unittest.mock import patch
 
@@ -715,6 +716,65 @@ def test_sessions_missing_json_payload_is_actionable_and_schema_versioned() -> N
     assert "codex-observe demo --db missing.sqlite" in payload["next_commands"]
     assert payload["review_path"][0]["label"] == "Create demo data"
     assert payload["review_path"][1]["label"] == "Ingest local logs"
+
+
+def test_ingest_payload_and_text_include_review_path() -> None:
+    result = SimpleNamespace(
+        files_seen=2,
+        files_imported=2,
+        threads=3,
+        events=4,
+        duplicate_files=0,
+        empty_files=0,
+        malformed_files=0,
+        missing_meta_files=0,
+        unreadable_files=0,
+        malformed_lines=0,
+    )
+
+    payload = cli.ingest_success_payload("sessions", "demo.sqlite", result)
+    text = "\n".join(cli.ingest_success_lines("demo.sqlite", result))
+
+    assert payload["schema_version"] == cli.INGEST_SCHEMA_VERSION
+    assert payload["status"] == "ok"
+    assert [step["label"] for step in payload["review_path"]] == [
+        "Verify database health",
+        "Choose a reportable run",
+        "Export aggregate report",
+        "Open dashboard",
+    ]
+    assert payload["review_path"][0]["command"] == (
+        "codex-observe doctor --db demo.sqlite --json"
+    )
+    assert payload["review_path"][1]["command"] == (
+        "codex-observe sessions --db demo.sqlite --json"
+    )
+    assert "Review path:" in text
+    assert (
+        "Verify database health: codex-observe doctor --db demo.sqlite --json" in text
+    )
+    assert "Success check: doctor JSON status is ok and review_path is present." in text
+
+    empty_result = SimpleNamespace(
+        files_seen=0,
+        files_imported=0,
+        threads=0,
+        events=0,
+        duplicate_files=0,
+        empty_files=0,
+        malformed_files=0,
+        missing_meta_files=0,
+        unreadable_files=0,
+        malformed_lines=0,
+    )
+    empty_payload = cli.ingest_success_payload("sessions", "empty.sqlite", empty_result)
+
+    assert empty_payload["status"] == "empty"
+    assert [step["label"] for step in empty_payload["review_path"]] == [
+        "Check input path",
+        "Try synthetic data",
+        "Verify database health",
+    ]
 
 
 def test_doctor_report_includes_review_path_for_healthy_and_missing_databases(

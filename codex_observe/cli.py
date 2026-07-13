@@ -1690,9 +1690,7 @@ def release_audit_report(
 
     actual_db_path = db_path
     try:
-        result = create_demo_database(
-            actual_db_path, sessions_path, keep_sessions=False
-        )
+        result = create_demo_database(actual_db_path, sessions_path, keep_sessions=True)
         demo_detail = f"{result.files_imported} files, {result.threads} threads, {result.events} events"
     except PermissionError:
         requested = Path(db_path).expanduser()
@@ -1700,9 +1698,7 @@ def release_audit_report(
             f"{requested.stem}-audit{requested.suffix or '.sqlite'}"
         )
         actual_db_path = str(fallback)
-        result = create_demo_database(
-            actual_db_path, sessions_path, keep_sessions=False
-        )
+        result = create_demo_database(actual_db_path, sessions_path, keep_sessions=True)
         demo_detail = f"{result.files_imported} files, {result.threads} threads, {result.events} events; requested DB was locked, used {actual_db_path}"
     add(
         "demo database",
@@ -1726,6 +1722,66 @@ def release_audit_report(
         "schema, counts, database, and next commands verified"
         if demo_json_ok
         else "demo JSON schema_version, counts, database, or next_commands missing",
+    )
+
+    ingest_contract_path = Path(actual_db_path).with_name(
+        f"{Path(actual_db_path).stem}-ingest-contract.sqlite"
+    )
+    if ingest_contract_path.exists():
+        ingest_contract_path.unlink()
+    ingest_result = ingest(sessions_path, str(ingest_contract_path))
+    ingest_payload = ingest_success_payload(
+        sessions_path, str(ingest_contract_path), ingest_result
+    )
+    ingest_lines_text = "\n".join(
+        ingest_success_lines(str(ingest_contract_path), ingest_result)
+    )
+    ingest_review_path = ingest_payload.get("review_path")
+    ingest_has_review_path = (
+        isinstance(ingest_review_path, list)
+        and len(ingest_review_path) >= 3
+        and all(
+            isinstance(step, dict)
+            and step.get("label")
+            and step.get("command")
+            and step.get("success_check")
+            for step in ingest_review_path
+        )
+        and any(
+            "codex-observe doctor" in str(step.get("command"))
+            and "--json" in str(step.get("command"))
+            for step in ingest_review_path
+            if isinstance(step, dict)
+        )
+        and any(
+            "codex-observe sessions" in str(step.get("command"))
+            and "--json" in str(step.get("command"))
+            for step in ingest_review_path
+            if isinstance(step, dict)
+        )
+    )
+    ingest_json_ok = (
+        ingest_payload.get("schema_version") == INGEST_SCHEMA_VERSION
+        and ingest_payload.get("status") == "ok"
+        and ingest_payload.get("privacy", {}).get("raw_content_included") is False
+        and ingest_payload.get("counts", {}).get("files_seen") == result.files_imported
+        and ingest_payload.get("counts", {}).get("files_imported")
+        == result.files_imported
+        and ingest_payload.get("counts", {}).get("threads") == result.threads
+        and ingest_payload.get("counts", {}).get("events") == result.events
+        and ingest_payload.get("skipped") == ingest_skipped_counts(ingest_result)
+        and ingest_payload.get("next_commands")
+        == ingest_next_commands(str(ingest_contract_path))
+        and ingest_has_review_path
+        and "Review path:" in ingest_lines_text
+        and "Verify database health:" in ingest_lines_text
+    )
+    add(
+        "synthetic ingest JSON",
+        ingest_json_ok,
+        "schema, counts, skipped categories, next commands, text review path, and review path verified"
+        if ingest_json_ok
+        else "synthetic ingest JSON schema_version, counts, skipped categories, next_commands, text review path, or review_path missing",
     )
 
     doctor_status, doctor = doctor_report(actual_db_path)
@@ -2785,12 +2841,58 @@ def ingest_next_commands(db_path: str) -> list[str]:
     ]
 
 
+def ingest_review_path(db_path: str, status: str) -> list[dict[str, str]]:
+    if status in {"ok", "partial"}:
+        return [
+            {
+                "label": "Verify database health",
+                "command": f"codex-observe doctor --db {db_path} --json",
+                "success_check": "doctor JSON status is ok and review_path is present.",
+            },
+            {
+                "label": "Choose a reportable run",
+                "command": f"codex-observe sessions --db {db_path} --json",
+                "success_check": "sessions JSON includes recommended_session and review_path.",
+            },
+            {
+                "label": "Export aggregate report",
+                "command": f"codex-observe report --db {db_path} --out run-report.md",
+                "success_check": "report output includes Recommended Action and Next Run Success Target.",
+            },
+            {
+                "label": "Open dashboard",
+                "command": f"codex-observe serve --db {db_path}",
+                "success_check": "dashboard opens on the same database without raw log output.",
+            },
+        ]
+    if status == "empty":
+        return [
+            {
+                "label": "Check input path",
+                "command": f"codex-observe ingest ~/.codex/sessions --db {db_path}",
+                "success_check": "ingest sees JSONL files with session_meta.",
+            },
+            {
+                "label": "Try synthetic data",
+                "command": f"codex-observe demo --db {db_path}",
+                "success_check": "demo creates reportable conversations for evaluation.",
+            },
+            {
+                "label": "Verify database health",
+                "command": f"codex-observe doctor --db {db_path} --json",
+                "success_check": "doctor reports status ok after ingest or demo.",
+            },
+        ]
+    return []
+
+
 def ingest_success_payload(
     sessions_path: str, db_path: str, result, serve: bool = False
 ) -> dict[str, object]:
+    status = ingest_status(result)
     return {
         "schema_version": INGEST_SCHEMA_VERSION,
-        "status": ingest_status(result),
+        "status": status,
         "privacy": {
             "mode": "aggregate-only",
             "private_log_required": True,
@@ -2808,17 +2910,28 @@ def ingest_success_payload(
         "skipped": ingest_skipped_counts(result),
         "next": "run the commands in next_commands to verify health, choose a run, and open the dashboard.",
         "next_commands": ingest_next_commands(db_path),
+        "review_path": ingest_review_path(db_path, status),
     }
 
 
 def ingest_success_lines(db_path: str, result, serve: bool = False) -> list[str]:
     commands = ingest_next_commands(db_path)
+    status = ingest_status(result)
+    review_path = ingest_review_path(db_path, status)
     lines = [
         f"{ingest_summary(result)} {db_path}",
-        "Next:",
-        f"- Verify database health: {commands[0].removesuffix(' --json')}",
-        f"- List reportable runs: {commands[1].removesuffix(' --json')}",
+        "Review path:",
     ]
+    for step in review_path:
+        lines.append(f"- {step['label']}: {step['command']}")
+        lines.append(f"  Success check: {step['success_check']}")
+    lines.extend(
+        [
+            "Next:",
+            f"- Verify database health: {commands[0].removesuffix(' --json')}",
+            f"- List reportable runs: {commands[1].removesuffix(' --json')}",
+        ]
+    )
     if serve:
         lines.append("- Launching dashboard now.")
     else:

@@ -6,6 +6,7 @@ The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
 
+- Added structured ingest review paths so fresh imports guide users through health checks, session selection, report export, and dashboard review.
 - Added structured doctor review paths so database health checks guide users toward recovery, session selection, dashboard inspection, and report export.
 - Added a top-level public-tour review path so text and JSON tour output expose the end-to-end evaluation checklist.
 - Added a structured session review path to sessions JSON and plain-text listings so terminal users can move from diagnosis to report, comparison, next-run validation, and safe feedback.
@@ -59,7 +60,7 @@ The project follows semantic versioning once release distribution is decided.
 - Public README tour for evaluating the synthetic demo, aggregate report quick read, opportunity stack, opportunity-change comparison workflow, visual QA evidence, reviewer evidence bundle, final audit, and privacy-safe feedback loop before using private logs, plus schema-versioned `codex-observe tour --json` output with evidence bullets for automation.
 - Responsive dashboard metric cards, narrow tab wrapping, verify-only validated manifest evidence and referenced screenshot files in path-safe visual QA manifests, and visual QA layout overflow/clipping review for release-candidate UX evidence.
 - Redacted fixture privacy review verifier and `--verify-only` mode for the real-log parser feedback loop, including generated JSONL row and manifest metadata checks.
-- Redacted fixture generation supports `--json` for machine-readable generation status and privacy-safe validation failures with error codes, validates the selected input path before touching output, redacts manifest source/output paths and source-derived candidate filenames, and refuses to overwrite arbitrary existing directories; use an empty output directory or a prior redacted candidate directory. `codex-observe ingest --json` now emits aggregate-only `codex-observe.ingest.v1` counts, skipped categories, privacy metadata, and next commands for automation.
+- Redacted fixture generation supports `--json` for machine-readable generation status and privacy-safe validation failures with error codes, validates the selected input path before touching output, redacts manifest source/output paths and source-derived candidate filenames, and refuses to overwrite arbitrary existing directories; use an empty output directory or a prior redacted candidate directory. `codex-observe ingest --json` now emits aggregate-only `codex-observe.ingest.v1` counts, skipped categories, privacy metadata, next commands, and structured review paths for automation.
 
 ### Changed
 
