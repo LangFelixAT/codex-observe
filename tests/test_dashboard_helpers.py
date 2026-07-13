@@ -16,6 +16,7 @@ from codex_observe.analysis import (
 )
 from codex_observe.dashboard import (
     comparison_download_payloads,
+    comparison_preview_html,
     conversation_button_label,
     dashboard_css,
     empty_state_commands_html,
@@ -355,6 +356,7 @@ def test_dashboard_css_contains_polish_hooks_without_viewport_scaled_type() -> N
     assert ".co-empty" in css
     assert ".co-empty-actions" in css
     assert ".co-empty-action" in css
+    assert ".co-comparison-preview" in css
     assert ".co-metric-grid" in css
     assert ".co-metric-card" in css
     assert ".co-metric-label" in css
@@ -551,6 +553,28 @@ def test_comparison_download_payloads_match_cli_comparison_contract() -> None:
     assert payloads["json"]["mime"] == "application/json"
     assert '"schema_version": "codex-observe.comparison.v1"' in payloads["json"]["data"]
     assert '"mode": "aggregate-only"' in payloads["json"]["data"]
+
+
+def test_comparison_preview_html_summarizes_and_escapes_quick_read() -> None:
+    rendered = comparison_preview_html(
+        {
+            "verdict": "improved <ok>",
+            "headline": {"headline": "Verdict improved & stable."},
+            "triage_risk": {"direction": "improved"},
+            "opportunity_change": {"summary": "Top opportunity stayed <largest>."},
+            "recommendation": "Keep change & compare again.",
+        }
+    )
+
+    assert 'class="co-comparison-preview"' in rendered
+    assert "Comparison quick read" in rendered
+    assert "improved &lt;ok&gt;" in rendered
+    assert "Verdict improved &amp; stable." in rendered
+    assert "Triage movement" in rendered
+    assert "Opportunity movement" in rendered
+    assert "Top opportunity stayed &lt;largest&gt;." in rendered
+    assert "Keep change &amp; compare again." in rendered
+    assert "improved <ok>" not in rendered
 
 
 def test_success_target_html_escapes_and_renders_target_card() -> None:

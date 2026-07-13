@@ -27,6 +27,7 @@ metric_card_value_failures = visual_qa.metric_card_value_failures
 sidebar_risk_label_failures = visual_qa.sidebar_risk_label_failures
 operator_briefing_failures = visual_qa.operator_briefing_failures
 download_control_failures = visual_qa.download_control_failures
+comparison_preview_failures = visual_qa.comparison_preview_failures
 visual_empty_state_failures = visual_qa.visual_empty_state_failures
 
 
@@ -173,6 +174,24 @@ def test_download_control_failures_require_report_exports() -> None:
     assert "narrow: report download control not found: Download report JSON" in failures
 
 
+def test_comparison_preview_failures_require_quick_read_contract() -> None:
+    assert (
+        comparison_preview_failures(
+            [
+                {
+                    "body": "Comparison quick read: regressed Triage movement: regressed Next step: Inspect new diagnostic first: Repeated prompt blocks."
+                }
+            ],
+            "desktop",
+        )
+        == []
+    )
+
+    failures = comparison_preview_failures([], "narrow")
+
+    assert "narrow: comparison preview card not rendered" in failures
+
+
 def test_operator_briefing_failures_require_briefing_contract() -> None:
     assert (
         operator_briefing_failures(
@@ -243,6 +262,12 @@ def complete_viewport_results(tmp_path: Path) -> dict[str, dict[str, object]]:
                     "best_habit": "Set a stop condition for the dominant thread",
                     "scale": "33.2k tokens (57.7% of run)",
                     "proof_target": "largest_thread_share_pct: 57.7% -> below 50.0%",
+                }
+            ],
+            "comparison_previews": [
+                {
+                    "label": "Comparison quick read: regressed",
+                    "body": "Comparison quick read: regressed Verdict: regressed; largest change: Total tokens +49.1k (regressed). Triage movement: regressed Next step: Inspect new diagnostic first: Repeated prompt blocks.",
                 }
             ],
             "layout_review": {
@@ -353,6 +378,9 @@ def test_visual_manifest_records_review_evidence(tmp_path: Path) -> None:
         "scale": "33.2k tokens (57.7% of run)",
         "proof_target": "largest_thread_share_pct: 57.7% -> below 50.0%",
     }
+    assert loaded["viewports"]["desktop"]["comparison_previews"][0]["label"] == (
+        "Comparison quick read: regressed"
+    )
     assert loaded["viewports"]["desktop"]["layout_review"]["document_width"] == 1440
     assert (
         loaded["empty_states"]["missing_database"]["viewports"]["desktop"]["title"]
@@ -388,6 +416,7 @@ def test_visual_manifest_failures_rejects_incomplete_evidence(tmp_path: Path) ->
                 "success_targets": [],
                 "download_controls": ["Download report MD"],
                 "operator_briefings": [],
+                "comparison_previews": [],
                 "layout_review": {
                     "viewport_width": 390,
                     "document_width": 430,
@@ -410,6 +439,7 @@ def test_visual_manifest_failures_rejects_incomplete_evidence(tmp_path: Path) ->
     assert "manifest desktop metric card not rendered: Uncached input" in failures
     assert "manifest desktop success target card not rendered" in failures
     assert "manifest desktop operator briefing card not rendered" in failures
+    assert "manifest desktop comparison preview card not rendered" in failures
     assert (
         "manifest desktop report download control not found: Download report JSON"
         in failures

@@ -6,7 +6,7 @@ The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
 
-- Added dashboard Markdown/JSON report and comparison downloads for the selected Overview session and visual/audit evidence that the controls render.
+- Added dashboard comparison quick-read card plus Markdown/JSON report and comparison downloads for the selected Overview session and visual/audit evidence that the controls render.
 
 ### Added
 

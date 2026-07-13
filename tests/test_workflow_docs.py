@@ -258,7 +258,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         "codex-observe demo --serve --host 127.0.0.1 --port 8501",
         "Overview operator briefing",
         "Overview triage card",
-        "dashboard report and comparison download controls",
+        "dashboard comparison quick-read card plus report and comparison download controls",
         "codex-observe doctor --db .artifacts/demo/codex_observe_demo.sqlite --json",
         "codex-observe sessions --db .artifacts/demo/codex_observe_demo.sqlite --json",
         "aggregate triage risk",
@@ -276,7 +276,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         "python scripts/visual_qa.py",
         "layout overflow/clipping checks",
         "metric card evidence",
-        "report and comparison download controls",
+        "comparison quick-read card plus report and comparison download controls",
         "aggregate triage assessment",
         "required_commands",
         ".artifacts/visual/visual-qa-manifest.json",
@@ -306,7 +306,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         "regression suite",
         "clean-install smoke gate",
         "aggregate release audit",
-        "report and comparison download controls",
+        "comparison quick-read card plus report and comparison download controls",
         "synthetic demo generation",
         "aggregate-only session listing",
         "database doctor",
@@ -337,7 +337,10 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         in release
     )
     assert "operator briefing" in release
-    assert "report and comparison download controls" in release
+    assert (
+        "comparison quick-read card plus report and comparison download controls"
+        in release
+    )
     assert "required_commands" in release
     assert "structured `next_commands`" in release
     assert "follow-up command templates" in release
@@ -363,7 +366,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         "codex-observe tour --json",
         "privacy-safe feedback loop",
         "generated public evidence bundle artifact validation",
-        "dashboard Markdown/JSON report and comparison downloads",
+        "dashboard comparison quick-read card plus Markdown/JSON report and comparison downloads",
         "codex-observe evidence-bundle --out .artifacts/public-evidence --skip-visual --json",
         "run-comparison.json",
     ]:

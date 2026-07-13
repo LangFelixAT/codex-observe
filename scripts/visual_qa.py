@@ -59,6 +59,12 @@ EXPECTED_DOWNLOAD_CONTROLS = [
     "Download comparison MD",
     "Download comparison JSON",
 ]
+EXPECTED_COMPARISON_PREVIEW = {
+    "label": "Comparison quick read",
+    "verdict": "regressed",
+    "triage_movement": "regressed",
+    "next_step": "Inspect new diagnostic first: Repeated prompt blocks.",
+}
 EXPECTED_DEFAULT_METRIC_VALUES = {
     "Threads": "3",
     "Largest thread": "33.2k tokens (57.7%)",
@@ -170,6 +176,32 @@ def download_control_failures(labels: list[str], viewport_name: str) -> list[str
         for label in EXPECTED_DOWNLOAD_CONTROLS
         if label not in observed
     ]
+
+
+def collect_comparison_previews(page) -> list[dict[str, str]]:
+    return page.evaluate(
+        r"""
+() => Array.from(document.querySelectorAll('.co-comparison-preview')).map((card) => ({
+  label: (card.querySelector('h3')?.innerText || '').replace(/\s+/g, ' ').trim(),
+  body: (card.innerText || '').replace(/\s+/g, ' ').trim(),
+})).filter((item) => item.label || item.body)
+        """
+    )
+
+
+def comparison_preview_failures(
+    previews: list[dict[str, str]], viewport_name: str
+) -> list[str]:
+    if not previews:
+        return [f"{viewport_name}: comparison preview card not rendered"]
+    body = str(previews[0].get("body") or "")
+    failures = []
+    for key, expected in EXPECTED_COMPARISON_PREVIEW.items():
+        if expected not in body:
+            failures.append(
+                f"{viewport_name}: comparison preview missing {key}: {expected}"
+            )
+    return failures
 
 
 def collect_metric_cards(page) -> list[dict[str, str]]:
@@ -390,10 +422,12 @@ def validate_dashboard_page(
     success_targets = collect_success_targets(page)
     operator_briefings = collect_operator_briefings(page)
     download_controls = collect_download_controls(page)
+    comparison_previews = collect_comparison_previews(page)
     page.evaluate("window.scrollTo(0, 0)")
     failures.extend(success_target_failures(success_targets, viewport_name))
     failures.extend(operator_briefing_failures(operator_briefings, viewport_name))
     failures.extend(download_control_failures(download_controls, viewport_name))
+    failures.extend(comparison_preview_failures(comparison_previews, viewport_name))
     for metric_label in ["Largest thread", "Uncached input"]:
         if metric_label not in text:
             failures.append(
@@ -452,6 +486,7 @@ def validate_dashboard_page(
         "success_targets": success_targets,
         "operator_briefings": operator_briefings,
         "download_controls": download_controls,
+        "comparison_previews": comparison_previews,
         "layout_review": layout_snapshot,
     }
     return failures, evidence
@@ -864,6 +899,16 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
             failures.extend(
                 failure.replace(f"{name}: ", f"manifest {name} ")
                 for failure in briefing_failures
+            )
+
+        comparison_previews = raw.get("comparison_previews")
+        if not isinstance(comparison_previews, list):
+            failures.append(f"manifest {name} missing comparison preview evidence")
+        else:
+            preview_failures = comparison_preview_failures(comparison_previews, name)
+            failures.extend(
+                failure.replace(f"{name}: ", f"manifest {name} ")
+                for failure in preview_failures
             )
 
         layout = raw.get("layout_review")

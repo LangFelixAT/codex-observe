@@ -42,6 +42,12 @@ EXPECTED_VISUAL_DOWNLOAD_CONTROLS = {
     "Download comparison MD",
     "Download comparison JSON",
 }
+EXPECTED_VISUAL_COMPARISON_PREVIEW = {
+    "Comparison quick read",
+    "regressed",
+    "Triage movement: regressed",
+    "Inspect new diagnostic first: Repeated prompt blocks.",
+}
 EXPECTED_VISUAL_METRICS = {
     "Threads": "3",
     "Largest thread": "33.2k tokens (57.7%)",
@@ -1282,6 +1288,26 @@ def visual_manifest_evidence_failures(root: Path) -> list[str]:
                         failures.append(
                             f"visual QA manifest {viewport_name} operator briefing {key} expected {expected}, got {actual or 'missing'}"
                         )
+        comparison_previews = viewport.get("comparison_previews")
+        if not isinstance(comparison_previews, list) or not comparison_previews:
+            failures.append(
+                f"visual QA manifest missing {viewport_name} comparison preview evidence"
+            )
+        else:
+            preview_text = "\n".join(
+                str(item.get("body") or item.get("label") or "")
+                for item in comparison_previews
+                if isinstance(item, dict)
+            )
+            missing_preview = EXPECTED_VISUAL_COMPARISON_PREVIEW - {
+                expected
+                for expected in EXPECTED_VISUAL_COMPARISON_PREVIEW
+                if expected in preview_text
+            }
+            if missing_preview:
+                failures.append(
+                    f"visual QA manifest {viewport_name} missing comparison preview evidence: {', '.join(sorted(missing_preview))}"
+                )
         success_targets = viewport.get("success_targets")
         if not isinstance(success_targets, list) or not success_targets:
             failures.append(
@@ -1758,7 +1784,7 @@ def release_audit_report(
         f"{VISUAL_MANIFEST.as_posix()}; "
         f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['desktop']).as_posix()}; "
         f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['narrow']).as_posix()}; "
-        "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, metric cards, report and comparison downloads, operator briefing, and success target verified"
+        "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, metric cards, report and comparison downloads, comparison preview, operator briefing, and success target verified"
         if not visual_manifest_failures
         else "; ".join(visual_manifest_failures[:3]),
     )

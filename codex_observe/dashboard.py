@@ -506,6 +506,32 @@ def dashboard_css() -> str:
   color: var(--co-muted);
   margin: 0.18rem 0;
 }
+
+.co-comparison-preview {
+  background: var(--co-panel);
+  border: 1px solid var(--co-border);
+  border-left: 5px solid var(--co-accent);
+  border-radius: 8px;
+  margin: 0.45rem 0 0.9rem 0;
+  padding: 0.9rem 1rem;
+}
+
+.co-comparison-preview h3 {
+  font-size: 1rem;
+  letter-spacing: 0;
+  line-height: 1.25;
+  margin: 0 0 0.35rem 0;
+}
+
+.co-comparison-preview p {
+  color: var(--co-muted);
+  font-size: 0.88rem;
+  margin: 0.24rem 0;
+}
+
+.co-comparison-preview strong {
+  color: var(--co-ink);
+}
 </style>
 """
 
@@ -661,6 +687,43 @@ def comparison_download_payloads(
             "mime": "application/json",
         },
     }
+
+
+def comparison_preview_html(comparison: dict[str, object]) -> str:
+    triage = comparison.get("triage_risk", {})
+    opportunity = comparison.get("opportunity_change", {})
+    verdict = html.escape(str(comparison.get("verdict") or "unknown"))
+    headline = html.escape(
+        str(
+            comparison.get("headline", {}).get("headline")
+            if isinstance(comparison.get("headline"), dict)
+            else "No comparison headline available."
+        )
+    )
+    recommendation = html.escape(
+        str(comparison.get("recommendation") or "Inspect the reports manually.")
+    )
+    triage_direction = html.escape(
+        str(triage.get("direction") if isinstance(triage, dict) else "unknown")
+    )
+    opportunity_summary = html.escape(
+        str(
+            opportunity.get("summary")
+            if isinstance(opportunity, dict)
+            else "No opportunity change summary available."
+        )
+    )
+    return "\n".join(
+        [
+            '<section class="co-comparison-preview">',
+            f"  <h3>Comparison quick read: <strong>{verdict}</strong></h3>",
+            f"  <p>{headline}</p>",
+            f"  <p><strong>Triage movement:</strong> {triage_direction}</p>",
+            f"  <p><strong>Opportunity movement:</strong> {opportunity_summary}</p>",
+            f"  <p><strong>Next step:</strong> {recommendation}</p>",
+            "</section>",
+        ]
+    )
 
 
 def success_target_html(success_target: dict[str, object]) -> str:
@@ -1248,6 +1311,7 @@ def main() -> None:
             )
             baseline_report = build_report(str(db), baseline_session_id)
             comparison = compare_reports(baseline_report, report)
+            st.markdown(comparison_preview_html(comparison), unsafe_allow_html=True)
             comparison_downloads = comparison_download_payloads(comparison)
             compare_left, compare_right = st.columns(2)
             with compare_left:
