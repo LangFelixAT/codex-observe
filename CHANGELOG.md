@@ -6,6 +6,7 @@ The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
 
+- Added per-step success checks to the public tour JSON/text contract so reviewers can verify each synthetic evaluation step without guessing.
 - Added ordered display labels to session recommendation driver summaries.
 - Added an aggregate Tool out column to plain-text session listings.
 - Added largest-tool-output evidence to structured session recommendation drivers.

@@ -30,7 +30,7 @@ codex-observe scan-and-serve ~/.codex/sessions
 
 ## Public Tour
 
-A new user can evaluate the product without private logs. `codex-observe tour` prints this path from the terminal with evidence to look for at each step, and `codex-observe tour --json` emits the same synthetic-data path plus `codex-observe.tour.v1` schema metadata for automation:
+A new user can evaluate the product without private logs. `codex-observe tour` prints this path from the terminal with evidence and success checks to look for at each step, and `codex-observe tour --json` emits the same synthetic-data path plus `codex-observe.tour.v1` schema metadata and per-step success checks for automation:
 
 1. Run `codex-observe demo --serve --host 127.0.0.1 --port 8501` to create a synthetic database and open the dashboard; use `codex-observe demo --json` for machine-readable demo creation status.
 2. Inspect the Overview operator briefing, Overview triage card, dashboard comparison quick-read, metric delta, and next validation command cards plus report and comparison download controls, diagnostics, and cost-share metrics, Agent detail thread brief, Timeline quick read, Tools quick read, Duplication quick read, and Raw tables data inventory tabs to see how Codex Observe explains cost and context growth.

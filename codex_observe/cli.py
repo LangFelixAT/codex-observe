@@ -1924,13 +1924,27 @@ def release_audit_report(
 
     tour_payload = public_tour_payload(actual_db_path)
     tour_commands = tour_payload.get("next_commands")
+    tour_steps = tour_payload.get("steps", [])
     tour_evidence = [
         evidence
-        for step in tour_payload.get("steps", [])
+        for step in tour_steps
         if isinstance(step, dict)
         for evidence in step.get("evidence", [])
         if isinstance(evidence, str)
     ]
+    tour_success_checks = [
+        check
+        for step in tour_steps
+        if isinstance(step, dict)
+        for check in step.get("success_checks", [])
+        if isinstance(check, str)
+    ]
+    tour_steps_have_success_checks = bool(tour_steps) and all(
+        isinstance(step, dict)
+        and isinstance(step.get("success_checks"), list)
+        and bool(step.get("success_checks"))
+        for step in tour_steps
+    )
     tour_ok = (
         tour_payload.get("schema_version") == TOUR_SCHEMA_VERSION
         and tour_payload.get("database") == actual_db_path
@@ -1942,6 +1956,7 @@ def release_audit_report(
         in tour_commands
         and "codex-observe evidence-bundle --out .artifacts/public-evidence"
         in tour_commands
+        and tour_steps_have_success_checks
         and any("ranked opportunity stack" in item for item in tour_evidence)
         and any("opportunity-change" in item for item in tour_evidence)
         and any("docs/PUBLIC_TOUR_FEEDBACK.md" in item for item in tour_evidence)
@@ -1956,13 +1971,16 @@ def release_audit_report(
             any(expected in item for item in tour_evidence)
             for expected in EXPECTED_TOUR_QUICK_READ_TEXT
         )
+        and any("failed_checks is empty" in item for item in tour_success_checks)
+        and any("layout overflow" in item for item in tour_success_checks)
+        and any("explicit publication approval" in item for item in tour_success_checks)
     )
     add(
         "public tour JSON",
         tour_ok,
-        "schema, privacy, database, evidence bundle, recommended-action evidence, terminal validation evidence, dashboard quick-read evidence, and next commands verified"
+        "schema, privacy, database, evidence bundle, recommended-action evidence, terminal validation evidence, dashboard quick-read evidence, per-step success checks, and next commands verified"
         if tour_ok
-        else "tour JSON schema_version, privacy, database, evidence bundle key findings, recommended-action evidence, terminal validation evidence, dashboard quick-read evidence, comparison metric delta evidence, report/comparison-download evidence, feedback evidence, or next_commands missing",
+        else "tour JSON schema_version, privacy, database, evidence bundle key findings, recommended-action evidence, terminal validation evidence, dashboard quick-read evidence, comparison metric delta evidence, report/comparison-download evidence, feedback evidence, per-step success checks, or next_commands missing",
     )
 
     ignore_failures = private_artifact_ignore_failures(root)
@@ -2208,6 +2226,10 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
                 "dashboard opens with representative high- and low-risk runs",
                 "dashboard quick reads cover Overview operator briefing, Agent detail thread brief, Timeline quick read, Tools quick read, Duplication quick read, and Raw tables data inventory",
             ],
+            "success_checks": [
+                "demo JSON reports status ok with schema_version codex-observe.demo.v1",
+                "dashboard opens on the synthetic database without private logs",
+            ],
             "commands": [
                 "codex-observe demo --serve --host 127.0.0.1 --port 8501",
                 "codex-observe demo --json",
@@ -2219,6 +2241,10 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
                 "doctor JSON includes schema_version and structured next_commands",
                 "recovery hints preserve the selected database path",
             ],
+            "success_checks": [
+                "doctor JSON status is ok for the demo database",
+                "next_commands include sessions and serve commands for the same database",
+            ],
             "commands": [f"codex-observe doctor --db {db_path} --json"],
         },
         {
@@ -2228,6 +2254,10 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
                 "plain-text sessions output includes a Tool out column and a recommended-action block with top aggregate drivers, including largest tool output",
                 "recommendation_detail explains the risk, recency tie-breakers, structured aggregate drivers, and ordered driver_summary display labels",
             ],
+            "success_checks": [
+                "recommended_session targets the highest-risk run, not merely the latest run",
+                "recommendation_detail.driver_summary includes display labels for aggregate drivers",
+            ],
             "commands": [f"codex-observe sessions --db {db_path} --json"],
         },
         {
@@ -2236,6 +2266,10 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
                 "reports include quick-read, triage, top-level Recommended Action, and ranked opportunity stack",
                 "report terminal confirmation includes next action and Success target",
                 "JSON includes schema_version, opportunities, success_target, and next_action_detail",
+            ],
+            "success_checks": [
+                "Markdown report includes Recommended Action and Next Run Success Target sections",
+                "JSON report includes schema_version, success_target, next_action_detail, and follow-up commands",
             ],
             "commands": [
                 f"codex-observe report --db {db_path} --out .artifacts/demo/run-report.md",
@@ -2250,6 +2284,10 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
                 "recommendation_detail targets persisted or regressed aggregate drivers",
                 "dashboard comparison metric delta cards show the largest aggregate changes before downloading artifacts",
             ],
+            "success_checks": [
+                "Markdown comparison includes opportunity-change movement and next validation command",
+                "JSON comparison includes schema_version, recommendation_detail, and next_command_templates",
+            ],
             "commands": [
                 "codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --out .artifacts/demo/run-comparison.md",
                 "codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --format json --out .artifacts/demo/run-comparison.json",
@@ -2261,6 +2299,10 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
                 "visual manifest records desktop and narrow screenshots",
                 "layout review, sidebar risk labels, metric cards, comparison metric delta cards, report and comparison download controls, operator briefing, dashboard quick reads, and success target are verified",
                 "tab checks cover Agent detail thread brief, Timeline quick read, Tools quick read, Duplication quick read, and Raw tables data inventory",
+            ],
+            "success_checks": [
+                "visual manifest verifies desktop and narrow screenshots",
+                "manifest verification records no layout overflow, clipped text, or Streamlit exceptions",
             ],
             "commands": [
                 "python scripts/visual_qa.py",
@@ -2274,6 +2316,10 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
                 "LIMITATIONS.md carries known boundaries and approval-gated work into the bundle",
                 "manifest uses codex-observe.evidence-bundle.v1 with review_summary and synthetic demo data only",
             ],
+            "success_checks": [
+                "bundle README starts with key findings and review checklist before artifact paths",
+                "manifest includes review_summary, validation_commands, LIMITATIONS.md, and PUBLIC_TOUR_FEEDBACK.md",
+            ],
             "commands": [
                 "codex-observe evidence-bundle --out .artifacts/public-evidence",
             ],
@@ -2284,6 +2330,10 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
                 "audit JSON lists required_commands and failed_checks",
                 "audit verifies report, comparison, tour, ingest, visual evidence, and public bundle contracts",
             ],
+            "success_checks": [
+                "audit status is ok and failed_checks is empty",
+                "required_commands lists the full local release gate",
+            ],
             "commands": ["codex-observe audit"],
         },
         {
@@ -2292,6 +2342,10 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
                 "docs/PUBLIC_TOUR_FEEDBACK.md explains safe feedback sources and what not to collect",
                 ".github/ISSUE_TEMPLATE/public_tour_feedback.yml captures useful, confusing, visual, bundle, and privacy-review notes",
                 "feedback should use synthetic or reviewed-redacted evidence only",
+            ],
+            "success_checks": [
+                "feedback avoids private prompts, tool output, local paths, and unreviewed screenshots",
+                "new implementation issues remain demoable and require explicit publication approval",
             ],
             "commands": [],
         },
@@ -2329,6 +2383,8 @@ def public_tour_lines(db_path: str = DEFAULT_DEMO_DB) -> list[str]:
         lines.append(f"{index}. {step['title']}:")
         for evidence in step.get("evidence", []):
             lines.append(f"   Evidence: {evidence}")
+        for check in step.get("success_checks", []):
+            lines.append(f"   Success check: {check}")
         lines.extend(f"   {command}" for command in step["commands"])
     return lines
 

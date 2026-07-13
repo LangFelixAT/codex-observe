@@ -589,7 +589,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     assert checks["tracking snapshot"]["ok"] is True
     assert (
         checks["public tour JSON"]["detail"]
-        == "schema, privacy, database, evidence bundle, recommended-action evidence, terminal validation evidence, dashboard quick-read evidence, and next commands verified"
+        == "schema, privacy, database, evidence bundle, recommended-action evidence, terminal validation evidence, dashboard quick-read evidence, per-step success checks, and next commands verified"
     )
     assert (
         checks["issue templates"]["detail"]
@@ -750,6 +750,9 @@ def test_public_tour_payload_is_private_log_free_and_points_to_visual_verificati
 ):
     payload = cli.public_tour_payload("demo.sqlite")
     evidence = [item for step in payload["steps"] for item in step.get("evidence", [])]
+    success_checks = [
+        item for step in payload["steps"] for item in step.get("success_checks", [])
+    ]
 
     assert payload["schema_version"] == cli.TOUR_SCHEMA_VERSION
     assert payload["privacy"]["private_log_required"] is False
@@ -779,6 +782,11 @@ def test_public_tour_payload_is_private_log_free_and_points_to_visual_verificati
     assert any("Next validation command" in item for item in evidence)
     assert any("comparison metric delta cards" in item for item in evidence)
     assert any("report and comparison download controls" in item for item in evidence)
+    assert len(success_checks) >= len(payload["steps"])
+    assert all(step.get("success_checks") for step in payload["steps"])
+    assert any("failed_checks is empty" in item for item in success_checks)
+    assert any("layout overflow" in item for item in success_checks)
+    assert any("explicit publication approval" in item for item in success_checks)
     for expected in [
         "Agent detail thread brief",
         "Timeline quick read",
