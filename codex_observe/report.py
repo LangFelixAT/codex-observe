@@ -1050,6 +1050,11 @@ def comparison_markdown(comparison: dict[str, Any]) -> str:
         f"- {comparison.get('headline', {}).get('diagnostic_change', 'No diagnostic change summary available.')}",
         f"- Recommended next step: {comparison.get('recommendation', 'Inspect the reports manually.')}",
         "",
+        "## Recommended Action",
+        "",
+        f"- Recommendation: {comparison.get('recommendation', 'Inspect the reports manually.')}",
+        *_action_detail_lines(comparison.get("recommendation_detail")),
+        "",
         "## Follow-up Commands",
         "",
     ]
@@ -1109,6 +1114,26 @@ def comparison_markdown(comparison: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _action_detail_lines(detail: object) -> list[str]:
+    if not isinstance(detail, dict):
+        return []
+    lines: list[str] = []
+    action = str(detail.get("action") or "").replace("_", " ").strip()
+    target_type = str(detail.get("target_type") or "target").replace("_", " ").strip()
+    target = str(detail.get("target") or "").strip()
+    reason = str(detail.get("reason") or detail.get("impact") or "").strip()
+    source = str(detail.get("source") or "").strip()
+    if action:
+        lines.append(f"- Action: {action}")
+    if target:
+        lines.append(f"- Target: {target_type}: {target}")
+    if reason:
+        lines.append(f"- Why: {reason}")
+    if source:
+        lines.append(f"- Evidence: {source}")
+    return lines
+
+
 def comparison_json(comparison: dict[str, Any]) -> str:
     return json.dumps(comparison, indent=2, sort_keys=True)
 
@@ -1133,6 +1158,11 @@ def report_markdown(report: dict[str, Any]) -> str:
         f"- {report.get('headline', {}).get('headline', 'No headline available.')}",
         f"- Top diagnostic: {report.get('headline', {}).get('top_diagnostic', 'none')}",
         f"- Recommended next habit: {report.get('headline', {}).get('recommendation', 'none')}",
+        "",
+        "## Recommended Action",
+        "",
+        *_action_detail_lines(report.get("next_action_detail")),
+        f"- Verify: {success_target.get('verification', 'Export the next run as report JSON and compare the target metric.')}",
         "",
         "## Triage",
         "",

@@ -28,6 +28,7 @@ The project follows semantic versioning once release distribution is decided.
 - Moved evidence bundle terminal key findings before artifact paths.
 - Hardened redacted fixture verification against raw identifier-field leaks.
 - Extended release audit redaction checks to require raw ID verify-only rejection.
+- Added top-level recommended-action sections to report and comparison Markdown exports.
 
 ### Added
 

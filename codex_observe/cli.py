@@ -1689,6 +1689,9 @@ def release_audit_report(
             and report_payload.get("schema_version") == REPORT_SCHEMA_VERSION
             and "## Cost Profile" in report_markdown_text
             and "## Opportunity Stack" in report_markdown_text
+            and "## Recommended Action" in report_markdown_text
+            and "Action:" in report_markdown_text
+            and "Target:" in report_markdown_text
             and "## Next Run Success Target" in report_markdown_text
             and "## Follow-up Commands" in report_markdown_text
             and "codex-observe sessions --db" in report_markdown_text
@@ -1725,7 +1728,7 @@ def release_audit_report(
         add(
             "aggregate report",
             report_has_cost_profile,
-            f"{out_path}; {json_out_path}; cost profile, opportunity stack, success target, triage, follow-up commands, structured next action, and schema verified",
+            f"{out_path}; {json_out_path}; recommended action, cost profile, opportunity stack, success target, triage, follow-up commands, structured next action, and schema verified",
         )
         comparison = compare_reports(report, report)
         comparison_out = out_path.with_name("run-comparison.md")
@@ -1744,6 +1747,9 @@ def release_audit_report(
             and comparison_payload.get("schema_version") == COMPARISON_SCHEMA_VERSION
             and "## Quick Read" in comparison_markdown_text
             and "Verdict: unchanged" in comparison_markdown_text
+            and "## Recommended Action" in comparison_markdown_text
+            and "Action:" in comparison_markdown_text
+            and "Target:" in comparison_markdown_text
             and "## Triage Risk" in comparison_markdown_text
             and "Direction: unchanged" in comparison_markdown_text
             and "## Opportunity Change" in comparison_markdown_text
@@ -1771,7 +1777,7 @@ def release_audit_report(
         add(
             "aggregate comparison",
             comparison_has_quick_read,
-            f"{comparison_out}; {comparison_json_out}; quick read, triage risk, opportunity change, structured recommendation, follow-up commands, and schema verified",
+            f"{comparison_out}; {comparison_json_out}; quick read, recommended action, triage risk, opportunity change, structured recommendation, follow-up commands, and schema verified",
         )
     except (FileNotFoundError, ValueError, KeyError) as exc:
         add("aggregate report", False, str(exc))

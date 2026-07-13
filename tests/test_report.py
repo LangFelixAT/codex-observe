@@ -123,6 +123,17 @@ def test_report_markdown_and_json_are_shareable_without_private_content(
         "Recommended next habit: Set a stop condition for the dominant thread"
         in markdown
     )
+    assert "## Recommended Action" in markdown
+    assert "Action: apply next run habit" in markdown
+    assert (
+        "Target: playbook habit: Set a stop condition for the dominant thread"
+        in markdown
+    )
+    assert "Why: Targets the largest total-token driver." in markdown
+    assert (
+        "Verify: Export the next run as report JSON and compare largest_thread_share_pct before adopting the workflow change."
+        in markdown
+    )
     assert "## Triage" in markdown
     assert "Risk level: high" in markdown
     assert "Primary driver: Largest thread drives the run" in markdown
@@ -373,6 +384,10 @@ def test_compare_reports_marks_improved_metrics_and_privacy_safe_output(
     assert "## Quick Read" in markdown
     assert "## Opportunity Change" in markdown
     assert "Top opportunity stayed Largest thread and improved" in markdown
+    assert "## Recommended Action" in markdown
+    assert "Action: target persisted diagnostic" in markdown
+    assert "Target: diagnostic: Largest thread drives the run" in markdown
+    assert "Why: The workflow improved, but this diagnostic still appears." in markdown
     assert "## Follow-up Commands" in markdown
     assert (
         "codex-observe report --db <db> --session-id <next-session-id> --format json --out next-run-report.json"
