@@ -687,7 +687,8 @@ def test_public_tour_payload_is_private_log_free_and_points_to_visual_verificati
         "codex-observe evidence-bundle --out .artifacts/public-evidence"
         in payload["next_commands"]
     )
-    assert any("bundle README" in item for item in evidence)
+    assert any("key findings" in item for item in evidence)
+    assert any("review_summary" in item for item in evidence)
     assert any("codex-observe.evidence-bundle.v1" in item for item in evidence)
     assert any("docs/PUBLIC_TOUR_FEEDBACK.md" in item for item in evidence)
     assert any("reviewed-redacted" in item for item in evidence)

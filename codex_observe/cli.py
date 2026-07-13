@@ -1808,6 +1808,8 @@ def release_audit_report(
         and any("ranked opportunity stack" in item for item in tour_evidence)
         and any("opportunity-change" in item for item in tour_evidence)
         and any("docs/PUBLIC_TOUR_FEEDBACK.md" in item for item in tour_evidence)
+        and any("key findings" in item for item in tour_evidence)
+        and any("review_summary" in item for item in tour_evidence)
         and any("reviewed-redacted" in item for item in tour_evidence)
         and any("comparison metric delta cards" in item for item in tour_evidence)
         and any(
@@ -1823,7 +1825,7 @@ def release_audit_report(
         tour_ok,
         "schema, privacy, database, evidence bundle, dashboard quick-read evidence, and next commands verified"
         if tour_ok
-        else "tour JSON schema_version, privacy, database, evidence bundle, dashboard quick-read evidence, comparison metric delta evidence, report/comparison-download evidence, feedback evidence, or next_commands missing",
+        else "tour JSON schema_version, privacy, database, evidence bundle key findings, dashboard quick-read evidence, comparison metric delta evidence, report/comparison-download evidence, feedback evidence, or next_commands missing",
     )
 
     ignore_failures = private_artifact_ignore_failures(root)
@@ -2097,9 +2099,9 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
         {
             "title": "Create a reviewer-facing evidence bundle",
             "evidence": [
-                "bundle README gives reviewers a human-readable starting point",
+                "bundle text output and README surface key findings before artifact paths",
                 "LIMITATIONS.md carries known boundaries and approval-gated work into the bundle",
-                "manifest uses codex-observe.evidence-bundle.v1 and synthetic demo data only",
+                "manifest uses codex-observe.evidence-bundle.v1 with review_summary and synthetic demo data only",
             ],
             "commands": [
                 "codex-observe evidence-bundle --out .artifacts/public-evidence",

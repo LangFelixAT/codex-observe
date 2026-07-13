@@ -126,7 +126,7 @@ Type: AFK
 
 Labels: `type: slice`, `area: release`, `area: dashboard`, `status: ready`
 
-What was built: `codex-observe evidence-bundle` now creates one synthetic local directory with a reviewer README with key findings and a review checklist, `LIMITATIONS.md`, the demo database, aggregate report Markdown/JSON, aggregate comparison Markdown/JSON, audit JSON, visual QA artifacts, and a schema-versioned `codex-observe.evidence-bundle.v1` manifest.
+What was built: `codex-observe evidence-bundle` now creates one synthetic local directory with a terminal output and reviewer README with key findings and a review checklist, `LIMITATIONS.md`, the demo database, aggregate report Markdown/JSON, aggregate comparison Markdown/JSON, audit JSON, visual QA artifacts, and a schema-versioned `codex-observe.evidence-bundle.v1` manifest.
 
 Acceptance criteria:
 
