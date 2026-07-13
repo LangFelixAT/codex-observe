@@ -603,7 +603,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     assert checks["tracking snapshot"]["ok"] is True
     assert (
         checks["public tour JSON"]["detail"]
-        == "schema, privacy, database, evidence bundle, recommended-action evidence, terminal validation evidence, dashboard quick-read evidence, per-step success checks, and next commands verified"
+        == "schema, privacy, database, evidence bundle, recommended-action evidence, terminal validation evidence, dashboard quick-read evidence, top-level review path, per-step success checks, and next commands verified"
     )
     assert (
         checks["issue templates"]["detail"]
@@ -808,6 +808,20 @@ def test_public_tour_payload_is_private_log_free_and_points_to_visual_verificati
     assert any("structured aggregate drivers" in item for item in evidence)
     assert any("driver_summary" in item for item in evidence)
     assert any("review_path" in item for item in evidence)
+    assert [item["label"] for item in payload["review_path"]] == [
+        "Create synthetic evidence",
+        "Verify database health",
+        "Choose the recommended run",
+        "Export aggregate reports",
+        "Compare workflow evidence",
+        "Verify UI and bundle evidence",
+        "Run release audit",
+        "File safe feedback",
+    ]
+    assert payload["review_path"][2]["command"] == (
+        "codex-observe sessions --db demo.sqlite --json"
+    )
+    assert payload["review_path"][-1]["command"] == "docs/PUBLIC_TOUR_FEEDBACK.md"
     assert any("Recommended Action" in item for item in evidence)
     assert any("report terminal confirmation" in item for item in evidence)
     assert any("comparison terminal confirmation" in item for item in evidence)

@@ -6,6 +6,7 @@ The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
 
+- Added a top-level public-tour review path so text and JSON tour output expose the end-to-end evaluation checklist.
 - Added a structured session review path to sessions JSON and plain-text listings so terminal users can move from diagnosis to report, comparison, next-run validation, and safe feedback.
 - Added a dashboard next-review path card with visual QA evidence so users can move from diagnosis to validation without leaving the Overview.
 - Added an ordered reviewer action plan to public evidence bundles so handoffs start with clear next review steps.

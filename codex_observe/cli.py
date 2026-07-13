@@ -1990,6 +1990,30 @@ def release_audit_report(
     tour_payload = public_tour_payload(actual_db_path)
     tour_commands = tour_payload.get("next_commands")
     tour_steps = tour_payload.get("steps", [])
+    tour_review_path = tour_payload.get("review_path", [])
+    tour_review_path_ok = (
+        isinstance(tour_review_path, list)
+        and len(tour_review_path) >= 6
+        and all(
+            isinstance(item, dict)
+            and item.get("step")
+            and item.get("label")
+            and item.get("command")
+            and item.get("success_check")
+            for item in tour_review_path
+        )
+        and any(
+            "codex-observe sessions" in str(item.get("command"))
+            and "--json" in str(item.get("command"))
+            for item in tour_review_path
+            if isinstance(item, dict)
+        )
+        and any(
+            "docs/PUBLIC_TOUR_FEEDBACK.md" == str(item.get("command"))
+            for item in tour_review_path
+            if isinstance(item, dict)
+        )
+    )
     tour_evidence = [
         evidence
         for step in tour_steps
@@ -2022,6 +2046,7 @@ def release_audit_report(
         and "codex-observe evidence-bundle --out .artifacts/public-evidence"
         in tour_commands
         and tour_steps_have_success_checks
+        and tour_review_path_ok
         and any("ranked opportunity stack" in item for item in tour_evidence)
         and any("opportunity-change" in item for item in tour_evidence)
         and any("docs/PUBLIC_TOUR_FEEDBACK.md" in item for item in tour_evidence)
@@ -2043,9 +2068,9 @@ def release_audit_report(
     add(
         "public tour JSON",
         tour_ok,
-        "schema, privacy, database, evidence bundle, recommended-action evidence, terminal validation evidence, dashboard quick-read evidence, per-step success checks, and next commands verified"
+        "schema, privacy, database, evidence bundle, recommended-action evidence, terminal validation evidence, dashboard quick-read evidence, top-level review path, per-step success checks, and next commands verified"
         if tour_ok
-        else "tour JSON schema_version, privacy, database, evidence bundle key findings, recommended-action evidence, terminal validation evidence, dashboard quick-read evidence, comparison metric delta evidence, report/comparison-download evidence, feedback evidence, per-step success checks, or next_commands missing",
+        else "tour JSON schema_version, privacy, database, evidence bundle key findings, recommended-action evidence, terminal validation evidence, dashboard quick-read evidence, comparison metric delta evidence, report/comparison-download evidence, feedback evidence, top-level review_path, per-step success checks, or next_commands missing",
     )
 
     ignore_failures = private_artifact_ignore_failures(root)
@@ -2468,8 +2493,62 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
     ]
 
 
+def public_tour_review_path(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]:
+    return [
+        {
+            "step": 1,
+            "label": "Create synthetic evidence",
+            "command": "codex-observe demo --serve --host 127.0.0.1 --port 8501",
+            "success_check": "Dashboard opens on synthetic high- and low-risk runs.",
+        },
+        {
+            "step": 2,
+            "label": "Verify database health",
+            "command": f"codex-observe doctor --db {db_path} --json",
+            "success_check": "Doctor JSON status is ok with schema_version codex-observe.doctor.v1.",
+        },
+        {
+            "step": 3,
+            "label": "Choose the recommended run",
+            "command": f"codex-observe sessions --db {db_path} --json",
+            "success_check": "Sessions JSON includes recommended_session and review_path.",
+        },
+        {
+            "step": 4,
+            "label": "Export aggregate reports",
+            "command": f"codex-observe report --db {db_path} --format json --out .artifacts/demo/run-report.json",
+            "success_check": "Report JSON includes success_target and next_action_detail.",
+        },
+        {
+            "step": 5,
+            "label": "Compare workflow evidence",
+            "command": "codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --out .artifacts/demo/run-comparison.md",
+            "success_check": "Comparison includes verdict, triage movement, and next validation command.",
+        },
+        {
+            "step": 6,
+            "label": "Verify UI and bundle evidence",
+            "command": "codex-observe evidence-bundle --out .artifacts/public-evidence",
+            "success_check": "Bundle manifest includes action_plan, review_summary, and validation_commands.",
+        },
+        {
+            "step": 7,
+            "label": "Run release audit",
+            "command": "codex-observe audit --json",
+            "success_check": "Audit status is ok and failed_checks is empty.",
+        },
+        {
+            "step": 8,
+            "label": "File safe feedback",
+            "command": "docs/PUBLIC_TOUR_FEEDBACK.md",
+            "success_check": "Feedback excludes private prompts, tool output, local paths, and raw logs.",
+        },
+    ]
+
+
 def public_tour_payload(db_path: str = DEFAULT_DEMO_DB) -> dict[str, object]:
     steps = public_tour_steps(db_path)
+    review_path = public_tour_review_path(db_path)
     return {
         "schema_version": TOUR_SCHEMA_VERSION,
         "status": "ok",
@@ -2480,6 +2559,7 @@ def public_tour_payload(db_path: str = DEFAULT_DEMO_DB) -> dict[str, object]:
             "private_log_required": False,
         },
         "steps": steps,
+        "review_path": review_path,
         "next_commands": [
             command
             for step in steps
@@ -2494,7 +2574,12 @@ def public_tour_lines(db_path: str = DEFAULT_DEMO_DB) -> list[str]:
         "Codex Observe public tour",
         "Privacy: this path uses synthetic data and aggregate-only exports.",
         "",
+        "Review path:",
     ]
+    for item in public_tour_review_path(db_path):
+        lines.append(f"- {item['step']}. {item['label']}: {item['command']}")
+        lines.append(f"  Success check: {item['success_check']}")
+    lines.append("")
     for index, step in enumerate(public_tour_steps(db_path), start=1):
         lines.append(f"{index}. {step['title']}:")
         for evidence in step.get("evidence", []):
