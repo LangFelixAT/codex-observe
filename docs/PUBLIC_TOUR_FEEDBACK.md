@@ -20,7 +20,7 @@ Use this runbook when collecting feedback from someone trying the synthetic publ
 ## Feedback Questions
 
 - Could the user install and start the synthetic tour without extra explanation?
-- Did the Overview, diagnostics, ranked opportunity stack, and next-run playbook explain what made the run expensive?
+- Did the Overview, diagnostics, ranked opportunity stack, next-run playbook, and dashboard quick reads explain what made the run expensive?
 - Did report and comparison artifacts give enough aggregate evidence to discuss a run without raw content?
 - Did `README.md`, `LIMITATIONS.md`, and `evidence-bundle.json` make the reviewer bundle self-explanatory?
 - What was the first confusing moment, missing command, misleading label, or visual polish issue?

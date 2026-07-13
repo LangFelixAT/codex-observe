@@ -1917,6 +1917,7 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
             "evidence": [
                 "synthetic data path requires no private logs",
                 "dashboard opens with representative high- and low-risk runs",
+                "dashboard quick reads cover Overview operator briefing, Agent detail thread brief, Timeline quick read, Tools quick read, Duplication quick read, and Raw tables data inventory",
             ],
             "commands": [
                 "codex-observe demo --serve --host 127.0.0.1 --port 8501",
@@ -1965,7 +1966,8 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
             "title": "Capture and verify UI evidence",
             "evidence": [
                 "visual manifest records desktop and narrow screenshots",
-                "layout review, sidebar risk labels, metric cards, report and comparison download controls, operator briefing, and success target are verified",
+                "layout review, sidebar risk labels, metric cards, report and comparison download controls, operator briefing, dashboard quick reads, and success target are verified",
+                "tab checks cover Agent detail thread brief, Timeline quick read, Tools quick read, Duplication quick read, and Raw tables data inventory",
             ],
             "commands": [
                 "python scripts/visual_qa.py",
