@@ -6,6 +6,7 @@ The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
 
+- Added structured next-run validation commands to the public evidence bundle manifest, README, CLI output, and audit validation.
 - Added dashboard comparison quick-read, metric delta, and next validation command cards plus Markdown/JSON report and comparison downloads for the selected Overview session and visual/audit evidence that the controls render.
 - Added an Agent detail thread brief that surfaces the selected thread's cost share, uncached input, tool count, and first inspection action.
 - Added a Tools quick read that highlights the noisiest captured output and the first command to tighten.

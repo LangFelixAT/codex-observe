@@ -640,6 +640,7 @@ def public_evidence_bundle_artifact_failures(
             if required not in summary_text:
                 failures.append(f"evidence bundle review_summary missing {required}")
     review_checklist = manifest.get("review_checklist")
+    validation_commands = manifest.get("validation_commands")
     if not isinstance(review_checklist, list) or not review_checklist:
         failures.append("evidence bundle manifest missing review_checklist")
     else:
@@ -654,6 +655,19 @@ def public_evidence_bundle_artifact_failures(
         ]:
             if required not in checklist_text:
                 failures.append(f"evidence bundle review_checklist missing {required}")
+    validation_commands = manifest.get("validation_commands")
+    if not isinstance(validation_commands, dict):
+        failures.append("evidence bundle manifest missing validation_commands")
+    else:
+        for key, snippet in {
+            "next_report": "codex-observe report --db <db> --session-id <next-session-id>",
+            "next_comparison": "codex-observe compare --before-report <after-report.json>",
+        }.items():
+            value = validation_commands.get(key)
+            if not isinstance(value, str) or snippet not in value:
+                failures.append(
+                    f"evidence bundle validation_commands {key} missing {snippet}"
+                )
     expected_artifacts = {
         "bundle_readme": "README.md",
         "limitations_markdown": "LIMITATIONS.md",
@@ -1979,7 +1993,7 @@ def release_audit_report(
         add(
             "public evidence bundle artifacts",
             not public_bundle_failures,
-            "manifest, reviewer README key findings, review checklist, feedback runbook, reproduce-local commands, limitations doc, aggregate reports, and audit artifact verified"
+            "manifest, reviewer README key findings, review checklist, feedback runbook, reproduce-local commands, validation commands, limitations doc, aggregate reports, and audit artifact verified"
             if not public_bundle_failures
             else "; ".join(public_bundle_failures[:3]),
         )
@@ -2693,6 +2707,7 @@ def evidence_bundle_readme(manifest: dict[str, object]) -> str:
     checks = manifest.get("checks", {})
     review_summary = manifest.get("review_summary")
     review_checklist = manifest.get("review_checklist")
+    validation_commands = manifest.get("validation_commands")
     lines = [
         "# Codex Observe Evidence Bundle",
         "",
@@ -2743,6 +2758,14 @@ def evidence_bundle_readme(manifest: dict[str, object]) -> str:
             artifact = str(item.get("artifact") or "unknown")
             look_for = str(item.get("look_for") or "Review the artifact.")
             lines.append(f"- {label}: `{artifact}` - {look_for}")
+
+    if isinstance(validation_commands, dict) and validation_commands:
+        lines.extend(["", "## Validate The Next Run", ""])
+        for key in ["next_report", "next_comparison", "same_database_comparison"]:
+            command = validation_commands.get(key)
+            if isinstance(command, str) and command:
+                label = key.replace("_", " ").title()
+                lines.append(f"- {label}: `{command}`")
 
     commands = manifest.get("commands")
     if isinstance(commands, list) and commands:
@@ -2940,6 +2963,20 @@ def public_evidence_bundle(
     if visual_status == "ok":
         next_step = "Start with README.md, LIMITATIONS.md, and PUBLIC_TOUR_FEEDBACK.md, then review evidence-bundle.json, run-report.md, run-comparison.md, audit.json, and visual QA screenshots before publishing or attaching artifacts."
 
+    validation_commands = {}
+    templates = comparison.get("next_command_templates", [])
+    if isinstance(templates, list):
+        template_keys = [
+            "next_report",
+            "next_comparison",
+            "same_database_comparison",
+        ]
+        validation_commands = {
+            key: command
+            for key, command in zip(template_keys, templates, strict=False)
+            if isinstance(command, str) and command
+        }
+
     manifest: dict[str, object] = {
         "schema_version": EVIDENCE_BUNDLE_SCHEMA_VERSION,
         "status": status,
@@ -2952,6 +2989,7 @@ def public_evidence_bundle(
         "artifacts": artifacts,
         "review_summary": review_summary,
         "review_checklist": review_checklist,
+        "validation_commands": validation_commands,
         "checks": statuses,
         "next": next_step,
     }
@@ -2975,6 +3013,13 @@ def evidence_bundle_lines(output_dir: str, manifest: dict[str, object]) -> list[
             label = str(item.get("label") or "Finding")
             value = str(item.get("value") or "unknown")
             lines.append(f"- {label}: {value}")
+    validation_commands = manifest.get("validation_commands")
+    if isinstance(validation_commands, dict) and validation_commands:
+        lines.append("Validation commands:")
+        for key in ["next_report", "next_comparison", "same_database_comparison"]:
+            command = validation_commands.get(key)
+            if isinstance(command, str) and command:
+                lines.append(f"- {key}: {command}")
     lines.append("Artifacts:")
     if isinstance(artifacts, dict):
         for key, value in artifacts.items():

@@ -536,6 +536,14 @@ def test_public_evidence_bundle_artifact_failures_require_limitations(
 
     assert "evidence bundle manifest missing review_checklist" in failures
 
+    loaded = json.loads((bundle / "evidence-bundle.json").read_text(encoding="utf-8"))
+    loaded.pop("validation_commands")
+    (bundle / "evidence-bundle.json").write_text(json.dumps(loaded), encoding="utf-8")
+
+    failures = cli.public_evidence_bundle_artifact_failures(Path.cwd(), bundle)
+
+    assert "evidence bundle manifest missing validation_commands" in failures
+
 
 def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     db = tmp_path / "demo.sqlite"
@@ -601,7 +609,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     )
     assert (
         checks["public evidence bundle artifacts"]["detail"]
-        == "manifest, reviewer README key findings, review checklist, feedback runbook, reproduce-local commands, limitations doc, aggregate reports, and audit artifact verified"
+        == "manifest, reviewer README key findings, review checklist, feedback runbook, reproduce-local commands, validation commands, limitations doc, aggregate reports, and audit artifact verified"
     )
     assert (
         "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, metric cards, dashboard quick reads, report and comparison downloads, comparison preview and deltas, operator briefing, and success target verified"
@@ -825,6 +833,17 @@ def test_public_evidence_bundle_writes_privacy_safe_manifest_and_artifacts(
     assert "Verify release gates" in checklist_text
     assert "next validation command" in checklist_text
     assert str(tmp_path) not in checklist_text
+    validation_commands = loaded["validation_commands"]
+    assert validation_commands["next_report"] == (
+        "codex-observe report --db <db> --session-id <next-session-id> --format json --out next-run-report.json"
+    )
+    assert validation_commands["next_comparison"] == (
+        "codex-observe compare --before-report <after-report.json> --after-report next-run-report.json --out next-run-comparison.md"
+    )
+    assert validation_commands["same_database_comparison"] == (
+        "codex-observe compare --before-session demo-session-cost-review --after-session <next-session-id> --db <db> --out next-run-comparison.md"
+    )
+    assert str(tmp_path) not in json.dumps(validation_commands)
     assert loaded["checks"]["demo"]["status"] == "ok"
     assert loaded["checks"]["report"]["schema_version"] == cli.REPORT_SCHEMA_VERSION
     assert (
@@ -868,6 +887,14 @@ def test_public_evidence_bundle_writes_privacy_safe_manifest_and_artifacts(
     assert "Check workflow-change evidence" in readme
     assert "Verify release gates" in readme
     assert "next validation command" in readme
+    assert "## Validate The Next Run" in readme
+    assert "Next Report" in readme
+    assert "Next Comparison" in readme
+    assert "Same Database Comparison" in readme
+    assert (
+        "codex-observe report --db <db> --session-id <next-session-id> --format json --out next-run-report.json"
+        in readme
+    )
     assert "## Reproduce Locally" in readme
     assert "codex-observe demo --db demo/codex_observe_demo.sqlite" in readme
     assert (
@@ -923,6 +950,10 @@ def test_evidence_bundle_cli_json_and_text_outputs_are_actionable(
         assert payload["artifacts"]["report_markdown"] == "demo/run-report.md"
         assert payload["review_summary"][0]["label"] == "Run triage"
         assert payload["review_checklist"][0]["label"] == "Confirm the bundle boundary"
+        assert "next_report" in payload["validation_commands"]
+        assert payload["validation_commands"]["next_report"].startswith(
+            "codex-observe report --db <db> --session-id <next-session-id>"
+        )
         assert payload["next"].startswith(
             "Start with README.md, LIMITATIONS.md, and PUBLIC_TOUR_FEEDBACK.md"
         )
@@ -948,4 +979,13 @@ def test_evidence_bundle_cli_json_and_text_outputs_are_actionable(
     assert "Top opportunity: Largest thread - 33.2k tokens" in captured.out
     assert "Next-run target: largest_thread_share_pct" in captured.out
     assert "Audit status: ok with 0 failed checks" in captured.out
+    assert "Validation commands:" in captured.out
+    assert (
+        "next_report: codex-observe report --db <db> --session-id <next-session-id>"
+        in captured.out
+    )
+    assert (
+        "next_comparison: codex-observe compare --before-report <after-report.json>"
+        in captured.out
+    )
     assert "audit_json: audit/audit.json" in captured.out
