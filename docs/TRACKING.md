@@ -1,0 +1,39 @@
+# Tracking Snapshot
+
+This file records the current issue-tracking state and the expected workflow for new work.
+
+## Current GitHub issue state
+
+Checked: 2026-07-13 with:
+
+```powershell
+gh issue list --limit 20 --state all --json number,title,state,labels,updatedAt,url
+```
+
+All current GitHub issues are closed:
+
+| Issue | State | Title |
+| --- | --- | --- |
+| #8 | Closed | Document supported log shapes and local validation workflow |
+| #7 | Closed | Browser-verify the Streamlit dashboard against real data |
+| #6 | Closed | Add dashboard helper tests for classification and derived metrics |
+| #5 | Closed | Harden tool-call normalization across supported Codex payload shapes |
+| #4 | Closed | Make duplicate and reimport behavior explicit and tested |
+| #3 | Closed | Add representative JSONL ingestion regression coverage |
+| #2 | Closed | Fix Streamlit host and port CLI flags |
+| #1 | Closed | Track Codex Observe hardening pass |
+
+There is no `.github/backlog` directory and no current publishable local issue draft.
+
+## New work workflow
+
+Use GitHub issues for new work only when the work is fresh, demoable, and not merely a human-input reminder.
+
+1. Start from `docs/CURRENT.md`, `docs/NEXT_WAVE.md`, `docs/LIMITATIONS.md`, and `docs/PUBLIC_TOUR_FEEDBACK.md`.
+2. Capture privacy-safe observations with `.github/ISSUE_TEMPLATE/public_tour_feedback.yml` before converting feedback into implementation work.
+3. If a local draft is useful, create it under `.github/backlog/` with acceptance criteria, blocked-by notes, tests, visual QA expectations, and privacy review notes.
+4. Run `python scripts/backlog_publish_plan.py --json` to validate draft metadata.
+5. Publish with `gh issue create` only after explicit human approval for the external write.
+6. Commit and push the implementation branch after a passing quality gate so the work remains traceable.
+
+Completed local drafts should stay retired and must not be republished as stale issues.

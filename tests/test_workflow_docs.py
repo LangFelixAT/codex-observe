@@ -126,6 +126,7 @@ def test_current_state_handoff_covers_gates_evidence_and_remaining_blocker() -> 
         "docs/RELEASE.md",
         "docs/LIMITATIONS.md",
         "docs/PUBLIC_TOUR_FEEDBACK.md",
+        "docs/TRACKING.md",
         "codex-observe tour",
         "codex-observe demo --serve --host 127.0.0.1 --port 8501",
         "codex-observe doctor --db .artifacts/demo/codex_observe_demo.sqlite --json",
@@ -149,12 +150,14 @@ def test_current_state_handoff_covers_gates_evidence_and_remaining_blocker() -> 
         "codex-observe evidence-bundle",
         "codex-observe.evidence-bundle.v1",
         "There is currently no publishable local issue draft",
+        "issues #1-#8 are closed",
         "attaching generated artifacts externally still requires explicit human approval",
         "human-approved private input path",
     ]:
         assert required in current
     assert "docs/CURRENT.md" in readme
     assert "docs/LIMITATIONS.md" in readme
+    assert "docs/TRACKING.md" in readme
 
 
 def test_issue_templates_cover_main_work_types() -> None:
@@ -168,6 +171,7 @@ def test_issue_templates_cover_main_work_types() -> None:
     assert "visual_polish.yml" in templates
     assert "public_tour_feedback.yml" in templates
     assert "config.yml" in templates
+    assert "docs/TRACKING.md" in templates["config.yml"]
     assert "Visual/UI polish" in templates["visual_polish.yml"]
     assert "Parser/log shape gap" in templates["parser_gap.yml"]
     assert "Implementation slice" in templates["implementation_slice.yml"]
@@ -232,6 +236,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         "python scripts/backlog_publish_plan.py --json",
         "docs/PUBLIC_TOUR_FEEDBACK.md",
         ".github/ISSUE_TEMPLATE/public_tour_feedback.yml",
+        "docs/TRACKING.md",
         "codex-observe evidence-bundle --out .artifacts/public-evidence",
         "codex-observe audit --json",
         "events.payload_json",
@@ -324,6 +329,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
     assert "remaining HITL blocker" in release
     assert "docs/LIMITATIONS.md" in release
     assert "release branch is pushed to `origin`" in release
+    assert "tracking snapshot" in release
     assert "git status --short --branch" in release
     for required_distribution_item in [
         "codex-observe evidence-bundle --out .artifacts/public-evidence",
@@ -332,6 +338,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         "run-comparison.md",
         "run-comparison.json",
         "docs/PUBLIC_TOUR_FEEDBACK.md",
+        "docs/TRACKING.md",
     ]:
         assert required_distribution_item in distribution
     for required_changelog_item in [
@@ -405,6 +412,7 @@ def test_limitations_doc_covers_current_boundaries_and_next_work_sources() -> No
         "Real-user feedback",
         "Fresh GitHub issues",
         "docs/PUBLIC_TOUR_FEEDBACK.md",
+        "docs/TRACKING.md",
     ]:
         assert required in limitations
     assert "docs/LIMITATIONS.md" in release
@@ -467,3 +475,25 @@ def test_completed_fresh_draft_records_are_not_publishable_ready() -> None:
     assert "codex-observe evidence-bundle" in next_wave
     assert "009" in next_wave
     assert "human-approved local input path still required" in next_wave
+
+
+def test_tracking_snapshot_records_current_issue_state_and_publish_guard() -> None:
+    tracking = read("docs/TRACKING.md")
+    current = read("docs/CURRENT.md")
+    config = read(".github/ISSUE_TEMPLATE/config.yml")
+
+    for required in [
+        "Checked: 2026-07-13",
+        "gh issue list --limit 20 --state all --json number,title,state,labels,updatedAt,url",
+        "All current GitHub issues are closed",
+        "There is no `.github/backlog` directory",
+        "no current publishable local issue draft",
+        "python scripts/backlog_publish_plan.py --json",
+        "explicit human approval",
+        "Commit and push the implementation branch",
+    ]:
+        assert required in tracking
+    for issue_number in range(1, 9):
+        assert f"#{issue_number}" in tracking
+    assert "docs/TRACKING.md" in current
+    assert "docs/TRACKING.md" in config

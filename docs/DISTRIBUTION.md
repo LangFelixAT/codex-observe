@@ -81,4 +81,4 @@ A source-distribution release candidate is ready when:
 - `codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --out .artifacts/demo/run-comparison.md` creates an aggregate-only comparison.
 - `codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --format json --out .artifacts/demo/run-comparison.json` creates the machine-readable comparison.
 - `python scripts/visual_qa.py` passes and produces desktop/narrow screenshots.
-- `docs/RELEASE.md`, `CHANGELOG.md`, `README.md`, `docs/CURRENT.md`, `docs/LIMITATIONS.md`, and `docs/PUBLIC_TOUR_FEEDBACK.md` match the release candidate.
+- `docs/RELEASE.md`, `CHANGELOG.md`, `README.md`, `docs/CURRENT.md`, `docs/LIMITATIONS.md`, `docs/PUBLIC_TOUR_FEEDBACK.md`, and `docs/TRACKING.md` match the release candidate.

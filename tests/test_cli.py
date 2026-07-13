@@ -448,9 +448,14 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     assert checks["CI reviewer evidence bundle"]["ok"] is True
     assert checks["public evidence bundle artifacts"]["ok"] is True
     assert checks["issue templates"]["ok"] is True
+    assert checks["tracking snapshot"]["ok"] is True
     assert (
         checks["issue templates"]["detail"]
         == "issue templates require demoable evidence, visual QA, public-tour feedback, privacy review, and limitations checks"
+    )
+    assert (
+        checks["tracking snapshot"]["detail"]
+        == "GitHub issue snapshot, local draft state, approval gate, and push cadence documented"
     )
     assert (
         checks["CI reviewer evidence bundle"]["detail"]

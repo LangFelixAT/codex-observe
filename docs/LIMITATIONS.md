@@ -9,7 +9,7 @@ This project is intentionally local-first and source-install only right now. The
 - Parser coverage is strong for known synthetic, Codex `total_token_usage`, OpenAI-style `usage`, and redacted-style fixture shapes, but real-log parser expansion remains dependent on human-approved private input paths.
 - Screenshots, copied dashboard rows, exported tables, issue bodies, and evidence bundles are local artifacts and may still contain sensitive paths or aggregate clues. Review generated artifacts before attaching or publishing them.
 - The reviewer evidence bundle is synthetic and local-only by default, and it includes a copy of this limitations document for review context. Attaching it externally still requires explicit human approval.
-- Completed local backlog drafts were retired instead of published as stale GitHub issues. Fresh GitHub issues should represent new, demoable work only.
+- Completed local backlog drafts were retired instead of published as stale GitHub issues. Fresh GitHub issues should represent new, demoable work only; `docs/TRACKING.md` records the current issue snapshot, local draft state, and approval-gated publishing workflow.
 
 ## Remaining HITL Blocker
 

@@ -3,3 +3,6 @@ contact_links:
   - name: Project quality bar and backlog
     url: https://github.com/LangFelixAT/codex-observe/blob/main/docs/AMAZING.md
     about: Read the current product bar and implementation backlog before opening new work.
+  - name: Tracking snapshot
+    url: https://github.com/LangFelixAT/codex-observe/blob/main/docs/TRACKING.md
+    about: Check current GitHub issue state, local draft policy, and publishing approval rules.

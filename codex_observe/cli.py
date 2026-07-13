@@ -88,6 +88,7 @@ RELEASE_REQUIRED_FILES = [
     "docs/LIMITATIONS.md",
     "docs/PUBLIC_TOUR_FEEDBACK.md",
     "docs/CURRENT.md",
+    "docs/TRACKING.md",
     ".github/workflows/ci.yml",
 ]
 
@@ -494,6 +495,32 @@ def issue_template_failures(root: Path | None = None) -> list[str]:
         for required in required_values:
             if required not in body:
                 failures.append(f"{relative} missing {required}")
+    return failures
+
+
+def tracking_doc_failures(root: Path | None = None) -> list[str]:
+    root = root or Path.cwd()
+    tracking = root / "docs/TRACKING.md"
+    if not tracking.exists():
+        return ["missing docs/TRACKING.md"]
+
+    body = tracking.read_text(encoding="utf-8")
+    required = [
+        "Checked: 2026-07-13",
+        "gh issue list --limit 20 --state all --json number,title,state,labels,updatedAt,url",
+        "All current GitHub issues are closed",
+        "There is no `.github/backlog` directory",
+        "no current publishable local issue draft",
+        "python scripts/backlog_publish_plan.py --json",
+        "explicit human approval",
+        "Commit and push the implementation branch",
+    ]
+    failures = [
+        f"docs/TRACKING.md missing {item}" for item in required if item not in body
+    ]
+    for issue_number in range(1, 9):
+        if f"#{issue_number}" not in body:
+            failures.append(f"docs/TRACKING.md missing issue #{issue_number}")
     return failures
 
 
@@ -1510,6 +1537,14 @@ def release_audit_report(
         else "; ".join(issue_template_drift[:3]),
     )
 
+    tracking_failures = tracking_doc_failures(root)
+    add(
+        "tracking snapshot",
+        not tracking_failures,
+        "GitHub issue snapshot, local draft state, approval gate, and push cadence documented"
+        if not tracking_failures
+        else "; ".join(tracking_failures[:3]),
+    )
     workflow_doc_failures = release_workflow_doc_failures(root)
     add(
         "release workflow docs",

@@ -14,10 +14,10 @@ Use Python 3.10, 3.11, or 3.12. The supported source-install distribution policy
 
 ## Planning workflow
 
-- Work from a fresh vertical slice in docs or a published GitHub issue; `docs/BACKLOG.md` is now a completed closeout record.
+- Work from a fresh vertical slice in docs or a published GitHub issue; `docs/TRACKING.md` records the current issue snapshot and `docs/BACKLOG.md` is now a completed closeout record.
 - Keep slices demoable on their own.
 - Run `python scripts/backlog_publish_plan.py` before publishing fresh local issue drafts; use `python scripts/backlog_publish_plan.py --json` for machine-readable review metadata.
-- Do not publish fresh local issue drafts to GitHub without explicit approval.
+- Do not publish fresh local issue drafts to GitHub without explicit approval; check `docs/TRACKING.md` before opening or retiring issues.
 - Use `.github/PULL_REQUEST_TEMPLATE.md` for verification and privacy evidence.
 - Use `.github/ISSUE_TEMPLATE/public_tour_feedback.yml` and `docs/PUBLIC_TOUR_FEEDBACK.md` for privacy-safe public-tour or reviewer-bundle observations before turning feedback into implementation issues.
 
