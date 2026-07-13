@@ -196,6 +196,19 @@ def default_report_session(db_path: str) -> str:
     return str(summaries[0]["session_id"])
 
 
+def report_follow_up_commands(db_path: str, session_id: str) -> dict[str, list[str]]:
+    return {
+        "next_commands": [
+            f"codex-observe sessions --db {db_path} --json",
+            f"codex-observe report --db {db_path} --session-id {session_id} --format json --out run-report.json",
+        ],
+        "next_command_templates": [
+            f"codex-observe report --db {db_path} --session-id <next-session-id> --format json --out next-run-report.json",
+            "codex-observe compare --before-report run-report.json --after-report next-run-report.json --out run-comparison.md",
+        ],
+    }
+
+
 def build_report(db_path: str, session_id: str | None = None) -> dict[str, Any]:
     db = Path(db_path).expanduser()
     if not db.exists():
@@ -369,6 +382,7 @@ def build_report(db_path: str, session_id: str | None = None) -> dict[str, Any]:
     report["triage"] = report_triage(report)
     report["next_action_detail"] = report_next_action_detail(report)
     report["success_target"] = report_success_target(report)
+    report.update(report_follow_up_commands(str(db), selected_session))
     return report
 
 
@@ -1178,6 +1192,22 @@ def report_markdown(report: dict[str, Any]) -> str:
         )
     if not report["playbook"]:
         lines.extend(["No playbook items available.", ""])
+
+    lines.extend(["## Follow-up Commands", ""])
+    for command in report.get("next_commands", []):
+        lines.extend(["```bash", str(command), "```", ""])
+    templates = report.get("next_command_templates", [])
+    if templates:
+        lines.extend(
+            [
+                "After the next run, replace `<next-session-id>` with the selected session from `codex-observe sessions`:",
+                "",
+            ]
+        )
+        for command in templates:
+            lines.extend(["```bash", str(command), "```", ""])
+    if not report.get("next_commands") and not templates:
+        lines.extend(["No follow-up commands available.", ""])
 
     lines.extend(["## Findings", ""])
     for row in report["findings"]:

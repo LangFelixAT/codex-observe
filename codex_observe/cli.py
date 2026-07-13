@@ -1475,6 +1475,9 @@ def release_audit_report(
             and "## Cost Profile" in report_markdown_text
             and "## Opportunity Stack" in report_markdown_text
             and "## Next Run Success Target" in report_markdown_text
+            and "## Follow-up Commands" in report_markdown_text
+            and "codex-observe sessions --db" in report_markdown_text
+            and "codex-observe compare --before-report" in report_markdown_text
             and "Target: below" in report_markdown_text
             and "Scale: " in report_markdown_text
             and "Largest thread share" in report_markdown_text
@@ -1488,15 +1491,26 @@ def release_audit_report(
             and report_payload.get("next_action_detail", {}).get("action")
             and report_payload.get("success_target", {}).get("metric")
             and report_payload.get("success_target", {}).get("target_value") is not None
+            and any(
+                str(command).startswith("codex-observe sessions --db ")
+                and str(command).endswith(" --json")
+                for command in report_payload.get("next_commands", [])
+            )
+            and any(
+                "codex-observe compare --before-report" in str(command)
+                for command in report_payload.get("next_command_templates", [])
+            )
             and report_payload.get("opportunities", [{}])[0].get("Driver")
             and '"opportunities"' in report_json_text
             and '"next_action_detail"' in report_json_text
             and '"success_target"' in report_json_text
+            and '"next_commands"' in report_json_text
+            and '"next_command_templates"' in report_json_text
         )
         add(
             "aggregate report",
             report_has_cost_profile,
-            f"{out_path}; {json_out_path}; cost profile, opportunity stack, success target, triage, structured next action, and schema verified",
+            f"{out_path}; {json_out_path}; cost profile, opportunity stack, success target, triage, follow-up commands, structured next action, and schema verified",
         )
         comparison = compare_reports(report, report)
         comparison_out = out_path.with_name("run-comparison.md")

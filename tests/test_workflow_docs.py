@@ -132,6 +132,7 @@ def test_current_state_handoff_covers_gates_evidence_and_remaining_blocker() -> 
         "codex-observe demo --serve --host 127.0.0.1 --port 8501",
         "codex-observe doctor --db .artifacts/demo/codex_observe_demo.sqlite --json",
         "structured `next_commands`",
+        "follow-up command templates",
         "copy-pasteable",
         "copy-pasteable next actions",
         "same `--db` path",
@@ -266,6 +267,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         "codex-observe report --db .artifacts/demo/codex_observe_demo.sqlite --format json --out .artifacts/demo/run-report.json",
         "codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --out .artifacts/demo/run-comparison.md",
         "quick-read headline",
+        "follow-up command templates",
         "aggregate triage assessment",
         "aggregate triage assessment",
         "largest-change summary",
@@ -338,6 +340,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
     assert "report and comparison download controls" in release
     assert "required_commands" in release
     assert "structured `next_commands`" in release
+    assert "follow-up command templates" in release
     assert "docs/CURRENT.md" in release
     assert "dashboard empty-state next actions" in release
     assert "remaining HITL blocker" in release

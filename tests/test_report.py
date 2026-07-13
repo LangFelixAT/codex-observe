@@ -13,6 +13,7 @@ from codex_observe.report import (
     build_report,
     compare_reports,
     default_report_session,
+    report_follow_up_commands,
     comparison_json,
     comparison_markdown,
     load_report_json,
@@ -93,6 +94,14 @@ def test_build_report_returns_privacy_safe_diagnostics_and_playbook(
         "impact": "Targets the largest total-token driver.",
         "source": "Largest thread drives the run: Worker (Parser) used 33.2k tokens (57.7% of thread totals).",
     }
+    assert report["next_commands"] == [
+        f"codex-observe sessions --db {db} --json",
+        f"codex-observe report --db {db} --session-id demo-session-cost-review --format json --out run-report.json",
+    ]
+    assert report["next_command_templates"] == [
+        f"codex-observe report --db {db} --session-id <next-session-id> --format json --out next-run-report.json",
+        "codex-observe compare --before-report run-report.json --after-report next-run-report.json --out run-comparison.md",
+    ]
     assert "no command captured" in serialized
     for private in PRIVATE_DEMO_STRINGS:
         assert private not in serialized
@@ -123,6 +132,12 @@ def test_report_markdown_and_json_are_shareable_without_private_content(
     assert "Target: below 50.0%" in markdown
     assert "## Next Run Playbook" in markdown
     assert "Impact: Targets the largest total-token driver." in markdown
+    assert "## Follow-up Commands" in markdown
+    assert f"codex-observe sessions --db {db} --json" in markdown
+    assert (
+        "codex-observe compare --before-report run-report.json --after-report next-run-report.json --out run-comparison.md"
+        in markdown
+    )
     assert "## Cost Profile" in markdown
     assert "## Opportunity Stack" in markdown
     assert "1. **Set a stop condition for the dominant thread**" in markdown
@@ -138,9 +153,26 @@ def test_report_markdown_and_json_are_shareable_without_private_content(
     assert payload["next_action_detail"]["target"] == (
         "Set a stop condition for the dominant thread"
     )
+    assert payload["next_commands"][0] == f"codex-observe sessions --db {db} --json"
+    assert "<next-session-id>" in payload["next_command_templates"][0]
     for private in PRIVATE_DEMO_STRINGS:
         assert private not in markdown
         assert private not in json.dumps(payload)
+
+
+def test_report_follow_up_commands_are_structured_for_current_and_next_run() -> None:
+    commands = report_follow_up_commands("demo.sqlite", "session-1")
+
+    assert commands == {
+        "next_commands": [
+            "codex-observe sessions --db demo.sqlite --json",
+            "codex-observe report --db demo.sqlite --session-id session-1 --format json --out run-report.json",
+        ],
+        "next_command_templates": [
+            "codex-observe report --db demo.sqlite --session-id <next-session-id> --format json --out next-run-report.json",
+            "codex-observe compare --before-report run-report.json --after-report next-run-report.json --out run-comparison.md",
+        ],
+    }
 
 
 def test_load_report_json_requires_current_report_schema(tmp_path: Path) -> None:

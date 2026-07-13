@@ -532,7 +532,11 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     assert report_payload["schema_version"] == cli.REPORT_SCHEMA_VERSION
     assert report_payload["success_target"]["metric"] == "largest_thread_share_pct"
     assert report_payload["success_target"]["target_value"] == 50.0
-    assert "## Next Run Success Target" in report.read_text(encoding="utf-8")
+    assert report_payload["next_commands"]
+    assert report_payload["next_command_templates"]
+    report_text = report.read_text(encoding="utf-8")
+    assert "## Next Run Success Target" in report_text
+    assert "## Follow-up Commands" in report_text
 
 
 def test_audit_cli_json_and_text_outputs_are_privacy_safe(
