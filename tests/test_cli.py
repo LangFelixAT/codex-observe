@@ -581,7 +581,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     assert checks["tracking snapshot"]["ok"] is True
     assert (
         checks["public tour JSON"]["detail"]
-        == "schema, privacy, database, evidence bundle, dashboard quick-read evidence, and next commands verified"
+        == "schema, privacy, database, evidence bundle, recommended-action evidence, terminal validation evidence, dashboard quick-read evidence, and next commands verified"
     )
     assert (
         checks["issue templates"]["detail"]
@@ -713,6 +713,11 @@ def test_public_tour_payload_is_private_log_free_and_points_to_visual_verificati
     assert any("reviewed-redacted" in item for item in evidence)
     assert any("success_target" in item for item in evidence)
     assert any("success target" in item for item in evidence)
+    assert any("recommended-action block" in item for item in evidence)
+    assert any("Recommended Action" in item for item in evidence)
+    assert any("report terminal confirmation" in item for item in evidence)
+    assert any("comparison terminal confirmation" in item for item in evidence)
+    assert any("Next validation command" in item for item in evidence)
     assert any("comparison metric delta cards" in item for item in evidence)
     assert any("report and comparison download controls" in item for item in evidence)
     for expected in [

@@ -32,6 +32,7 @@ The project follows semantic versioning once release distribution is decided.
 - Added a recommended-action block to plain-text session listings.
 - Added success-target feedback to report write confirmations.
 - Added next-validation command feedback to comparison write confirmations.
+- Updated the public tour to point at recommended-action and terminal validation evidence.
 
 ### Added
 

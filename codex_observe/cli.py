@@ -1935,9 +1935,9 @@ def release_audit_report(
     add(
         "public tour JSON",
         tour_ok,
-        "schema, privacy, database, evidence bundle, dashboard quick-read evidence, and next commands verified"
+        "schema, privacy, database, evidence bundle, recommended-action evidence, terminal validation evidence, dashboard quick-read evidence, and next commands verified"
         if tour_ok
-        else "tour JSON schema_version, privacy, database, evidence bundle key findings, dashboard quick-read evidence, comparison metric delta evidence, report/comparison-download evidence, feedback evidence, or next_commands missing",
+        else "tour JSON schema_version, privacy, database, evidence bundle key findings, recommended-action evidence, terminal validation evidence, dashboard quick-read evidence, comparison metric delta evidence, report/comparison-download evidence, feedback evidence, or next_commands missing",
     )
 
     ignore_failures = private_artifact_ignore_failures(root)
@@ -2169,6 +2169,7 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
             "title": "List aggregate-only sessions and the recommended high-risk run",
             "evidence": [
                 "recommended_session chooses the highest-risk run",
+                "plain-text sessions output includes a recommended-action block with top aggregate drivers",
                 "recommendation_detail explains the risk and recency tie-breakers",
             ],
             "commands": [f"codex-observe sessions --db {db_path} --json"],
@@ -2176,7 +2177,8 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
         {
             "title": "Export shareable aggregate reports",
             "evidence": [
-                "reports include quick-read, triage, and ranked opportunity stack",
+                "reports include quick-read, triage, top-level Recommended Action, and ranked opportunity stack",
+                "report terminal confirmation includes next action and Success target",
                 "JSON includes schema_version, opportunities, success_target, and next_action_detail",
             ],
             "commands": [
@@ -2188,6 +2190,7 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
             "title": "Compare reports without exposing prompts or tool output",
             "evidence": [
                 "comparison highlights triage-risk and opportunity-change movement",
+                "comparison terminal confirmation includes Next validation command",
                 "recommendation_detail targets persisted or regressed aggregate drivers",
                 "dashboard comparison metric delta cards show the largest aggregate changes before downloading artifacts",
             ],
