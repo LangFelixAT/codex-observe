@@ -6,6 +6,7 @@ The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
 
+- Added an aggregate Tool out column to plain-text session listings.
 - Added largest-tool-output evidence to structured session recommendation drivers.
 - Added largest-tool-output evidence to session summaries and the recommended-action driver list.
 - Added structured next-run validation commands to the public evidence bundle manifest, README, CLI output, and audit validation.

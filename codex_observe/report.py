@@ -194,7 +194,9 @@ def session_summary_lines(db_path: str) -> list[str]:
             "No conversations found.",
             f"Next: run `codex-observe ingest ~/.codex/sessions --db {db_path}` or `codex-observe demo`.",
         ]
-    lines = ["Session ID | Last seen | Risk | Threads | Tools | Tokens | Uncached"]
+    lines = [
+        "Session ID | Last seen | Risk | Threads | Tools | Tool out | Tokens | Uncached"
+    ]
     for row in summaries:
         lines.append(
             " | ".join(
@@ -204,6 +206,7 @@ def session_summary_lines(db_path: str) -> list[str]:
                     str(row["triage_risk"]),
                     str(row["threads"]),
                     str(row["tool_calls"]),
+                    fmt_short(row.get("largest_tool_output_chars", 0)),
                     fmt_short(row["total_tokens"]),
                     fmt_short(row["uncached_input_tokens"]),
                 ]

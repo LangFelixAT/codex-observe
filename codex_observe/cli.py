@@ -1669,6 +1669,7 @@ def release_audit_report(
             "Recommended action:" in session_lines_text
             and "Export report for session:" in session_lines_text
             and "Top drivers:" in session_lines_text
+            and "Tool out" in session_lines_text
             and "largest tool output:" in session_lines_text
             and all("largest_tool_output_chars" in row for row in sessions)
         )
@@ -1684,9 +1685,9 @@ def release_audit_report(
         add(
             "session listing",
             session_listing_ok,
-            f"{len(sessions)} sessions; triage risk, status, schema, text recommended action, tool-output driver, recommendation detail, and next commands verified"
+            f"{len(sessions)} sessions; triage risk, status, schema, text recommended action, session table tool-output column, tool-output driver, recommendation detail, and next commands verified"
             if session_listing_ok
-            else "session listing missing aggregate triage risk, status, schema_version, text recommended action, recommended_session, recommendation_detail, tool-output driver, or next_commands",
+            else "session listing missing aggregate triage risk, status, schema_version, text recommended action, recommended_session, recommendation_detail, session table tool-output column, tool-output driver, or next_commands",
         )
     except FileNotFoundError as exc:
         sessions = []
@@ -2187,7 +2188,7 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
             "title": "List aggregate-only sessions and the recommended high-risk run",
             "evidence": [
                 "recommended_session chooses the highest-risk run",
-                "plain-text sessions output includes a recommended-action block with top aggregate drivers, including largest tool output",
+                "plain-text sessions output includes a Tool out column and a recommended-action block with top aggregate drivers, including largest tool output",
                 "recommendation_detail explains the risk, recency tie-breakers, and structured aggregate drivers",
             ],
             "commands": [f"codex-observe sessions --db {db_path} --json"],

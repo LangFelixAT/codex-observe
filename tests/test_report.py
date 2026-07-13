@@ -306,10 +306,17 @@ def test_session_summaries_are_aggregate_only(tmp_path: Path) -> None:
         },
     ]
     assert (
-        "Session ID | Last seen | Risk | Threads | Tools | Tokens | Uncached" in lines
+        "Session ID | Last seen | Risk | Threads | Tools | Tool out | Tokens | Uncached"
+        in lines
     )
-    assert "demo-session-cost-review | 2026-01-01T12:23:00Z | high" in lines
-    assert "demo-session-focused-followup | 2026-01-01T12:35:00Z | low" in lines
+    assert (
+        "demo-session-cost-review | 2026-01-01T12:23:00Z | high | 3 | 2 | 4.0k | 57.5k | 22.7k"
+        in lines
+    )
+    assert (
+        "demo-session-focused-followup | 2026-01-01T12:35:00Z | low | 3 | 1 | 880 | 8.4k | 1.2k"
+        in lines
+    )
     assert "Recommended action:" in lines
     assert "Export report for session: demo-session-cost-review" in lines
     assert "Why: highest aggregate triage risk; latest run breaks ties" in lines
