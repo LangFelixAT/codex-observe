@@ -756,6 +756,9 @@ def test_report_and_comparison_written_lines_include_actionable_drivers(
             },
             "opportunity_change": {"summary": "Largest thread improved."},
             "recommendation": "Keep the change.",
+            "next_command_templates": [
+                "codex-observe report --db <db> --session-id <next-session-id> --format json --out next-run-report.json"
+            ],
         },
     )
 
@@ -768,6 +771,10 @@ def test_report_and_comparison_written_lines_include_actionable_drivers(
     assert "Triage risk: high -> moderate (improved)" in comparison_lines
     assert "Opportunity change: Largest thread improved." in comparison_lines
     assert "Next step: Keep the change." in comparison_lines
+    assert (
+        "Next validation command: codex-observe report --db <db> --session-id <next-session-id> --format json --out next-run-report.json"
+        in comparison_lines
+    )
 
 
 def test_public_evidence_bundle_writes_privacy_safe_manifest_and_artifacts(

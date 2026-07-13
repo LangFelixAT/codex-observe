@@ -31,6 +31,7 @@ The project follows semantic versioning once release distribution is decided.
 - Added top-level recommended-action sections to report and comparison Markdown exports.
 - Added a recommended-action block to plain-text session listings.
 - Added success-target feedback to report write confirmations.
+- Added next-validation command feedback to comparison write confirmations.
 
 ### Added
 

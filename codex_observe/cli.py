@@ -1752,6 +1752,14 @@ def release_audit_report(
         comparison_out.write_text(comparison_markdown_text, encoding="utf-8")
         comparison_json_out.write_text(comparison_json_text, encoding="utf-8")
         comparison_payload = json.loads(comparison_json_text)
+        comparison_written_text = "\n".join(
+            comparison_written_lines(comparison_out, comparison)
+        )
+        comparison_confirmation_has_validation_command = (
+            "Next validation command:" in comparison_written_text
+            and "codex-observe report --db <db> --session-id <next-session-id>"
+            in comparison_written_text
+        )
         comparison_has_quick_read = (
             comparison.get("verdict") == "unchanged"
             and comparison_out.exists()
@@ -1776,6 +1784,7 @@ def release_audit_report(
             in comparison_markdown_text
             and comparison.get("recommendation")
             and comparison.get("recommendation_detail", {}).get("action")
+            and comparison_confirmation_has_validation_command
             and any(
                 "codex-observe compare --before-report" in str(command)
                 for command in comparison_payload.get("next_command_templates", [])
@@ -1791,7 +1800,7 @@ def release_audit_report(
         add(
             "aggregate comparison",
             comparison_has_quick_read,
-            f"{comparison_out}; {comparison_json_out}; quick read, recommended action, triage risk, opportunity change, structured recommendation, follow-up commands, and schema verified",
+            f"{comparison_out}; {comparison_json_out}; quick read, recommended action, triage risk, opportunity change, terminal validation command, structured recommendation, follow-up commands, and schema verified",
         )
     except (FileNotFoundError, ValueError, KeyError) as exc:
         add("aggregate report", False, str(exc))
@@ -2487,6 +2496,9 @@ def comparison_written_lines(path: Path, comparison: dict) -> list[str]:
     if opportunity_summary:
         lines.append(f"Opportunity change: {opportunity_summary}")
     lines.append(f"Next step: {recommendation}")
+    templates = comparison.get("next_command_templates", [])
+    if isinstance(templates, list) and templates:
+        lines.append(f"Next validation command: {templates[0]}")
     return lines
 
 
