@@ -234,6 +234,7 @@ def complete_viewport_results(tmp_path: Path) -> dict[str, dict[str, object]]:
             "viewport": viewport,
             "screenshot": screenshot_metadata(screenshot),
             "tabs_exercised": list(visual_qa.TAB_CHECKS.keys()),
+            "quick_read_evidence": list(visual_qa.EXPECTED_QUICK_READ_EVIDENCE),
             "agent_detail_selector_exercised": True,
             "sidebar_risk_labels": ["High risk", "Low risk"],
             "metric_cards": [
@@ -350,6 +351,9 @@ def test_visual_manifest_records_review_evidence(tmp_path: Path) -> None:
     assert loaded["viewports"]["desktop"]["tabs_exercised"] == list(
         visual_qa.TAB_CHECKS.keys()
     )
+    assert loaded["viewports"]["desktop"]["quick_read_evidence"] == list(
+        visual_qa.EXPECTED_QUICK_READ_EVIDENCE
+    )
     assert loaded["viewports"]["desktop"]["agent_detail_selector_exercised"] is True
     assert loaded["viewports"]["desktop"]["sidebar_risk_labels"] == [
         "High risk",
@@ -431,6 +435,7 @@ def test_visual_manifest_failures_rejects_incomplete_evidence(tmp_path: Path) ->
     failures = visual_manifest_failures(manifest)
 
     assert "manifest desktop tabs_exercised incomplete" in failures
+    assert "manifest desktop missing quick-read evidence" in failures
     assert "manifest desktop agent detail selector was not exercised" in failures
     assert "manifest desktop screenshot width mismatch" in failures
     assert "manifest desktop screenshot is empty" in failures

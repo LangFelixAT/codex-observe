@@ -74,6 +74,14 @@ EXPECTED_VISUAL_TABS = [
     "Duplication",
     "Raw tables",
 ]
+EXPECTED_VISUAL_QUICK_READ_EVIDENCE = [
+    {"tab": "Overview", "text": "Run triage"},
+    {"tab": "Agent detail", "text": "Thread brief"},
+    {"tab": "Timeline & jumps", "text": "Timeline quick read"},
+    {"tab": "Tools", "text": "Tool quick read"},
+    {"tab": "Duplication", "text": "Duplication quick read"},
+    {"tab": "Raw tables", "text": "Data inventory"},
+]
 EXPECTED_VISUAL_VIEWPORTS = {
     "desktop": {"width": 1440, "height": 1000},
     "narrow": {"width": 390, "height": 900},
@@ -1148,6 +1156,24 @@ def visual_manifest_evidence_failures(root: Path) -> list[str]:
             failures.append(
                 f"visual QA manifest {viewport_name} tabs_exercised incomplete"
             )
+        quick_read_evidence = viewport.get("quick_read_evidence")
+        if not isinstance(quick_read_evidence, list):
+            failures.append(
+                f"visual QA manifest {viewport_name} missing quick-read evidence"
+            )
+        else:
+            observed = {
+                str(item.get("tab") or ""): str(item.get("text") or "")
+                for item in quick_read_evidence
+                if isinstance(item, dict)
+            }
+            for expected in EXPECTED_VISUAL_QUICK_READ_EVIDENCE:
+                tab = expected["tab"]
+                expected_text = expected["text"]
+                if observed.get(tab) != expected_text:
+                    failures.append(
+                        f"visual QA manifest {viewport_name} quick-read evidence missing {tab}: {expected_text}"
+                    )
         if viewport.get("agent_detail_selector_exercised") is not True:
             failures.append(
                 f"visual QA manifest {viewport_name} agent detail selector was not exercised"
@@ -1784,7 +1810,7 @@ def release_audit_report(
         f"{VISUAL_MANIFEST.as_posix()}; "
         f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['desktop']).as_posix()}; "
         f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['narrow']).as_posix()}; "
-        "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, metric cards, report and comparison downloads, comparison preview, operator briefing, and success target verified"
+        "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, metric cards, dashboard quick reads, report and comparison downloads, comparison preview, operator briefing, and success target verified"
         if not visual_manifest_failures
         else "; ".join(visual_manifest_failures[:3]),
     )

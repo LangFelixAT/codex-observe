@@ -34,7 +34,7 @@ codex-observe evidence-bundle --out .artifacts/public-evidence
 codex-observe audit --json
 ```
 
-The visual QA manifest records desktop and narrow screenshots, exercised tabs, Agent detail selector exercise, missing/empty database onboarding states, sidebar risk labels, metric card evidence, operator-briefing evidence, report-and-comparison-download-control evidence, success-target evidence, screenshot metadata, and layout review; the final audit verifies the saved manifest schema/contract, referenced screenshots, missing/empty database onboarding states, layout review, sidebar risk labels, high-risk metric evidence, operator-briefing evidence, report-and-comparison-download-control evidence, success-target evidence, and generated public evidence bundle artifacts.
+The visual QA manifest records desktop and narrow screenshots, exercised tabs, structured quick-read evidence, Agent detail selector exercise, missing/empty database onboarding states, sidebar risk labels, metric card evidence, operator-briefing evidence, report-and-comparison-download-control evidence, success-target evidence, screenshot metadata, and layout review; the final audit verifies the saved manifest schema/contract, referenced screenshots, missing/empty database onboarding states, layout review, sidebar risk labels, high-risk metric evidence, structured quick-read evidence, operator-briefing evidence, report-and-comparison-download-control evidence, success-target evidence, and generated public evidence bundle artifacts.
 
 ## Tracking State
 

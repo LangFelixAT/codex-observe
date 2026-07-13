@@ -50,6 +50,9 @@ TAB_CHECKS = {
     "Duplication": "Duplication quick read",
     "Raw tables": "Data inventory",
 }
+EXPECTED_QUICK_READ_EVIDENCE = [
+    {"tab": tab, "text": text} for tab, text in TAB_CHECKS.items()
+]
 
 EXPECTED_METRIC_CARDS = ["Threads", "Largest thread", "Uncached input"]
 EXPECTED_SIDEBAR_RISK_LABELS = ["High risk", "Low risk"]
@@ -221,6 +224,25 @@ def metric_card_failures(cards: list[dict[str, str]], viewport_name: str) -> lis
     for label in EXPECTED_METRIC_CARDS:
         if label not in labels:
             failures.append(f"{viewport_name}: metric card not rendered: {label}")
+    return failures
+
+
+def quick_read_evidence_failures(evidence: object, viewport_name: str) -> list[str]:
+    if not isinstance(evidence, list):
+        return [f"{viewport_name}: missing quick-read evidence"]
+    observed = {
+        str(item.get("tab") or ""): str(item.get("text") or "")
+        for item in evidence
+        if isinstance(item, dict)
+    }
+    failures = []
+    for expected in EXPECTED_QUICK_READ_EVIDENCE:
+        tab = expected["tab"]
+        text = expected["text"]
+        if observed.get(tab) != text:
+            failures.append(
+                f"{viewport_name}: quick-read evidence missing {tab}: {text}"
+            )
     return failures
 
 
@@ -397,6 +419,7 @@ def validate_dashboard_page(
 ) -> tuple[list[str], dict[str, object]]:
     failures: list[str] = []
     exercised_tabs: list[str] = []
+    quick_read_evidence: list[dict[str, str]] = []
     agent_selector_exercised = False
     text = page.locator("body").inner_text(timeout=5000)
     if visible_text_has_error(text):
@@ -451,6 +474,8 @@ def validate_dashboard_page(
             failures.append(
                 f"{viewport_name}: expected text not found on {tab_name}: {expected_text}"
             )
+        else:
+            quick_read_evidence.append({"tab": tab_name, "text": expected_text})
 
         if tab_name == "Agent detail":
             if "Select a thread" not in body:
@@ -480,6 +505,7 @@ def validate_dashboard_page(
 
     evidence = {
         "tabs_exercised": exercised_tabs,
+        "quick_read_evidence": quick_read_evidence,
         "agent_detail_selector_exercised": agent_selector_exercised,
         "metric_cards": metric_cards,
         "sidebar_risk_labels": sidebar_risk_labels,
@@ -834,6 +860,12 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
             failures.append(f"manifest {name} viewport size does not match expected")
         if raw.get("tabs_exercised") != list(TAB_CHECKS.keys()):
             failures.append(f"manifest {name} tabs_exercised incomplete")
+        failures.extend(
+            failure.replace(f"{name}: ", f"manifest {name} ")
+            for failure in quick_read_evidence_failures(
+                raw.get("quick_read_evidence"), name
+            )
+        )
         if raw.get("agent_detail_selector_exercised") is not True:
             failures.append(f"manifest {name} agent detail selector was not exercised")
 

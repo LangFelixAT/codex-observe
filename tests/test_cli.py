@@ -165,6 +165,7 @@ def write_valid_visual_manifest(root: Path) -> None:
                 "bytes": screenshot_path.stat().st_size,
             },
             "tabs_exercised": tabs,
+            "quick_read_evidence": list(cli.EXPECTED_VISUAL_QUICK_READ_EVIDENCE),
             "agent_detail_selector_exercised": True,
             "layout_review": {
                 "viewport_width": viewport["width"],
@@ -303,6 +304,9 @@ def test_visual_manifest_evidence_failures_validate_saved_sidebar_metric_and_suc
 
     payload = json.loads(manifest_path.read_text(encoding="utf-8"))
     payload["viewports"]["desktop"]["sidebar_risk_labels"] = ["High risk"]
+    payload["viewports"]["desktop"]["quick_read_evidence"] = [
+        {"tab": "Overview", "text": "Run triage"}
+    ]
     payload["viewports"]["narrow"]["metric_cards"][1]["value"] = "2.9k tokens (34.5%)"
     payload["viewports"]["desktop"]["success_targets"][0]["current"] = "34.5%"
     payload["viewports"]["desktop"]["operator_briefings"][0]["best_habit"] = (
@@ -314,6 +318,10 @@ def test_visual_manifest_evidence_failures_validate_saved_sidebar_metric_and_suc
     failures = cli.visual_manifest_evidence_failures(tmp_path)
 
     assert "visual QA manifest desktop missing risk labels: Low risk" in failures
+    assert (
+        "visual QA manifest desktop quick-read evidence missing Agent detail: Thread brief"
+        in failures
+    )
     assert (
         "visual QA manifest narrow Largest thread expected 33.2k tokens (57.7%), got 2.9k tokens (34.5%)"
         in failures
@@ -364,6 +372,7 @@ def test_visual_manifest_evidence_rejects_stale_minimal_manifest_shape(
 
     assert "visual QA manifest checks must be an object" in failures
     assert "visual QA manifest desktop tabs_exercised incomplete" in failures
+    assert "visual QA manifest desktop missing quick-read evidence" in failures
     assert "visual QA manifest desktop missing screenshot metadata" in failures
     assert "visual QA manifest desktop missing layout review" in failures
     assert "visual QA manifest missing desktop operator briefing evidence" in failures
@@ -531,7 +540,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
         == "manifest, reviewer README, limitations doc, aggregate reports, and audit artifact verified"
     )
     assert (
-        "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, metric cards, report and comparison downloads, comparison preview, operator briefing, and success target verified"
+        "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, metric cards, dashboard quick reads, report and comparison downloads, comparison preview, operator briefing, and success target verified"
         in checks["visual QA manifest evidence"]["detail"]
     )
     report_payload = json.loads(report.with_suffix(".json").read_text(encoding="utf-8"))
