@@ -645,6 +645,11 @@ def public_evidence_bundle_artifact_failures(
         readme = readme_path.read_text(encoding="utf-8")
         for required in [
             "# Codex Observe Evidence Bundle",
+            "## Reproduce Locally",
+            "codex-observe demo --db demo/codex_observe_demo.sqlite",
+            "codex-observe report --db demo/codex_observe_demo.sqlite --out demo/run-report.md",
+            "codex-observe compare --before-report demo/run-report.json --after-report demo/run-report.json --out demo/run-comparison.md",
+            "codex-observe audit --json",
             "LIMITATIONS.md",
             "private Codex logs",
             "External publishing or attachment still requires explicit human approval",
@@ -1810,7 +1815,7 @@ def release_audit_report(
         add(
             "public evidence bundle artifacts",
             not public_bundle_failures,
-            "manifest, reviewer README, limitations doc, aggregate reports, and audit artifact verified"
+            "manifest, reviewer README reproduce-local commands, limitations doc, aggregate reports, and audit artifact verified"
             if not public_bundle_failures
             else "; ".join(public_bundle_failures[:3]),
         )
@@ -2428,6 +2433,13 @@ def evidence_bundle_readme(manifest: dict[str, object]) -> str:
         if isinstance(screenshots, list) and screenshots:
             joined = ", ".join(f"`{item}`" for item in screenshots)
             lines.append(f"- {joined}: Dashboard screenshots.")
+
+    commands = manifest.get("commands")
+    if isinstance(commands, list) and commands:
+        lines.extend(["", "## Reproduce Locally", ""])
+        for command in commands:
+            if isinstance(command, str) and command:
+                lines.append(f"- `{command}`")
 
     lines.extend(["", "## Checks", ""])
     if isinstance(checks, dict):

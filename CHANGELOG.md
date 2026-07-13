@@ -17,6 +17,7 @@ The project follows semantic versioning once release distribution is decided.
 - Strengthened release audit checks for public tour dashboard quick-read guidance.
 - Added dashboard comparison metric delta cards and visual/audit evidence that they render.
 - Updated the public tour to point reviewers at dashboard comparison metric delta cards.
+- Added reproduce-local commands to the reviewer evidence bundle README and release audit validation.
 
 ### Added
 

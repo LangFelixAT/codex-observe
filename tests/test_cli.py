@@ -566,7 +566,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     )
     assert (
         checks["public evidence bundle artifacts"]["detail"]
-        == "manifest, reviewer README, limitations doc, aggregate reports, and audit artifact verified"
+        == "manifest, reviewer README reproduce-local commands, limitations doc, aggregate reports, and audit artifact verified"
     )
     assert (
         "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, metric cards, dashboard quick reads, report and comparison downloads, comparison preview and deltas, operator briefing, and success target verified"
@@ -778,6 +778,17 @@ def test_public_evidence_bundle_writes_privacy_safe_manifest_and_artifacts(
     assert "LIMITATIONS.md" in readme
     assert "demo/run-report.md" in readme
     assert "audit/audit.json" in readme
+    assert "## Reproduce Locally" in readme
+    assert "codex-observe demo --db demo/codex_observe_demo.sqlite" in readme
+    assert (
+        "codex-observe report --db demo/codex_observe_demo.sqlite --out demo/run-report.md"
+        in readme
+    )
+    assert (
+        "codex-observe compare --before-report demo/run-report.json --after-report demo/run-report.json --out demo/run-comparison.md"
+        in readme
+    )
+    assert "codex-observe audit --json" in readme
     assert "private Codex logs" in readme
     limitations = (out / artifacts["limitations_markdown"]).read_text(encoding="utf-8")
     assert "# Limitations and Next Work" in limitations
