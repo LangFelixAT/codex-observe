@@ -325,6 +325,17 @@ def test_session_summaries_are_aggregate_only(tmp_path: Path) -> None:
         "Top drivers: largest thread share: 57.7%; repeated prompt share: 17.4%; uncached input share: 39.5%; largest tool output: 4.0k chars"
         in lines
     )
+    assert "Review path:" in lines
+    assert "Save report JSON: codex-observe report --db" in lines
+    assert (
+        "--session-id demo-session-cost-review --format json --out run-report.json"
+        in lines
+    )
+    assert (
+        "Compare workflow change: codex-observe compare --before-report run-report.json --after-report next-run-report.json --out run-comparison.md"
+        in lines
+    )
+    assert "File safe feedback: docs/PUBLIC_TOUR_FEEDBACK.md" in lines
     assert (
         "Next: review the highest-risk run (demo-session-cost-review, high risk); run `codex-observe report --db"
         in lines

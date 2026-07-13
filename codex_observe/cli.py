@@ -1716,6 +1716,22 @@ def release_audit_report(
                 if isinstance(row, dict)
             )
         )
+        sessions_has_review_path = (
+            isinstance(sessions_payload.get("review_path"), list)
+            and len(sessions_payload.get("review_path", [])) >= 4
+            and all(
+                isinstance(step, dict)
+                and step.get("label")
+                and step.get("command")
+                and step.get("success_check")
+                for step in sessions_payload.get("review_path", [])
+            )
+            and any(
+                "codex-observe compare --before-report" in str(step.get("command"))
+                for step in sessions_payload.get("review_path", [])
+                if isinstance(step, dict)
+            )
+        )
         session_lines_text = "\n".join(session_summary_lines(actual_db_path))
         sessions_text_has_recommended_action = (
             "Recommended action:" in session_lines_text
@@ -1723,6 +1739,9 @@ def release_audit_report(
             and "Top drivers:" in session_lines_text
             and "Tool out" in session_lines_text
             and "largest tool output:" in session_lines_text
+            and "Review path:" in session_lines_text
+            and "Save report JSON:" in session_lines_text
+            and "Compare workflow change:" in session_lines_text
             and all("largest_tool_output_chars" in row for row in sessions)
         )
         session_listing_ok = (
@@ -1732,14 +1751,15 @@ def release_audit_report(
             and sessions_has_recommendation
             and sessions_has_next_commands
             and sessions_has_recommendation_detail
+            and sessions_has_review_path
             and sessions_text_has_recommended_action
         )
         add(
             "session listing",
             session_listing_ok,
-            f"{len(sessions)} sessions; triage risk, status, schema, text recommended action, session table tool-output column, tool-output driver, structured driver summary, recommendation detail, and next commands verified"
+            f"{len(sessions)} sessions; triage risk, status, schema, text recommended action, session table tool-output column, tool-output driver, structured driver summary, recommendation detail, review path, and next commands verified"
             if session_listing_ok
-            else "session listing missing aggregate triage risk, status, schema_version, text recommended action, recommended_session, recommendation_detail, session table tool-output column, tool-output driver, structured driver summary, or next_commands",
+            else "session listing missing aggregate triage risk, status, schema_version, text recommended action, recommended_session, recommendation_detail, review_path, session table tool-output column, tool-output driver, structured driver summary, or next_commands",
         )
     except FileNotFoundError as exc:
         sessions = []
@@ -2181,6 +2201,7 @@ def sessions_missing_json_payload(db_path: str) -> dict[str, object]:
         "sessions": [],
         "recommended_session": None,
         "recommendation_detail": None,
+        "review_path": sessions_review_path(db_path),
         "next": (
             f"run `codex-observe demo --db {db_path}` for synthetic data or "
             f"`codex-observe ingest ~/.codex/sessions --db {db_path}` for local logs."
@@ -2236,6 +2257,51 @@ def session_recommendation_detail(recommended: dict[str, object]) -> dict[str, o
     }
 
 
+def sessions_review_path(
+    db_path: str, session_id: str | None = None
+) -> list[dict[str, str]]:
+    if not session_id:
+        return [
+            {
+                "label": "Create demo data",
+                "command": f"codex-observe demo --db {db_path}",
+                "success_check": "sessions JSON returns status ok with a recommended_session.",
+            },
+            {
+                "label": "Ingest local logs",
+                "command": f"codex-observe ingest ~/.codex/sessions --db {db_path}",
+                "success_check": "doctor reports a valid populated database.",
+            },
+        ]
+    return [
+        {
+            "label": "Save report Markdown",
+            "command": f"codex-observe report --db {db_path} --session-id {session_id} --out run-report.md",
+            "success_check": "Markdown includes Recommended Action and Next Run Success Target.",
+        },
+        {
+            "label": "Save report JSON",
+            "command": f"codex-observe report --db {db_path} --session-id {session_id} --format json --out run-report.json",
+            "success_check": "JSON includes schema_version, success_target, and next_action_detail.",
+        },
+        {
+            "label": "Compare workflow change",
+            "command": "codex-observe compare --before-report run-report.json --after-report next-run-report.json --out run-comparison.md",
+            "success_check": "Comparison includes a verdict, triage movement, and next validation command.",
+        },
+        {
+            "label": "Validate next run",
+            "command": f"codex-observe report --db {db_path} --session-id <next-session-id> --format json --out next-run-report.json",
+            "success_check": "The next report can be compared against run-report.json.",
+        },
+        {
+            "label": "File safe feedback",
+            "command": "docs/PUBLIC_TOUR_FEEDBACK.md",
+            "success_check": "Feedback excludes private prompts, tool output, local paths, and raw logs.",
+        },
+    ]
+
+
 def sessions_json_payload(db_path: str) -> dict[str, object]:
     summaries = session_summaries(db_path)
     payload: dict[str, object] = {
@@ -2246,15 +2312,18 @@ def sessions_json_payload(db_path: str) -> dict[str, object]:
     }
     if summaries:
         recommended = summaries[0]
+        recommended_session_id = str(recommended["session_id"])
         payload["recommended_session"] = recommended
         payload["recommendation_detail"] = session_recommendation_detail(recommended)
-        payload["next"] = session_report_hint(db_path, str(recommended["session_id"]))
+        payload["review_path"] = sessions_review_path(db_path, recommended_session_id)
+        payload["next"] = session_report_hint(db_path, recommended_session_id)
         payload["next_commands"] = sessions_next_commands(
-            db_path, str(recommended["session_id"])
+            db_path, recommended_session_id
         )
     else:
         payload["recommended_session"] = None
         payload["recommendation_detail"] = None
+        payload["review_path"] = sessions_review_path(db_path)
         payload["next"] = (
             f"run `codex-observe ingest ~/.codex/sessions --db {db_path}` or `codex-observe demo --db {db_path}`."
         )
@@ -2298,10 +2367,12 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
                 "recommended_session chooses the highest-risk run",
                 "plain-text sessions output includes a Tool out column and a recommended-action block with top aggregate drivers, including largest tool output",
                 "recommendation_detail explains the risk, recency tie-breakers, structured aggregate drivers, and ordered driver_summary display labels",
+                "review_path turns the recommendation into report, compare, validation, and safe-feedback steps",
             ],
             "success_checks": [
                 "recommended_session targets the highest-risk run, not merely the latest run",
                 "recommendation_detail.driver_summary includes display labels for aggregate drivers",
+                "review_path includes report JSON, comparison, next-run validation, and safe-feedback steps",
             ],
             "commands": [f"codex-observe sessions --db {db_path} --json"],
         },

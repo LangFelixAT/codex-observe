@@ -187,6 +187,16 @@ def session_recommended_action_lines(recommended: dict[str, Any]) -> list[str]:
     ]
 
 
+def session_review_path_lines(db_path: str, session_id: str) -> list[str]:
+    return [
+        "Review path:",
+        f"- Save report JSON: codex-observe report --db {db_path} --session-id {session_id} --format json --out run-report.json",
+        "- Compare workflow change: codex-observe compare --before-report run-report.json --after-report next-run-report.json --out run-comparison.md",
+        f"- Validate next run: codex-observe report --db {db_path} --session-id <next-session-id> --format json --out next-run-report.json",
+        "- File safe feedback: docs/PUBLIC_TOUR_FEEDBACK.md",
+    ]
+
+
 def session_summary_lines(db_path: str) -> list[str]:
     summaries = session_summaries(db_path)
     if not summaries:
@@ -213,11 +223,13 @@ def session_summary_lines(db_path: str) -> list[str]:
             )
         )
     recommended = summaries[0]
+    recommended_session_id = str(recommended["session_id"])
     lines.extend(session_recommended_action_lines(recommended))
+    lines.extend(session_review_path_lines(db_path, recommended_session_id))
     lines.append(
         "Next: review the highest-risk run "
         f"({recommended['session_id']}, {recommended['triage_risk']} risk); "
-        f"{session_report_hint(db_path, str(recommended['session_id']))}"
+        f"{session_report_hint(db_path, recommended_session_id)}"
     )
     return lines
 

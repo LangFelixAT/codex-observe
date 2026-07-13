@@ -592,7 +592,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     assert report.with_name("run-comparison.json").exists()
     assert (
         checks["session listing"]["detail"]
-        == "2 sessions; triage risk, status, schema, text recommended action, session table tool-output column, tool-output driver, structured driver summary, recommendation detail, and next commands verified"
+        == "2 sessions; triage risk, status, schema, text recommended action, session table tool-output column, tool-output driver, structured driver summary, recommendation detail, review path, and next commands verified"
     )
     assert checks["aggregate report"]["ok"] is True
     assert "success target" in checks["aggregate report"]["detail"]
@@ -710,6 +710,8 @@ def test_sessions_missing_json_payload_is_actionable_and_schema_versioned() -> N
     assert payload["recommendation_detail"] is None
     assert payload["sessions"] == []
     assert "codex-observe demo --db missing.sqlite" in payload["next_commands"]
+    assert payload["review_path"][0]["label"] == "Create demo data"
+    assert payload["review_path"][1]["label"] == "Ingest local logs"
 
 
 def test_session_recommendation_detail_includes_structured_tool_output_driver() -> None:
@@ -730,6 +732,21 @@ def test_session_recommendation_detail_includes_structured_tool_output_driver() 
         "uncached_input_share_pct": 39.5,
         "largest_tool_output_chars": 3960,
     }
+
+    review_path = cli.sessions_review_path("demo.sqlite", "session-high")
+
+    assert [step["label"] for step in review_path] == [
+        "Save report Markdown",
+        "Save report JSON",
+        "Compare workflow change",
+        "Validate next run",
+        "File safe feedback",
+    ]
+    assert review_path[1]["command"] == (
+        "codex-observe report --db demo.sqlite --session-id session-high --format json --out run-report.json"
+    )
+    assert "codex-observe compare --before-report" in review_path[2]["command"]
+    assert review_path[-1]["command"] == "docs/PUBLIC_TOUR_FEEDBACK.md"
 
     assert detail["driver_summary"] == [
         {
@@ -790,6 +807,7 @@ def test_public_tour_payload_is_private_log_free_and_points_to_visual_verificati
     assert any("Tool out column" in item for item in evidence)
     assert any("structured aggregate drivers" in item for item in evidence)
     assert any("driver_summary" in item for item in evidence)
+    assert any("review_path" in item for item in evidence)
     assert any("Recommended Action" in item for item in evidence)
     assert any("report terminal confirmation" in item for item in evidence)
     assert any("comparison terminal confirmation" in item for item in evidence)
