@@ -29,6 +29,7 @@ from codex_observe.dashboard import (
     report_download_payloads,
     triage_card_html,
     success_target_html,
+    timeline_quick_read_html,
     thread_brief_html,
     tool_quick_read_html,
 )
@@ -136,6 +137,45 @@ def test_tool_quick_read_html_summarizes_noisy_tool_output_and_escapes() -> None
     assert "25.0k chars" in rendered
     assert "83.3%" in rendered
     assert "shell <run>" not in rendered
+
+
+def test_timeline_quick_read_html_summarizes_jump_and_escapes() -> None:
+    rendered = timeline_quick_read_html(
+        pd.DataFrame(
+            [
+                {
+                    "label": "Worker <Builder>",
+                    "timestamp": "2026-07-13T10:00:00Z",
+                    "delta_input_tokens": 18_000,
+                }
+            ]
+        ),
+        pd.DataFrame([{"thread_id": "t1"}, {"thread_id": "t2"}]),
+        60_000,
+    )
+
+    assert 'class="co-timeline-brief"' in rendered
+    assert "Timeline quick read" in rendered
+    assert "Open the rows around the largest jump" in rendered
+    assert "Worker &lt;Builder&gt;" in rendered
+    assert "18.0k input tokens" in rendered
+    assert "30.0%" in rendered
+    assert "Compactions:</strong> 2" in rendered
+    assert "Worker <Builder>" not in rendered
+
+
+def test_timeline_quick_read_html_handles_compaction_without_jumps() -> None:
+    rendered = timeline_quick_read_html(
+        pd.DataFrame(), pd.DataFrame([{"thread_id": "t1"}]), 10_000
+    )
+
+    assert "Timeline quick read" in rendered
+    assert "Inspect the compaction boundary first" in rendered
+    assert "No token jump captured" in rendered
+
+
+def test_timeline_quick_read_html_returns_empty_string_without_evidence() -> None:
+    assert timeline_quick_read_html(pd.DataFrame(), pd.DataFrame(), 1000) == ""
 
 
 def test_tool_quick_read_html_returns_empty_string_without_tools() -> None:
@@ -452,6 +492,7 @@ def test_dashboard_css_contains_polish_hooks_without_viewport_scaled_type() -> N
     assert ".co-thread-brief" in css
     assert ".co-tool-brief" in css
     assert ".co-duplication-brief" in css
+    assert ".co-timeline-brief" in css
     assert ".co-metric-grid" in css
     assert ".co-metric-card" in css
     assert ".co-metric-label" in css

@@ -38,7 +38,7 @@
 - Visual QA manifest: schema-versioned, path-safe `.artifacts/visual/visual-qa-manifest.json` with validated manifest evidence, referenced screenshot files, layout review, sidebar risk labels, expected high-risk metric card evidence, report-and-comparison-download-control evidence, and operator-briefing evidence
 - Aggregate report artifacts: `.artifacts/demo/run-report.md`, `.artifacts/demo/run-report.json`, `.artifacts/demo/run-comparison.md`, `.artifacts/demo/run-comparison.json`; JSON artifacts and audit output include `schema_version`, opportunity stack, and opportunity-change evidence
 - Public evidence bundle: `.artifacts/public-evidence/README.md`, `.artifacts/public-evidence/evidence-bundle.json`, visual screenshots when included, and `codex-observe.evidence-bundle.v1` manifest evidence
-- Tabs exercised: Overview, Agent detail, Timeline & jumps, Tools quick read, Duplication quick read, Raw tables
+- Tabs exercised: Overview, Agent detail, Timeline quick read, Tools quick read, Duplication quick read, Raw tables
 - Agent detail selector exercised: yes/no; Agent detail thread brief visible: yes/no
 
 ## Data/privacy review

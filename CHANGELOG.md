@@ -10,6 +10,7 @@ The project follows semantic versioning once release distribution is decided.
 - Added an Agent detail thread brief that surfaces the selected thread's cost share, uncached input, tool count, and first inspection action.
 - Added a Tools quick read that highlights the noisiest captured output and the first command to tighten.
 - Added a Duplication quick read that turns replayed prompt-block estimates into a first cleanup action.
+- Added a Timeline quick read that points reviewers to the largest context jump or compaction boundary first.
 
 ### Added
 

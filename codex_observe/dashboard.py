@@ -627,6 +627,32 @@ def dashboard_css() -> str:
 .co-duplication-brief strong {
   color: var(--co-ink);
 }
+
+.co-timeline-brief {
+  background: var(--co-panel);
+  border: 1px solid var(--co-border);
+  border-left: 5px solid var(--co-accent);
+  border-radius: 8px;
+  margin: 0.25rem 0 1rem 0;
+  padding: 0.9rem 1rem;
+}
+
+.co-timeline-brief h3 {
+  font-size: 1rem;
+  letter-spacing: 0;
+  line-height: 1.25;
+  margin: 0 0 0.35rem 0;
+}
+
+.co-timeline-brief p {
+  color: var(--co-muted);
+  font-size: 0.88rem;
+  margin: 0.22rem 0;
+}
+
+.co-timeline-brief strong {
+  color: var(--co-ink);
+}
 </style>
 """
 
@@ -947,6 +973,38 @@ def conversation_button_label(row: pd.Series, selected: bool) -> str:
     risk_label = f"{risk.capitalize()} risk"
     prefix = "> " if selected else ""
     return f"{prefix}{risk_marker(risk)} {risk_label} | {preview}"
+
+
+def timeline_quick_read_html(
+    jumps: pd.DataFrame, compactions: pd.DataFrame, total_tokens: object
+) -> str:
+    if jumps.empty and compactions.empty:
+        return ""
+    jump_tokens = 0
+    jump_label = "No token jump captured"
+    jump_timestamp = "unknown time"
+    if not jumps.empty:
+        jump = jumps.sort_values("delta_input_tokens", ascending=False).iloc[0]
+        jump_tokens = int(jump.get("delta_input_tokens") or 0)
+        jump_label = html.escape(str(jump.get("label") or "unknown thread"))
+        jump_timestamp = html.escape(str(jump.get("timestamp") or "unknown time"))
+    compaction_count = int(len(compactions)) if not compactions.empty else 0
+    share = pct_of_total(jump_tokens, total_tokens)
+    if jump_tokens >= 10_000:
+        action = "Open the rows around the largest jump and look for pasted context, broad file reads, or bulky tool output."
+    elif compaction_count:
+        action = "Inspect the compaction boundary first; it marks where the run outgrew its working context."
+    else:
+        action = "Use this tab to find the first meaningful context-growth step before changing workflow."
+    return "\n".join(
+        [
+            '<section class="co-timeline-brief">',
+            "  <h3>Timeline quick read</h3>",
+            f"  <p><strong>Inspect first:</strong> {html.escape(action)}</p>",
+            f"  <p><strong>Largest jump:</strong> {jump_label} at {jump_timestamp} added {fmt_short(jump_tokens)} input tokens ({share:.1f}% of run) | <strong>Compactions:</strong> {fmt_int(compaction_count)}</p>",
+            "</section>",
+        ]
+    )
 
 
 def duplication_quick_read_html(
@@ -1692,6 +1750,11 @@ def main() -> None:
             )
 
     with tab_timeline:
+        jumps = token_jumps_df(usage, threads, limit=50)
+        st.markdown(
+            timeline_quick_read_html(jumps, compactions, total_tokens),
+            unsafe_allow_html=True,
+        )
         st.subheader("Spawn graph / thread lifecycle")
         lifecycle = threads[
             [
@@ -1709,7 +1772,6 @@ def main() -> None:
         st.code(build_tree(threads, session_id), language="text")
 
         st.subheader("Largest token jumps")
-        jumps = token_jumps_df(usage, threads, limit=50)
         if jumps.empty:
             st.info("No token snapshots found.")
         else:
