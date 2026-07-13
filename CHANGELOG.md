@@ -6,6 +6,8 @@ The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
 
+- Added dashboard Markdown/JSON report downloads for the selected Overview session and visual/audit evidence that the controls render.
+
 ### Added
 
 - Synthetic demo database workflow through `codex-observe demo`, including `--serve` for a one-command first run and `--json` for schema-versioned creation status.

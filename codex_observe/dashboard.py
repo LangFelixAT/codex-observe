@@ -28,7 +28,14 @@ from codex_observe.analysis import (
     useful_text_preview,
     worker_goal,
 )
-from codex_observe.report import report_success_target, report_triage, session_summaries
+from codex_observe.report import (
+    build_report,
+    report_json,
+    report_markdown,
+    report_success_target,
+    report_triage,
+    session_summaries,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -570,6 +577,29 @@ def pct_of_total(value: object, total: object) -> float:
     return round(numerator / denominator * 100, 1)
 
 
+def report_download_payloads(report: dict[str, object]) -> dict[str, dict[str, str]]:
+    session = report.get("session", {})
+    raw_session_id = str(session.get("session_id") or "selected-session")
+    safe_session_id = "".join(
+        char if char.isalnum() or char in {"-", "_"} else "-" for char in raw_session_id
+    ).strip("-")
+    if not safe_session_id:
+        safe_session_id = "selected-session"
+    base = f"codex-observe-{safe_session_id}-report"
+    return {
+        "markdown": {
+            "filename": f"{base}.md",
+            "data": report_markdown(report),
+            "mime": "text/markdown",
+        },
+        "json": {
+            "filename": f"{base}.json",
+            "data": report_json(report),
+            "mime": "application/json",
+        },
+    }
+
+
 def success_target_html(success_target: dict[str, object]) -> str:
     metric = html.escape(str(success_target.get("metric") or "total_tokens"))
     current = html.escape(str(success_target.get("current") or "unknown"))
@@ -1063,6 +1093,27 @@ def main() -> None:
             unsafe_allow_html=True,
         )
         st.markdown(triage_card_html(triage), unsafe_allow_html=True)
+        report = build_report(str(db), session_id)
+        downloads = report_download_payloads(report)
+        export_left, export_right = st.columns(2)
+        with export_left:
+            st.download_button(
+                "Download report MD",
+                downloads["markdown"]["data"],
+                file_name=downloads["markdown"]["filename"],
+                mime=downloads["markdown"]["mime"],
+                width="stretch",
+                key=f"download_report_md_{session_id}",
+            )
+        with export_right:
+            st.download_button(
+                "Download report JSON",
+                downloads["json"]["data"],
+                file_name=downloads["json"]["filename"],
+                mime=downloads["json"]["mime"],
+                width="stretch",
+                key=f"download_report_json_{session_id}",
+            )
         st.subheader("Next run success target")
         st.markdown(success_target_html(success_target), unsafe_allow_html=True)
         st.subheader("Opportunity stack")

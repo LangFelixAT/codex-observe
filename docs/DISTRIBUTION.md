@@ -76,7 +76,7 @@ A source-distribution release candidate is ready when:
 - `codex-observe demo` creates the synthetic database.
 - `codex-observe doctor --db .artifacts/demo/codex_observe_demo.sqlite --json` returns `status: ok`.
 - `codex-observe sessions --db .artifacts/demo/codex_observe_demo.sqlite --json` lists aggregate-only session summaries.
-- `codex-observe report --db .artifacts/demo/codex_observe_demo.sqlite --out .artifacts/demo/run-report.md` creates an aggregate-only report.
+- `codex-observe report --db .artifacts/demo/codex_observe_demo.sqlite --out .artifacts/demo/run-report.md` creates an aggregate-only report, and the dashboard Overview exposes matching selected-session Markdown/JSON downloads.
 - `codex-observe report --db .artifacts/demo/codex_observe_demo.sqlite --format json --out .artifacts/demo/run-report.json` creates the machine-readable report.
 - `codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --out .artifacts/demo/run-comparison.md` creates an aggregate-only comparison.
 - `codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --format json --out .artifacts/demo/run-comparison.json` creates the machine-readable comparison.

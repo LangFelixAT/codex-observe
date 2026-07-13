@@ -26,6 +26,7 @@ metric_card_failures = visual_qa.metric_card_failures
 metric_card_value_failures = visual_qa.metric_card_value_failures
 sidebar_risk_label_failures = visual_qa.sidebar_risk_label_failures
 operator_briefing_failures = visual_qa.operator_briefing_failures
+download_control_failures = visual_qa.download_control_failures
 
 
 def test_playwright_install_hint_uses_project_extras() -> None:
@@ -152,6 +153,19 @@ def test_sidebar_risk_label_failures_require_high_and_low_risk_labels() -> None:
     assert "narrow: sidebar risk label not found: Low risk" in failures
 
 
+def test_download_control_failures_require_report_exports() -> None:
+    assert (
+        download_control_failures(
+            ["Download report MD", "Download report JSON"], "desktop"
+        )
+        == []
+    )
+
+    failures = download_control_failures(["Download report MD"], "narrow")
+
+    assert "narrow: report download control not found: Download report JSON" in failures
+
+
 def test_operator_briefing_failures_require_briefing_contract() -> None:
     assert (
         operator_briefing_failures(
@@ -208,6 +222,7 @@ def complete_viewport_results(tmp_path: Path) -> dict[str, dict[str, object]]:
                     "target": "below 50.0%",
                 }
             ],
+            "download_controls": ["Download report MD", "Download report JSON"],
             "operator_briefings": [
                 {
                     "label": "Operator briefing",
@@ -268,6 +283,10 @@ def test_visual_manifest_records_review_evidence(tmp_path: Path) -> None:
         "current": "57.7%",
         "target": "below 50.0%",
     }
+    assert loaded["viewports"]["desktop"]["download_controls"] == [
+        "Download report MD",
+        "Download report JSON",
+    ]
     assert loaded["viewports"]["desktop"]["operator_briefings"][0] == {
         "label": "Operator briefing",
         "heading": "High risk: Dominant thread concentration",
@@ -299,6 +318,7 @@ def test_visual_manifest_failures_rejects_incomplete_evidence(tmp_path: Path) ->
                 "sidebar_risk_labels": ["High risk"],
                 "metric_cards": [{"label": "Threads", "value": "3"}],
                 "success_targets": [],
+                "download_controls": ["Download report MD"],
                 "operator_briefings": [],
                 "layout_review": {
                     "viewport_width": 390,
@@ -321,6 +341,10 @@ def test_visual_manifest_failures_rejects_incomplete_evidence(tmp_path: Path) ->
     assert "manifest desktop metric card not rendered: Uncached input" in failures
     assert "manifest desktop success target card not rendered" in failures
     assert "manifest desktop operator briefing card not rendered" in failures
+    assert (
+        "manifest desktop report download control not found: Download report JSON"
+        in failures
+    )
     assert "manifest desktop layout review contains failures" in failures
     assert "manifest missing narrow viewport evidence" in failures
 

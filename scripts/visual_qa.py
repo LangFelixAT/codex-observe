@@ -49,6 +49,7 @@ TAB_CHECKS = {
 
 EXPECTED_METRIC_CARDS = ["Threads", "Largest thread", "Uncached input"]
 EXPECTED_SIDEBAR_RISK_LABELS = ["High risk", "Low risk"]
+EXPECTED_DOWNLOAD_CONTROLS = ["Download report MD", "Download report JSON"]
 EXPECTED_DEFAULT_METRIC_VALUES = {
     "Threads": "3",
     "Largest thread": "33.2k tokens (57.7%)",
@@ -123,6 +124,26 @@ def sidebar_risk_label_failures(labels: list[str], viewport_name: str) -> list[s
     return [
         f"{viewport_name}: sidebar risk label not found: {label}"
         for label in EXPECTED_SIDEBAR_RISK_LABELS
+        if label not in observed
+    ]
+
+
+def collect_download_controls(page) -> list[str]:
+    return page.evaluate(
+        r"""
+() => {
+  const text = document.body.innerText || '';
+  return ['Download report MD', 'Download report JSON'].filter((label) => text.includes(label));
+}
+        """
+    )
+
+
+def download_control_failures(labels: list[str], viewport_name: str) -> list[str]:
+    observed = set(labels)
+    return [
+        f"{viewport_name}: report download control not found: {label}"
+        for label in EXPECTED_DOWNLOAD_CONTROLS
         if label not in observed
     ]
 
@@ -344,9 +365,11 @@ def validate_dashboard_page(
     page.wait_for_timeout(500)
     success_targets = collect_success_targets(page)
     operator_briefings = collect_operator_briefings(page)
+    download_controls = collect_download_controls(page)
     page.evaluate("window.scrollTo(0, 0)")
     failures.extend(success_target_failures(success_targets, viewport_name))
     failures.extend(operator_briefing_failures(operator_briefings, viewport_name))
+    failures.extend(download_control_failures(download_controls, viewport_name))
     for metric_label in ["Largest thread", "Uncached input"]:
         if metric_label not in text:
             failures.append(
@@ -404,6 +427,7 @@ def validate_dashboard_page(
         "sidebar_risk_labels": sidebar_risk_labels,
         "success_targets": success_targets,
         "operator_briefings": operator_briefings,
+        "download_controls": download_controls,
         "layout_review": layout_snapshot,
     }
     return failures, evidence
@@ -562,6 +586,16 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
             failures.extend(
                 failure.replace(f"{name}: ", f"manifest {name} ")
                 for failure in target_failures
+            )
+
+        download_controls = raw.get("download_controls")
+        if not isinstance(download_controls, list):
+            failures.append(f"manifest {name} missing report download control evidence")
+        else:
+            control_failures = download_control_failures(download_controls, name)
+            failures.extend(
+                failure.replace(f"{name}: ", f"manifest {name} ")
+                for failure in control_failures
             )
 
         operator_briefings = raw.get("operator_briefings")

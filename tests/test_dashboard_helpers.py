@@ -22,6 +22,7 @@ from codex_observe.dashboard import (
     metric_with_share,
     operator_briefing_html,
     pct_of_total,
+    report_download_payloads,
     triage_card_html,
     success_target_html,
 )
@@ -422,6 +423,69 @@ def test_operator_briefing_html_summarizes_top_action_and_escapes_content() -> N
     assert "Stop &lt;dominant&gt; worker" in rendered
     assert "largest_thread_share_pct: 57.7% -> below &lt;50%" in rendered
     assert "Largest <thread>" not in rendered
+
+
+def test_report_download_payloads_match_cli_report_contract() -> None:
+    report = {
+        "schema_version": "codex-observe.report.v1",
+        "privacy": {"mode": "aggregate-only"},
+        "session": {"session_id": "demo/session <cost>"},
+        "headline": {
+            "headline": "High risk run",
+            "top_diagnostic": "Largest thread drives the run",
+            "recommendation": "Set a stop condition",
+        },
+        "summary": {
+            "threads": 3,
+            "workers": 1,
+            "explorers": 1,
+            "guardians": 1,
+            "tool_calls": 4,
+            "compactions": 1,
+            "total_tokens": 57510,
+            "input_tokens": 34700,
+            "uncached_input_tokens": 22700,
+            "cached_input_tokens": 12000,
+            "cache_pct": 34.6,
+            "largest_thread_tokens": 33200,
+            "largest_thread_kind": "worker",
+            "largest_thread_share_pct": 57.7,
+            "repeated_prompt_tokens": 10000,
+            "repeated_prompt_share_pct": 17.4,
+            "uncached_input_share_pct": 39.5,
+            "largest_tool_output_chars": 4000,
+        },
+        "triage": {
+            "risk_level": "high",
+            "primary_driver": "Largest thread drives the run",
+            "next_action": "Set a stop condition",
+            "reasons": ["Largest thread used 57.7% of total tokens."],
+        },
+        "opportunities": [],
+        "diagnostics": [],
+        "playbook": [],
+        "findings": [],
+        "success_target": {
+            "metric": "largest_thread_share_pct",
+            "current": "57.7%",
+            "target": "below 50.0%",
+        },
+        "next_action_detail": {"action": "Set a stop condition"},
+    }
+
+    payloads = report_download_payloads(report)
+
+    assert (
+        payloads["markdown"]["filename"] == "codex-observe-demo-session--cost-report.md"
+    )
+    assert payloads["markdown"]["mime"] == "text/markdown"
+    assert "# Codex Observe Run Report" in payloads["markdown"]["data"]
+    assert (
+        payloads["json"]["filename"] == "codex-observe-demo-session--cost-report.json"
+    )
+    assert payloads["json"]["mime"] == "application/json"
+    assert '"schema_version": "codex-observe.report.v1"' in payloads["json"]["data"]
+    assert '"mode": "aggregate-only"' in payloads["json"]["data"]
 
 
 def test_success_target_html_escapes_and_renders_target_card() -> None:

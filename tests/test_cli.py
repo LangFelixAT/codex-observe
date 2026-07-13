@@ -178,6 +178,7 @@ def write_valid_visual_manifest(root: Path) -> None:
                 for label, value in cli.EXPECTED_VISUAL_METRICS.items()
             ],
             "success_targets": [dict(cli.EXPECTED_VISUAL_SUCCESS_TARGET)],
+            "download_controls": sorted(cli.EXPECTED_VISUAL_DOWNLOAD_CONTROLS),
             "operator_briefings": [
                 {
                     "label": "Operator briefing",
@@ -251,6 +252,7 @@ def test_visual_manifest_evidence_failures_validate_saved_sidebar_metric_and_suc
     payload["viewports"]["desktop"]["operator_briefings"][0]["best_habit"] = (
         "Read raw tables"
     )
+    payload["viewports"]["desktop"]["download_controls"] = ["Download report MD"]
     manifest_path.write_text(json.dumps(payload), encoding="utf-8")
 
     failures = cli.visual_manifest_evidence_failures(tmp_path)
@@ -267,6 +269,10 @@ def test_visual_manifest_evidence_failures_validate_saved_sidebar_metric_and_suc
 
     assert (
         "visual QA manifest desktop operator briefing best_habit expected Set a stop condition for the dominant thread, got Read raw tables"
+        in failures
+    )
+    assert (
+        "visual QA manifest desktop missing report download controls: Download report JSON"
         in failures
     )
 
@@ -287,6 +293,9 @@ def test_visual_manifest_evidence_rejects_stale_minimal_manifest_shape(
                             for label, value in cli.EXPECTED_VISUAL_METRICS.items()
                         ],
                         "success_targets": [dict(cli.EXPECTED_VISUAL_SUCCESS_TARGET)],
+                        "download_controls": sorted(
+                            cli.EXPECTED_VISUAL_DOWNLOAD_CONTROLS
+                        ),
                     }
                     for name in ["desktop", "narrow"]
                 }
@@ -466,7 +475,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
         == "manifest, reviewer README, limitations doc, aggregate reports, and audit artifact verified"
     )
     assert (
-        "visual manifest schema and contract, screenshots, layout review, risk labels, metric cards, operator briefing, and success target verified"
+        "visual manifest schema and contract, screenshots, layout review, risk labels, metric cards, report downloads, operator briefing, and success target verified"
         in checks["visual QA manifest evidence"]["detail"]
     )
     report_payload = json.loads(report.with_suffix(".json").read_text(encoding="utf-8"))
