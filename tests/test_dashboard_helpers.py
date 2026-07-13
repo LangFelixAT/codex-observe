@@ -19,6 +19,7 @@ from codex_observe.dashboard import (
     comparison_preview_html,
     conversation_button_label,
     dashboard_css,
+    data_inventory_html,
     duplication_quick_read_html,
     empty_state_commands_html,
     risk_marker,
@@ -176,6 +177,40 @@ def test_timeline_quick_read_html_handles_compaction_without_jumps() -> None:
 
 def test_timeline_quick_read_html_returns_empty_string_without_evidence() -> None:
     assert timeline_quick_read_html(pd.DataFrame(), pd.DataFrame(), 1000) == ""
+
+
+def test_data_inventory_html_summarizes_table_counts_and_escapes_action() -> None:
+    rendered = data_inventory_html(
+        pd.DataFrame([{"session_id": "s1"}]),
+        pd.DataFrame([{"thread_id": "t1"}, {"thread_id": "t2"}]),
+        pd.DataFrame([{"thread_id": "t1"}]),
+        pd.DataFrame([{"tool_name": "shell"}]),
+        pd.DataFrame([{"text": "hello"}]),
+        pd.DataFrame([{"type": "token_count"}, {"type": "thread"}]),
+    )
+
+    assert 'class="co-inventory-brief"' in rendered
+    assert "Data inventory" in rendered
+    assert "Use these raw tables only" in rendered
+    assert "Conversations" in rendered
+    assert "Threads" in rendered
+    assert "2" in rendered
+    assert "Events" in rendered
+
+
+def test_data_inventory_html_points_to_missing_usage_snapshots() -> None:
+    rendered = data_inventory_html(
+        pd.DataFrame([{"session_id": "s1"}]),
+        pd.DataFrame([{"thread_id": "t1"}]),
+        pd.DataFrame(),
+        pd.DataFrame(),
+        pd.DataFrame([{"text": "hello"}]),
+        pd.DataFrame([{"type": "event"}]),
+    )
+
+    assert "Check parser coverage for token usage payloads" in rendered
+    assert "Usage" in rendered
+    assert "0" in rendered
 
 
 def test_tool_quick_read_html_returns_empty_string_without_tools() -> None:
@@ -493,6 +528,7 @@ def test_dashboard_css_contains_polish_hooks_without_viewport_scaled_type() -> N
     assert ".co-tool-brief" in css
     assert ".co-duplication-brief" in css
     assert ".co-timeline-brief" in css
+    assert ".co-inventory-brief" in css
     assert ".co-metric-grid" in css
     assert ".co-metric-card" in css
     assert ".co-metric-label" in css

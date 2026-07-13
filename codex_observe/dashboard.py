@@ -653,6 +653,49 @@ def dashboard_css() -> str:
 .co-timeline-brief strong {
   color: var(--co-ink);
 }
+
+.co-inventory-brief {
+  background: var(--co-panel);
+  border: 1px solid var(--co-border);
+  border-left: 5px solid var(--co-accent-2);
+  border-radius: 8px;
+  margin: 0.25rem 0 1rem 0;
+  padding: 0.9rem 1rem;
+}
+
+.co-inventory-brief h3 {
+  font-size: 1rem;
+  letter-spacing: 0;
+  line-height: 1.25;
+  margin: 0 0 0.35rem 0;
+}
+
+.co-inventory-brief p {
+  color: var(--co-muted);
+  font-size: 0.88rem;
+  margin: 0.22rem 0;
+}
+
+.co-inventory-brief-grid {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  margin-top: 0.65rem;
+}
+
+.co-inventory-brief-fact {
+  background: var(--co-surface);
+  border: 1px solid var(--co-border);
+  border-radius: 8px;
+  padding: 0.55rem 0.65rem;
+}
+
+.co-inventory-brief-fact strong {
+  color: var(--co-ink);
+  display: block;
+  font-size: 0.82rem;
+  margin-bottom: 0.18rem;
+}
 </style>
 """
 
@@ -973,6 +1016,48 @@ def conversation_button_label(row: pd.Series, selected: bool) -> str:
     risk_label = f"{risk.capitalize()} risk"
     prefix = "> " if selected else ""
     return f"{prefix}{risk_marker(risk)} {risk_label} | {preview}"
+
+
+def data_inventory_html(
+    conversations: pd.DataFrame,
+    threads: pd.DataFrame,
+    usage: pd.DataFrame,
+    tools: pd.DataFrame,
+    messages: pd.DataFrame,
+    events: pd.DataFrame,
+) -> str:
+    counts = [
+        ("Conversations", len(conversations)),
+        ("Threads", len(threads)),
+        ("Usage", len(usage)),
+        ("Tools", len(tools)),
+        ("Messages", len(messages)),
+        ("Events", len(events)),
+    ]
+    if threads.empty:
+        action = "Re-run ingestion against a Codex session directory; no thread rows are available to analyze."
+    elif usage.empty:
+        action = "Check parser coverage for token usage payloads; cost charts need usage snapshots."
+    elif messages.empty:
+        action = "Inspect events first; transcript snippets are missing for this selected run."
+    else:
+        action = "Use these raw tables only to verify a specific aggregate finding from the guided tabs."
+    fact_html = "".join(
+        '<div class="co-inventory-brief-fact">'
+        f"<strong>{html.escape(label)}</strong>"
+        f"<span>{fmt_int(value)}</span>"
+        "</div>"
+        for label, value in counts
+    )
+    return "\n".join(
+        [
+            '<section class="co-inventory-brief">',
+            "  <h3>Data inventory</h3>",
+            f"  <p><strong>Inspect first:</strong> {html.escape(action)}</p>",
+            f'  <div class="co-inventory-brief-grid">{fact_html}</div>',
+            "</section>",
+        ]
+    )
 
 
 def timeline_quick_read_html(
@@ -1908,6 +1993,10 @@ def main() -> None:
         )
 
     with tab_raw:
+        st.markdown(
+            data_inventory_html(conversations, threads, usage, tools, messages, events),
+            unsafe_allow_html=True,
+        )
         st.subheader("Conversations")
         st.dataframe(conversations, width="stretch", hide_index=True)
         st.subheader("Threads")

@@ -11,6 +11,7 @@ The project follows semantic versioning once release distribution is decided.
 - Added a Tools quick read that highlights the noisiest captured output and the first command to tighten.
 - Added a Duplication quick read that turns replayed prompt-block estimates into a first cleanup action.
 - Added a Timeline quick read that points reviewers to the largest context jump or compaction boundary first.
+- Added a Raw tables data inventory that summarizes parsed table counts before showing row-level evidence.
 
 ### Added
 

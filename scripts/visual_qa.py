@@ -48,7 +48,7 @@ TAB_CHECKS = {
     "Timeline & jumps": "Timeline quick read",
     "Tools": "Tool quick read",
     "Duplication": "Duplication quick read",
-    "Raw tables": "Conversations",
+    "Raw tables": "Data inventory",
 }
 
 EXPECTED_METRIC_CARDS = ["Threads", "Largest thread", "Uncached input"]
