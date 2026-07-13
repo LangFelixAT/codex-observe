@@ -568,6 +568,10 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     assert report.with_suffix(".json").exists()
     assert report.with_name("run-comparison.md").exists()
     assert report.with_name("run-comparison.json").exists()
+    assert (
+        checks["session listing"]["detail"]
+        == "2 sessions; triage risk, status, schema, text recommended action, recommendation detail, and next commands verified"
+    )
     assert checks["aggregate report"]["ok"] is True
     assert "success target" in checks["aggregate report"]["detail"]
     assert checks["visual QA manifest evidence"]["ok"] is True

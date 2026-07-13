@@ -308,6 +308,14 @@ def test_session_summaries_are_aggregate_only(tmp_path: Path) -> None:
     )
     assert "demo-session-cost-review | 2026-01-01T12:23:00Z | high" in lines
     assert "demo-session-focused-followup | 2026-01-01T12:35:00Z | low" in lines
+    assert "Recommended action:" in lines
+    assert "Export report for session: demo-session-cost-review" in lines
+    assert "Why: highest aggregate triage risk; latest run breaks ties" in lines
+    assert "Risk: high" in lines
+    assert (
+        "Top drivers: largest thread share: 57.7%; repeated prompt share: 17.4%; uncached input share: 39.5%"
+        in lines
+    )
     assert (
         "Next: review the highest-risk run (demo-session-cost-review, high risk); run `codex-observe report --db"
         in lines

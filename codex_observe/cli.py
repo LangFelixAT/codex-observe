@@ -1649,6 +1649,12 @@ def release_audit_report(
             and recommendation_detail.get("ranked_by") == ["triage_risk", "last_seen"]
             and isinstance(recommendation_detail.get("drivers"), dict)
         )
+        session_lines_text = "\n".join(session_summary_lines(actual_db_path))
+        sessions_text_has_recommended_action = (
+            "Recommended action:" in session_lines_text
+            and "Export report for session:" in session_lines_text
+            and "Top drivers:" in session_lines_text
+        )
         session_listing_ok = (
             sessions_have_risk
             and sessions_has_schema
@@ -1656,13 +1662,14 @@ def release_audit_report(
             and sessions_has_recommendation
             and sessions_has_next_commands
             and sessions_has_recommendation_detail
+            and sessions_text_has_recommended_action
         )
         add(
             "session listing",
             session_listing_ok,
-            f"{len(sessions)} sessions; triage risk, status, schema, recommendation detail, and next commands verified"
+            f"{len(sessions)} sessions; triage risk, status, schema, text recommended action, recommendation detail, and next commands verified"
             if session_listing_ok
-            else "session listing missing aggregate triage risk, status, schema_version, recommended_session, recommendation_detail, or next_commands",
+            else "session listing missing aggregate triage risk, status, schema_version, text recommended action, recommended_session, recommendation_detail, or next_commands",
         )
     except FileNotFoundError as exc:
         sessions = []

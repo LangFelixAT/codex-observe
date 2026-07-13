@@ -158,6 +158,29 @@ def session_report_hint(db_path: str, session_id: str | None = None) -> str:
     )
 
 
+def session_recommended_action_lines(recommended: dict[str, Any]) -> list[str]:
+    drivers = [
+        ("largest thread share", recommended.get("largest_thread_share_pct")),
+        ("repeated prompt share", recommended.get("repeated_prompt_share_pct")),
+        ("uncached input share", recommended.get("uncached_input_share_pct")),
+    ]
+    driver_parts = []
+    for label, value in drivers:
+        try:
+            numeric = float(value)
+        except (TypeError, ValueError):
+            continue
+        if numeric > 0:
+            driver_parts.append(f"{label}: {numeric:.1f}%")
+    return [
+        "Recommended action:",
+        f"- Export report for session: {recommended['session_id']}",
+        "- Why: highest aggregate triage risk; latest run breaks ties",
+        f"- Risk: {recommended['triage_risk']}",
+        f"- Top drivers: {'; '.join(driver_parts) if driver_parts else 'none recorded'}",
+    ]
+
+
 def session_summary_lines(db_path: str) -> list[str]:
     summaries = session_summaries(db_path)
     if not summaries:
@@ -181,6 +204,7 @@ def session_summary_lines(db_path: str) -> list[str]:
             )
         )
     recommended = summaries[0]
+    lines.extend(session_recommended_action_lines(recommended))
     lines.append(
         "Next: review the highest-risk run "
         f"({recommended['session_id']}, {recommended['triage_risk']} risk); "
