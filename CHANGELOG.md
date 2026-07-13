@@ -26,6 +26,7 @@ The project follows semantic versioning once release distribution is decided.
 - Updated the public tour and audit contract to require evidence bundle key-findings guidance.
 - Bundled the privacy-safe public-tour feedback runbook in reviewer evidence bundles.
 - Moved evidence bundle terminal key findings before artifact paths.
+- Hardened redacted fixture verification against raw identifier-field leaks.
 
 ### Added
 

@@ -156,10 +156,18 @@ def sensitive_value_is_redacted(key: str, value: Any) -> bool:
         except json.JSONDecodeError:
             return False
         return isinstance(parsed, dict) and parsed.get("redacted") is True
+    if key in ID_KEYS:
+        if value in {None, ""}:
+            return True
+        return isinstance(value, str) and bool(
+            re.fullmatch(rf"redacted-{re.escape(key)}-\d+", value)
+        )
     if key in PATH_KEYS:
         return value == "[redacted-path]"
     if key in TEXT_KEYS:
-        return isinstance(value, str) and value.startswith("[redacted-text chars=")
+        return isinstance(value, str) and (
+            value == "[redacted-path]" or value.startswith("[redacted-text chars=")
+        )
     return True
 
 
@@ -190,7 +198,9 @@ def privacy_findings_in_value(
             findings.append(
                 f"{path}: output_name must use stable redacted-###.jsonl form"
             )
-        if key not in SAFE_STRING_KEYS and key in TEXT_KEYS | PATH_KEYS | {"arguments"}:
+        if key not in SAFE_STRING_KEYS and key in TEXT_KEYS | PATH_KEYS | ID_KEYS | {
+            "arguments"
+        }:
             if not sensitive_value_is_redacted(key, value):
                 findings.append(f"{path}: sensitive field {key!r} is not redacted")
     return findings

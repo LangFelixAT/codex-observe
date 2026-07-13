@@ -18,7 +18,7 @@ sys.modules[SPEC.name] = redact_fixtures
 SPEC.loader.exec_module(redact_fixtures)
 
 PRIVATE_STRINGS = [
-    "Please inspect my private repo",
+    "Please inspect C:/Users/felix/private-repo",
     "Get-Content C:/Users/felix/private.txt",
     "secret tool output",
     "C:/Users/felix/private-repo",
@@ -48,7 +48,7 @@ def write_private_log(path: Path) -> None:
             "payload": {
                 "type": "message",
                 "role": "user",
-                "content": "Please inspect my private repo",
+                "content": "Please inspect C:/Users/felix/private-repo",
                 "turn_id": "turn-private",
             },
         },
@@ -194,6 +194,48 @@ def test_verify_redacted_output_rejects_unredacted_sensitive_fields(
     assert review["status"] == "failed"
     assert any("private-looking path" in finding for finding in review["findings"])
     assert any("sensitive field" in finding for finding in review["findings"])
+
+
+def test_verify_redacted_output_rejects_raw_identifier_fields(
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "redacted"
+    output.mkdir()
+    (output / "manifest.json").write_text(
+        json.dumps(
+            {
+                "mode": "redacted-fixture-candidate",
+                "review_required": True,
+                "files": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (output / "redacted-001.jsonl").write_text(
+        json.dumps(
+            {
+                "timestamp": "2026-02-01T00:00:00Z",
+                "type": "event",
+                "payload": {
+                    "type": "message",
+                    "session_id": "session-private",
+                    "thread_id": "thread-private",
+                    "turn_id": "turn-private",
+                    "call_id": "call-private",
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    review = redact_fixtures.verify_redacted_output(output)
+
+    assert review["status"] == "failed"
+    assert any("session_id" in finding for finding in review["findings"])
+    assert any("thread_id" in finding for finding in review["findings"])
+    assert any("turn_id" in finding for finding in review["findings"])
+    assert any("call_id" in finding for finding in review["findings"])
 
 
 def test_verify_only_cli_reports_existing_candidate_status(

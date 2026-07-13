@@ -17,7 +17,7 @@ The command supports `--json` with `schema_version` for machine-readable generat
 python scripts/redact_fixtures.py .artifacts/redacted-fixtures --verify-only
 ```
 
-Stop if this reports `failed`; it checks generated JSONL rows and manifest metadata. Fix the redaction script or discard the candidate directory before continuing.
+Stop if this reports `failed`; it checks generated JSONL rows and manifest metadata, including raw identifier-field leaks that must be pseudonymized as `redacted-<kind>-N`. Fix the redaction script or discard the candidate directory before continuing.
 
 ## 3. Human review checklist
 
