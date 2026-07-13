@@ -44,7 +44,7 @@ PLAYWRIGHT_INSTALL_HINT = (
 
 TAB_CHECKS = {
     "Overview": "Run triage",
-    "Agent detail": "Worker / thread detail",
+    "Agent detail": "Thread brief",
     "Timeline & jumps": "Spawn graph / thread lifecycle",
     "Tools": "Tool calls",
     "Duplication": "Repeated prompt blocks",

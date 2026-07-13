@@ -39,7 +39,7 @@
 - Aggregate report artifacts: `.artifacts/demo/run-report.md`, `.artifacts/demo/run-report.json`, `.artifacts/demo/run-comparison.md`, `.artifacts/demo/run-comparison.json`; JSON artifacts and audit output include `schema_version`, opportunity stack, and opportunity-change evidence
 - Public evidence bundle: `.artifacts/public-evidence/README.md`, `.artifacts/public-evidence/evidence-bundle.json`, visual screenshots when included, and `codex-observe.evidence-bundle.v1` manifest evidence
 - Tabs exercised: Overview, Agent detail, Timeline & jumps, Tools, Duplication, Raw tables
-- Agent detail selector exercised: yes/no
+- Agent detail selector exercised: yes/no; Agent detail thread brief visible: yes/no
 
 ## Data/privacy review
 

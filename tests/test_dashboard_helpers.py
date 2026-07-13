@@ -28,6 +28,7 @@ from codex_observe.dashboard import (
     report_download_payloads,
     triage_card_html,
     success_target_html,
+    thread_brief_html,
 )
 
 
@@ -89,6 +90,30 @@ def test_risk_marker_makes_sidebar_risk_scannable() -> None:
     assert risk_marker("low") == "OK"
     assert risk_marker("unknown") == "??"
     assert risk_marker("") == "??"
+
+
+def test_thread_brief_html_summarizes_selected_thread_and_escapes() -> None:
+    rendered = thread_brief_html(
+        pd.Series(
+            {
+                "label": "Worker <Parser>",
+                "kind": "worker",
+                "final_total_tokens": 33_200,
+                "final_uncached_input_tokens": 12_000,
+                "tool_call_count": 3,
+            }
+        ),
+        57_510,
+    )
+
+    assert 'class="co-thread-brief"' in rendered
+    assert "Thread brief" in rendered
+    assert "Worker &lt;Parser&gt;" in rendered
+    assert "Shorten or split this thread first" in rendered
+    assert "33.2k tokens" in rendered
+    assert "57.7%" in rendered
+    assert "12.0k tokens" in rendered
+    assert "Worker <Parser>" not in rendered
 
 
 def test_thread_kind_classifies_root_worker_explorer_guardian_and_unknown() -> None:
@@ -357,6 +382,7 @@ def test_dashboard_css_contains_polish_hooks_without_viewport_scaled_type() -> N
     assert ".co-empty-actions" in css
     assert ".co-empty-action" in css
     assert ".co-comparison-preview" in css
+    assert ".co-thread-brief" in css
     assert ".co-metric-grid" in css
     assert ".co-metric-card" in css
     assert ".co-metric-label" in css

@@ -532,6 +532,49 @@ def dashboard_css() -> str:
 .co-comparison-preview strong {
   color: var(--co-ink);
 }
+
+.co-thread-brief {
+  background: var(--co-panel);
+  border: 1px solid var(--co-border);
+  border-left: 5px solid var(--co-accent-2);
+  border-radius: 8px;
+  margin: 0.25rem 0 1rem 0;
+  padding: 0.9rem 1rem;
+}
+
+.co-thread-brief h3 {
+  font-size: 1.02rem;
+  letter-spacing: 0;
+  line-height: 1.25;
+  margin: 0 0 0.35rem 0;
+}
+
+.co-thread-brief p {
+  color: var(--co-muted);
+  font-size: 0.88rem;
+  margin: 0.22rem 0;
+}
+
+.co-thread-brief-grid {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+  margin-top: 0.65rem;
+}
+
+.co-thread-brief-fact {
+  background: var(--co-surface);
+  border: 1px solid var(--co-border);
+  border-radius: 8px;
+  padding: 0.55rem 0.65rem;
+}
+
+.co-thread-brief-fact strong {
+  color: var(--co-ink);
+  display: block;
+  font-size: 0.82rem;
+  margin-bottom: 0.18rem;
+}
 </style>
 """
 
@@ -854,6 +897,50 @@ def conversation_button_label(row: pd.Series, selected: bool) -> str:
     return f"{prefix}{risk_marker(risk)} {risk_label} | {preview}"
 
 
+def thread_brief_html(selected_thread: pd.Series, total_tokens: object) -> str:
+    label = html.escape(str(selected_thread.get("label") or "Selected thread"))
+    kind = html.escape(str(selected_thread.get("kind") or "unknown"))
+    tokens = int(selected_thread.get("final_total_tokens") or 0)
+    uncached = int(selected_thread.get("final_uncached_input_tokens") or 0)
+    tools = int(selected_thread.get("tool_call_count") or 0)
+    share = pct_of_total(tokens, total_tokens)
+    if share >= 50:
+        action = (
+            "Shorten or split this thread first; it dominates the run's context budget."
+        )
+    elif uncached >= 10_000:
+        action = "Gate fresh context before this thread starts; uncached input is the main cost to reduce."
+    elif tools:
+        action = "Inspect this thread's tool outputs and narrow bulky commands before replaying results."
+    else:
+        action = (
+            "Review this thread's timeline for context jumps before changing workflow."
+        )
+    facts = [
+        ("Kind", kind),
+        ("Total", f"{fmt_short(tokens)} tokens"),
+        ("Run share", f"{share:.1f}%"),
+        ("Uncached", f"{fmt_short(uncached)} tokens"),
+        ("Tools", fmt_int(tools)),
+    ]
+    fact_html = "".join(
+        '<div class="co-thread-brief-fact">'
+        f"<strong>{html.escape(name)}</strong>"
+        f"<span>{html.escape(str(value))}</span>"
+        "</div>"
+        for name, value in facts
+    )
+    return "\n".join(
+        [
+            '<section class="co-thread-brief">',
+            f"  <h3>Thread brief: {label}</h3>",
+            f"  <p><strong>Inspect first:</strong> {html.escape(action)}</p>",
+            f'  <div class="co-thread-brief-grid">{fact_html}</div>',
+            "</section>",
+        ]
+    )
+
+
 def load_events_for_session(db: str, session_id: str) -> pd.DataFrame:
     return read_sql(
         db,
@@ -892,6 +979,13 @@ def render_agent_detail(
 ) -> None:
     tid = selected_thread["thread_id"]
     st.subheader(selected_thread["label"])
+    total_thread_tokens = (
+        threads["final_total_tokens"].fillna(0).sum() if not threads.empty else 0
+    )
+    st.markdown(
+        thread_brief_html(selected_thread, total_thread_tokens),
+        unsafe_allow_html=True,
+    )
     render_metric_grid(
         [
             ("Kind", selected_thread["kind"]),

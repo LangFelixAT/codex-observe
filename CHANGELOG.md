@@ -7,6 +7,7 @@ The project follows semantic versioning once release distribution is decided.
 ## Unreleased
 
 - Added dashboard comparison quick-read card plus Markdown/JSON report and comparison downloads for the selected Overview session and visual/audit evidence that the controls render.
+- Added an Agent detail thread brief that surfaces the selected thread's cost share, uncached input, tool count, and first inspection action.
 
 ### Added
 
@@ -57,3 +58,4 @@ The project follows semantic versioning once release distribution is decided.
 - `codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --format json --out .artifacts/demo/run-comparison.json`
 - `codex-observe evidence-bundle --out .artifacts/public-evidence --skip-visual --json`
 - `python scripts/visual_qa.py`
+
