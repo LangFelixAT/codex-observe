@@ -601,6 +601,32 @@ def dashboard_css() -> str:
 .co-tool-brief strong {
   color: var(--co-ink);
 }
+
+.co-duplication-brief {
+  background: var(--co-panel);
+  border: 1px solid var(--co-border);
+  border-left: 5px solid var(--co-accent-2);
+  border-radius: 8px;
+  margin: 0.25rem 0 1rem 0;
+  padding: 0.9rem 1rem;
+}
+
+.co-duplication-brief h3 {
+  font-size: 1rem;
+  letter-spacing: 0;
+  line-height: 1.25;
+  margin: 0 0 0.35rem 0;
+}
+
+.co-duplication-brief p {
+  color: var(--co-muted);
+  font-size: 0.88rem;
+  margin: 0.22rem 0;
+}
+
+.co-duplication-brief strong {
+  color: var(--co-ink);
+}
 </style>
 """
 
@@ -921,6 +947,42 @@ def conversation_button_label(row: pd.Series, selected: bool) -> str:
     risk_label = f"{risk.capitalize()} risk"
     prefix = "> " if selected else ""
     return f"{prefix}{risk_marker(risk)} {risk_label} | {preview}"
+
+
+def duplication_quick_read_html(
+    duplicated_blocks: pd.DataFrame, total_tokens: object
+) -> str:
+    if duplicated_blocks.empty:
+        return ""
+    dup = duplicated_blocks.copy()
+    if "approx_tokens_replayed" not in dup.columns:
+        dup["approx_tokens_replayed"] = 0
+    dup["approx_tokens_replayed"] = pd.to_numeric(
+        dup["approx_tokens_replayed"], errors="coerce"
+    ).fillna(0)
+    replayed = int(dup["approx_tokens_replayed"].sum())
+    if replayed <= 0:
+        return ""
+    top = dup.sort_values("approx_tokens_replayed", ascending=False).iloc[0]
+    label = html.escape(str(top.get("label") or "repeated block"))
+    seen = int(top.get("seen") or 0)
+    threads = int(top.get("threads") or 0)
+    share = pct_of_total(replayed, total_tokens)
+    if replayed >= 10_000:
+        action = "Move the top repeated block into a stable file or summary and point workers to it once."
+    elif threads >= 3:
+        action = "Check why this block is crossing thread boundaries before launching more workers."
+    else:
+        action = "Review the top repeated block and decide whether it should be referenced instead of replayed."
+    return "\n".join(
+        [
+            '<section class="co-duplication-brief">',
+            "  <h3>Duplication quick read</h3>",
+            f"  <p><strong>Inspect first:</strong> {html.escape(action)}</p>",
+            f"  <p><strong>Replay estimate:</strong> {fmt_short(replayed)} tokens ({share:.1f}% of run) | <strong>Top block:</strong> {label} seen {fmt_int(seen)} times across {fmt_int(threads)} threads</p>",
+            "</section>",
+        ]
+    )
 
 
 def tool_quick_read_html(tools: pd.DataFrame) -> str:
@@ -1754,6 +1816,10 @@ def main() -> None:
                 "No repeated large prompt blocks found with the current heuristics."
             )
         else:
+            st.markdown(
+                duplication_quick_read_html(dup, total_tokens),
+                unsafe_allow_html=True,
+            )
             d1, d2, d3 = st.columns(3)
             d1.metric(
                 "Repeated approx tokens", fmt_short(dup["approx_tokens_replayed"].sum())

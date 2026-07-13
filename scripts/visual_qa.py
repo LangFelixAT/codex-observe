@@ -47,7 +47,7 @@ TAB_CHECKS = {
     "Agent detail": "Thread brief",
     "Timeline & jumps": "Spawn graph / thread lifecycle",
     "Tools": "Tool quick read",
-    "Duplication": "Repeated prompt blocks",
+    "Duplication": "Duplication quick read",
     "Raw tables": "Conversations",
 }
 

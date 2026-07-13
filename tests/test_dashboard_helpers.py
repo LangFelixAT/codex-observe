@@ -19,6 +19,7 @@ from codex_observe.dashboard import (
     comparison_preview_html,
     conversation_button_label,
     dashboard_css,
+    duplication_quick_read_html,
     empty_state_commands_html,
     risk_marker,
     order_conversations_for_review,
@@ -139,6 +140,47 @@ def test_tool_quick_read_html_summarizes_noisy_tool_output_and_escapes() -> None
 
 def test_tool_quick_read_html_returns_empty_string_without_tools() -> None:
     assert tool_quick_read_html(pd.DataFrame()) == ""
+
+
+def test_duplication_quick_read_html_summarizes_replay_and_escapes() -> None:
+    rendered = duplication_quick_read_html(
+        pd.DataFrame(
+            [
+                {
+                    "label": "AGENTS <root>",
+                    "seen": 4,
+                    "threads": 3,
+                    "approx_tokens_replayed": 12_000,
+                },
+                {
+                    "label": "handoff",
+                    "seen": 2,
+                    "threads": 2,
+                    "approx_tokens_replayed": 3_000,
+                },
+            ]
+        ),
+        60_000,
+    )
+
+    assert 'class="co-duplication-brief"' in rendered
+    assert "Duplication quick read" in rendered
+    assert "Move the top repeated block" in rendered
+    assert "AGENTS &lt;root&gt;" in rendered
+    assert "15.0k tokens" in rendered
+    assert "25.0%" in rendered
+    assert "seen 4 times across 3 threads" in rendered
+    assert "AGENTS <root>" not in rendered
+
+
+def test_duplication_quick_read_html_returns_empty_string_without_replay() -> None:
+    assert duplication_quick_read_html(pd.DataFrame(), 1000) == ""
+    assert (
+        duplication_quick_read_html(
+            pd.DataFrame([{"label": "x", "approx_tokens_replayed": 0}]), 1000
+        )
+        == ""
+    )
 
 
 def test_thread_kind_classifies_root_worker_explorer_guardian_and_unknown() -> None:
@@ -409,6 +451,7 @@ def test_dashboard_css_contains_polish_hooks_without_viewport_scaled_type() -> N
     assert ".co-comparison-preview" in css
     assert ".co-thread-brief" in css
     assert ".co-tool-brief" in css
+    assert ".co-duplication-brief" in css
     assert ".co-metric-grid" in css
     assert ".co-metric-card" in css
     assert ".co-metric-label" in css
