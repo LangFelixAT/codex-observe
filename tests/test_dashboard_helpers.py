@@ -17,6 +17,7 @@ from codex_observe.analysis import (
 from codex_observe.dashboard import (
     comparison_delta_cards_html,
     comparison_download_payloads,
+    comparison_followup_html,
     comparison_preview_html,
     conversation_button_label,
     dashboard_css,
@@ -527,6 +528,7 @@ def test_dashboard_css_contains_polish_hooks_without_viewport_scaled_type() -> N
     assert ".co-comparison-preview" in css
     assert ".co-comparison-deltas" in css
     assert ".co-comparison-delta" in css
+    assert ".co-comparison-followup" in css
     assert ".co-thread-brief" in css
     assert ".co-tool-brief" in css
     assert ".co-duplication-brief" in css
@@ -738,6 +740,9 @@ def test_comparison_preview_html_summarizes_and_escapes_quick_read() -> None:
             "triage_risk": {"direction": "improved"},
             "opportunity_change": {"summary": "Top opportunity stayed <largest>."},
             "recommendation": "Keep change & compare again.",
+            "next_command_templates": [
+                "codex-observe report --db <db> --session-id <next-session-id> --format json --out next-run-report.json"
+            ],
         }
     )
 
@@ -749,7 +754,31 @@ def test_comparison_preview_html_summarizes_and_escapes_quick_read() -> None:
     assert "Opportunity movement" in rendered
     assert "Top opportunity stayed &lt;largest&gt;." in rendered
     assert "Keep change &amp; compare again." in rendered
+    assert "Next validation command" in rendered
+    assert (
+        "codex-observe report --db &lt;db&gt; --session-id &lt;next-session-id&gt; --format json --out next-run-report.json"
+        in rendered
+    )
     assert "improved <ok>" not in rendered
+
+
+def test_comparison_followup_html_escapes_command_template() -> None:
+    rendered = comparison_followup_html(
+        {
+            "next_command_templates": [
+                "codex-observe compare --before-report <after> --after-report next.json"
+            ]
+        }
+    )
+
+    assert 'class="co-comparison-followup"' in rendered
+    assert "Next validation command" in rendered
+    assert "&lt;after&gt;" in rendered
+    assert "<after>" not in rendered
+
+
+def test_comparison_followup_html_returns_empty_string_without_templates() -> None:
+    assert comparison_followup_html({}) == ""
 
 
 def test_comparison_delta_cards_html_renders_ranked_metric_deltas_and_escapes() -> None:

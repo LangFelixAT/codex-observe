@@ -180,7 +180,7 @@ def test_comparison_preview_failures_require_quick_read_contract() -> None:
         comparison_preview_failures(
             [
                 {
-                    "body": "Comparison quick read: regressed Triage movement: regressed Next step: Inspect new diagnostic first: Repeated prompt blocks."
+                    "body": "Comparison quick read: regressed Triage movement: regressed Next step: Inspect new diagnostic first: Repeated prompt blocks. Next validation command codex-observe report --db <db> --session-id <next-session-id> --format json --out next-run-report.json"
                 }
             ],
             "desktop",
@@ -295,7 +295,7 @@ def complete_viewport_results(tmp_path: Path) -> dict[str, dict[str, object]]:
             "comparison_previews": [
                 {
                     "label": "Comparison quick read: regressed",
-                    "body": "Comparison quick read: regressed Verdict: regressed; largest change: Total tokens +49.1k (regressed). Triage movement: regressed Next step: Inspect new diagnostic first: Repeated prompt blocks.",
+                    "body": "Comparison quick read: regressed Verdict: regressed; largest change: Total tokens +49.1k (regressed). Triage movement: regressed Next step: Inspect new diagnostic first: Repeated prompt blocks. Next validation command codex-observe report --db <db> --session-id <next-session-id> --format json --out next-run-report.json",
                 }
             ],
             "comparison_deltas": [

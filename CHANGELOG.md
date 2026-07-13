@@ -6,7 +6,7 @@ The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
 
-- Added dashboard comparison quick-read and metric delta cards plus Markdown/JSON report and comparison downloads for the selected Overview session and visual/audit evidence that the controls render.
+- Added dashboard comparison quick-read, metric delta, and next validation command cards plus Markdown/JSON report and comparison downloads for the selected Overview session and visual/audit evidence that the controls render.
 - Added an Agent detail thread brief that surfaces the selected thread's cost share, uncached input, tool count, and first inspection action.
 - Added a Tools quick read that highlights the noisiest captured output and the first command to tighten.
 - Added a Duplication quick read that turns replayed prompt-block estimates into a first cleanup action.
@@ -19,6 +19,7 @@ The project follows semantic versioning once release distribution is decided.
 - Updated the public tour to point reviewers at dashboard comparison metric delta cards.
 - Added reproduce-local commands to the reviewer evidence bundle README and release audit validation.
 - Added follow-up command templates to aggregate comparison Markdown/JSON exports.
+- Added the comparison next validation command to the dashboard Overview quick-read card and visual/audit evidence.
 
 ### Added
 

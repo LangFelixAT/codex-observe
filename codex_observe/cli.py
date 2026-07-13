@@ -47,6 +47,8 @@ EXPECTED_VISUAL_COMPARISON_PREVIEW = {
     "regressed",
     "Triage movement: regressed",
     "Inspect new diagnostic first: Repeated prompt blocks.",
+    "Next validation command",
+    "codex-observe report --db <db> --session-id <next-session-id> --format json --out next-run-report.json",
 }
 EXPECTED_VISUAL_COMPARISON_DELTAS = {
     "Total tokens": "regressed",

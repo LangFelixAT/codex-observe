@@ -563,6 +563,28 @@ def dashboard_css() -> str:
   overflow-wrap: anywhere;
 }
 
+.co-comparison-followup {
+  background: var(--co-surface);
+  border: 1px solid var(--co-border);
+  border-radius: 8px;
+  margin-top: 0.75rem;
+  padding: 0.65rem 0.75rem;
+}
+
+.co-comparison-followup strong {
+  display: block;
+  font-size: 0.82rem;
+  line-height: 1.2;
+  margin-bottom: 0.22rem;
+}
+
+.co-comparison-followup code {
+  color: var(--co-ink);
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
 .co-thread-brief {
   background: var(--co-panel);
   border: 1px solid var(--co-border);
@@ -923,6 +945,23 @@ def comparison_delta_cards_html(comparison: dict[str, object], limit: int = 4) -
     return '<div class="co-comparison-deltas">' + "".join(cards) + "</div>"
 
 
+def comparison_followup_html(comparison: dict[str, object]) -> str:
+    templates = comparison.get("next_command_templates")
+    if not isinstance(templates, list):
+        return ""
+    command = next(
+        (str(item) for item in templates if isinstance(item, str) and item), ""
+    )
+    if not command:
+        return ""
+    return (
+        '<div class="co-comparison-followup">'
+        "<strong>Next validation command</strong>"
+        f"<code>{html.escape(command)}</code>"
+        "</div>"
+    )
+
+
 def comparison_preview_html(comparison: dict[str, object]) -> str:
     triage = comparison.get("triage_risk", {})
     opportunity = comparison.get("opportunity_change", {})
@@ -956,6 +995,7 @@ def comparison_preview_html(comparison: dict[str, object]) -> str:
             f"  <p><strong>Opportunity movement:</strong> {opportunity_summary}</p>",
             f"  <p><strong>Next step:</strong> {recommendation}</p>",
             comparison_delta_cards_html(comparison),
+            comparison_followup_html(comparison),
             "</section>",
         ]
     )

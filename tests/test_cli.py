@@ -195,7 +195,7 @@ def write_valid_visual_manifest(root: Path) -> None:
             "comparison_previews": [
                 {
                     "label": "Comparison quick read: regressed",
-                    "body": "Comparison quick read: regressed Verdict: regressed; largest change: Total tokens +49.1k (regressed). Triage movement: regressed Next step: Inspect new diagnostic first: Repeated prompt blocks.",
+                    "body": "Comparison quick read: regressed Verdict: regressed; largest change: Total tokens +49.1k (regressed). Triage movement: regressed Next step: Inspect new diagnostic first: Repeated prompt blocks. Next validation command codex-observe report --db <db> --session-id <next-session-id> --format json --out next-run-report.json",
                 }
             ],
             "comparison_deltas": [

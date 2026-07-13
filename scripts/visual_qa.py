@@ -67,6 +67,8 @@ EXPECTED_COMPARISON_PREVIEW = {
     "verdict": "regressed",
     "triage_movement": "regressed",
     "next_step": "Inspect new diagnostic first: Repeated prompt blocks.",
+    "follow_up": "Next validation command",
+    "follow_up_command": "codex-observe report --db <db> --session-id <next-session-id> --format json --out next-run-report.json",
 }
 EXPECTED_COMPARISON_DELTAS = [
     {"label": "Total tokens", "direction": "regressed"},
