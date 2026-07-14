@@ -655,7 +655,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
         == "2 sessions; triage risk, status, schema, text recommended action, session table tool-output column, tool-output driver, structured driver summary, recommendation detail, review path, and next commands verified"
     )
     assert checks["database doctor"]["detail"] == (
-        "ok; schema, next commands, and review path verified"
+        "ok; schema, text next commands, next commands, and review path verified"
     )
     assert checks["aggregate report"]["ok"] is True
     assert "success target" in checks["aggregate report"]["detail"]
@@ -908,11 +908,19 @@ def test_doctor_report_includes_review_path_for_healthy_and_missing_databases(
         "Success check: sessions JSON includes status ok and a recommended_session."
         in text
     )
+    assert "Next commands:" in text
+    assert f"- codex-observe sessions --db {db}" in text
+    assert f"- codex-observe serve --db {db}" in text
+    assert text.index("Review path:") < text.index("Next commands:")
+    assert text.index("Next commands:") < text.index("Next:")
 
     missing = tmp_path / "missing.sqlite"
     missing_status, missing_report = cli.doctor_report(str(missing))
+    missing_lines_status, missing_lines = cli.doctor_lines(str(missing))
+    missing_text = "\n".join(missing_lines)
 
     assert missing_status == 2
+    assert missing_lines_status == 2
     assert missing_report["status"] == "missing"
     assert [item["label"] for item in missing_report["review_path"]] == [
         "Create synthetic database",
@@ -921,6 +929,9 @@ def test_doctor_report_includes_review_path_for_healthy_and_missing_databases(
     assert missing_report["review_path"][0]["command"] == (
         f"codex-observe demo --db {missing}"
     )
+    assert "Next commands:" in missing_text
+    assert f"- codex-observe demo --db {missing}" in missing_text
+    assert f"- codex-observe ingest ~/.codex/sessions --db {missing}" in missing_text
 
 
 def test_session_recommendation_detail_includes_structured_tool_output_driver() -> None:

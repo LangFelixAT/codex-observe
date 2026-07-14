@@ -411,6 +411,11 @@ def doctor_lines(db_path: str) -> tuple[int, list[str]]:
                 continue
             lines.append(f"- {item.get('label')}: {item.get('command')}")
             lines.append(f"  Success check: {item.get('success_check')}")
+    next_commands = report.get("next_commands")
+    if isinstance(next_commands, list) and next_commands:
+        lines.append("Next commands:")
+        for command in next_commands:
+            lines.append(f"- {command}")
     lines.append(f"Next: {report['next']}")
     return status, lines
 
@@ -1871,6 +1876,8 @@ def release_audit_report(
     )
 
     doctor_status, doctor = doctor_report(actual_db_path)
+    doctor_lines_status, doctor_text_lines = doctor_lines(actual_db_path)
+    doctor_lines_text = "\n".join(doctor_text_lines)
     doctor_has_schema = doctor.get("schema_version") == DOCTOR_SCHEMA_VERSION
     doctor_review_path = doctor.get("review_path")
     doctor_has_review_path = (
@@ -1897,16 +1904,23 @@ def release_audit_report(
         and doctor.get("next_commands")
         == doctor_next_commands(Path(actual_db_path), "ok")
         and doctor_has_review_path
+        and doctor_lines_status == 0
+        and "Review path:" in doctor_lines_text
+        and "Next commands:" in doctor_lines_text
+        and all(
+            command in doctor_lines_text
+            for command in doctor_next_commands(Path(actual_db_path), "ok")
+        )
     )
     add(
         "database doctor",
         doctor_ok,
-        "ok; schema, next commands, and review path verified"
+        "ok; schema, text next commands, next commands, and review path verified"
         if doctor_ok
         else (
             str(doctor.get("status"))
             if doctor_has_schema
-            else "doctor schema_version, next_commands, or review_path missing"
+            else "doctor schema_version, text next commands, next_commands, or review_path missing"
         ),
     )
 
