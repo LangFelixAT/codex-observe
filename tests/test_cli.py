@@ -646,6 +646,14 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     assert audit["schema_version"] == cli.AUDIT_SCHEMA_VERSION
     assert audit["failed_checks"] == []
     assert audit["required_commands"] == cli.RELEASE_REQUIRED_COMMANDS
+    assert (
+        checks["demo JSON"]["detail"]
+        == "schema, counts, database, text next commands, next commands, text review path, and review path verified"
+    )
+    assert (
+        checks["synthetic ingest JSON"]["detail"]
+        == "schema, counts, skipped categories, text next commands, next commands, text review path, and review path verified"
+    )
     assert report.exists()
     assert report.with_suffix(".json").exists()
     assert report.with_name("run-comparison.md").exists()
@@ -810,6 +818,11 @@ def test_demo_payload_and_text_include_review_path() -> None:
         in text
     )
     assert "Success check: doctor JSON status is ok" in text
+    assert "Next commands:" in text
+    for command in cli.demo_next_commands("demo.sqlite"):
+        assert f"- {command}" in text
+    assert text.index("Review path:") < text.index("Next commands:")
+    assert text.index("Next commands:") < text.index("Next:")
 
 
 def test_ingest_payload_and_text_include_review_path() -> None:
@@ -848,6 +861,11 @@ def test_ingest_payload_and_text_include_review_path() -> None:
         "Verify database health: codex-observe doctor --db demo.sqlite --json" in text
     )
     assert "Success check: doctor JSON status is ok and review_path is present." in text
+    assert "Next commands:" in text
+    for command in cli.ingest_next_commands("demo.sqlite"):
+        assert f"- {command}" in text
+    assert text.index("Review path:") < text.index("Next commands:")
+    assert text.index("Next commands:") < text.index("Next:")
 
     empty_result = SimpleNamespace(
         files_seen=0,

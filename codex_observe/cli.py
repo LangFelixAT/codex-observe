@@ -1806,13 +1806,17 @@ def release_audit_report(
         and demo_has_review_path
         and "Review path:" in demo_lines_text
         and "Verify synthetic database:" in demo_lines_text
+        and "Next commands:" in demo_lines_text
+        and all(
+            command in demo_lines_text for command in demo_next_commands(actual_db_path)
+        )
     )
     add(
         "demo JSON",
         demo_json_ok,
-        "schema, counts, database, next commands, text review path, and review path verified"
+        "schema, counts, database, text next commands, next commands, text review path, and review path verified"
         if demo_json_ok
-        else "demo JSON schema_version, counts, database, next_commands, text review path, or review_path missing",
+        else "demo JSON schema_version, counts, database, text next commands, next_commands, text review path, or review_path missing",
     )
 
     ingest_contract_path = Path(actual_db_path).with_name(
@@ -1866,13 +1870,18 @@ def release_audit_report(
         and ingest_has_review_path
         and "Review path:" in ingest_lines_text
         and "Verify database health:" in ingest_lines_text
+        and "Next commands:" in ingest_lines_text
+        and all(
+            command in ingest_lines_text
+            for command in ingest_next_commands(str(ingest_contract_path))
+        )
     )
     add(
         "synthetic ingest JSON",
         ingest_json_ok,
-        "schema, counts, skipped categories, next commands, text review path, and review path verified"
+        "schema, counts, skipped categories, text next commands, next commands, text review path, and review path verified"
         if ingest_json_ok
-        else "synthetic ingest JSON schema_version, counts, skipped categories, next_commands, text review path, or review_path missing",
+        else "synthetic ingest JSON schema_version, counts, skipped categories, text next commands, next_commands, text review path, or review_path missing",
     )
 
     doctor_status, doctor = doctor_report(actual_db_path)
@@ -2970,16 +2979,18 @@ def demo_success_lines(db_path: str, result, serve: bool = False) -> list[str]:
         lines.append(f"  Success check: {step['success_check']}")
     lines.extend(
         [
-            "Next:",
-            f"- Verify database health: {commands[0]}",
-            f"- List reportable runs: {commands[1]}",
-            f"- Export the recommended run: {commands[2]}",
+            "Next commands:",
+            *(f"- {command}" for command in commands),
         ]
     )
     if serve:
-        lines.append("- Launching dashboard now.")
+        lines.append(
+            "Next: dashboard is launching; use the commands above to verify and export evidence."
+        )
     else:
-        lines.append(f"- Open the dashboard: {commands[3]}")
+        lines.append(
+            "Next: run the commands above to verify health, choose a run, export a report, and open the dashboard."
+        )
     return lines
 
 
@@ -3121,15 +3132,18 @@ def ingest_success_lines(db_path: str, result, serve: bool = False) -> list[str]
         lines.append(f"  Success check: {step['success_check']}")
     lines.extend(
         [
-            "Next:",
-            f"- Verify database health: {commands[0].removesuffix(' --json')}",
-            f"- List reportable runs: {commands[1].removesuffix(' --json')}",
+            "Next commands:",
+            *(f"- {command}" for command in commands),
         ]
     )
     if serve:
-        lines.append("- Launching dashboard now.")
+        lines.append(
+            "Next: dashboard is launching; use the commands above to verify and inspect the database."
+        )
     else:
-        lines.append(f"- Open the dashboard: {commands[2]}")
+        lines.append(
+            "Next: run the commands above to verify health, choose a run, and open the dashboard."
+        )
     return lines
 
 
