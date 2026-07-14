@@ -26,16 +26,21 @@ body:
       label: Steps tried
       options:
         - label: `codex-observe tour`
+        - label: `codex-observe tour --json`
         - label: `codex-observe demo --serve --host 127.0.0.1 --port 8501`
         - label: `codex-observe doctor --db .artifacts/demo/codex_observe_demo.sqlite`
         - label: `codex-observe doctor --db .artifacts/demo/codex_observe_demo.sqlite --json`
         - label: `codex-observe sessions --db .artifacts/demo/codex_observe_demo.sqlite`
         - label: `codex-observe sessions --db .artifacts/demo/codex_observe_demo.sqlite --json`
         - label: `codex-observe report --db .artifacts/demo/codex_observe_demo.sqlite --out .artifacts/demo/run-report.md`
+        - label: `codex-observe report --db .artifacts/demo/codex_observe_demo.sqlite --format json --out .artifacts/demo/run-report.json`
         - label: `codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --out .artifacts/demo/run-comparison.md`
+        - label: `codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --format json --out .artifacts/demo/run-comparison.json`
         - label: report/comparison terminal `Next commands` blocks
+        - label: `python scripts/visual_qa.py`
         - label: `python scripts/visual_qa.py --verify-manifest .artifacts/visual/visual-qa-manifest.json`
         - label: `codex-observe evidence-bundle --out .artifacts/public-evidence`
+        - label: `codex-observe audit --json`
   - type: textarea
     id: useful
     attributes:

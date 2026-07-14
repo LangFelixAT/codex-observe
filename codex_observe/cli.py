@@ -619,9 +619,14 @@ def issue_template_failures(root: Path | None = None) -> list[str]:
         "public_tour_feedback.yml": [
             "Public tour feedback",
             "codex-observe tour",
+            "codex-observe tour --json",
             "codex-observe evidence-bundle --out .artifacts/public-evidence",
+            "codex-observe audit --json",
             "codex-observe doctor --db .artifacts/demo/codex_observe_demo.sqlite",
             "codex-observe sessions --db .artifacts/demo/codex_observe_demo.sqlite",
+            "codex-observe report --db .artifacts/demo/codex_observe_demo.sqlite --format json --out .artifacts/demo/run-report.json",
+            "codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --format json --out .artifacts/demo/run-comparison.json",
+            "python scripts/visual_qa.py",
             "report/comparison terminal `Next commands` blocks",
             "docs/PUBLIC_TOUR_FEEDBACK.md",
             "docs/LIMITATIONS.md",
@@ -2304,6 +2309,7 @@ def release_audit_report(
             cmd in readme
             for cmd in [
                 "codex-observe tour",
+                "codex-observe tour --json",
                 "codex-observe doctor",
                 "codex-observe sessions",
                 "codex-observe report",

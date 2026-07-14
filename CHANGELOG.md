@@ -20,6 +20,7 @@ The project follows semantic versioning once release distribution is decided.
 - Added a terminal next-command footer to plain public tour output and release audit coverage.
 - Aligned the public tour audit step on `codex-observe audit --json` and documented it in the README tour.
 - Added a public-tour `feedback_handoff` contract for the safe feedback runbook, issue template, and evidence rules.
+- Expanded the public-tour feedback template to capture tour JSON, audit JSON, visual QA generation, and JSON report/comparison review steps.
 - Added a top-level public-tour review path so text and JSON tour output expose the end-to-end evaluation checklist.
 - Added a structured session review path to sessions JSON and plain-text listings so terminal users can move from diagnosis to report, comparison, next-run validation, and safe feedback.
 - Added a dashboard next-review path card with visual QA evidence so users can move from diagnosis to validation without leaving the Overview.
