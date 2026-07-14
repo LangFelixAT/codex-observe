@@ -6,6 +6,7 @@ The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
 
+- Clarified largest-tool-output report evidence when command text is intentionally omitted by the privacy boundary.
 - Added a dashboard Overview risk distribution card with visual QA and release audit evidence.
 - Added aggregate risk distribution to `codex-observe sessions` text/JSON output and release audit checks so large histories show fleet-level triage context before a single recommended report.
 - Added `codex-observe ingest --newest-files <n>` and matching `scan-and-serve` support so large real-history directories can be sampled quickly with aggregate matched/processed/deferred counts.

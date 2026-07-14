@@ -129,7 +129,8 @@ def test_build_report_returns_privacy_safe_diagnostics_and_playbook(
     assert report["review_path"][-1]["command"] == (
         "codex-observe compare --before-report run-report.json --after-report next-run-report.json --out run-comparison.md"
     )
-    assert "no command captured" in serialized
+    assert "command omitted by privacy boundary" in serialized
+    assert "no command captured" not in serialized
     for private in PRIVATE_DEMO_STRINGS:
         assert private not in serialized
 

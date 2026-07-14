@@ -368,7 +368,8 @@ def diagnostics_df(
             row = largest_tool.iloc[0]
             tool_name = clean_value(row.get("tool_name")) or "unknown tool"
             command = (
-                useful_text_preview(row.get("command"), 90) or "no command captured"
+                useful_text_preview(row.get("command"), 90)
+                or "command omitted by privacy boundary"
             )
             rows.append(
                 {
