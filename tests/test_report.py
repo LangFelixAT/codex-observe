@@ -383,6 +383,17 @@ def test_session_summaries_are_aggregate_only(tmp_path: Path) -> None:
         "Compare workflow change: codex-observe compare --before-report run-report.json --after-report next-run-report.json --out run-comparison.md"
         in lines
     )
+    assert "Next commands:" in lines
+    assert (
+        "- codex-observe report --db" in lines
+        and "--session-id demo-session-cost-review --out run-report.md" in lines
+    )
+    assert (
+        "--session-id demo-session-cost-review --format json --out run-report.json"
+        in lines
+    )
+    assert lines.index("Review path:") < lines.index("Next commands:")
+    assert lines.index("Next commands:") < lines.index("Next:")
     assert "File safe feedback: docs/PUBLIC_TOUR_FEEDBACK.md" in lines
     assert (
         "Next: review the highest-risk run (demo-session-cost-review, high risk); run `codex-observe report --db"

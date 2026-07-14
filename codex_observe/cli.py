@@ -1987,6 +1987,13 @@ def release_audit_report(
             and "Review path:" in session_lines_text
             and "Save report JSON:" in session_lines_text
             and "Compare workflow change:" in session_lines_text
+            and "Next commands:" in session_lines_text
+            and all(
+                command in session_lines_text
+                for command in sessions_next_commands(
+                    actual_db_path, recommended_session_id
+                )
+            )
             and all("largest_tool_output_chars" in row for row in sessions)
         )
         session_listing_ok = (
@@ -2002,9 +2009,9 @@ def release_audit_report(
         add(
             "session listing",
             session_listing_ok,
-            f"{len(sessions)} sessions; triage risk, status, schema, text recommended action, session table tool-output column, tool-output driver, structured driver summary, recommendation detail, review path, and next commands verified"
+            f"{len(sessions)} sessions; triage risk, status, schema, text recommended action, session table tool-output column, tool-output driver, structured driver summary, recommendation detail, review path, text next commands, and next commands verified"
             if session_listing_ok
-            else "session listing missing aggregate triage risk, status, schema_version, text recommended action, recommended_session, recommendation_detail, review_path, session table tool-output column, tool-output driver, structured driver summary, or next_commands",
+            else "session listing missing aggregate triage risk, status, schema_version, text recommended action, recommended_session, recommendation_detail, review_path, text next commands, session table tool-output column, tool-output driver, structured driver summary, or next_commands",
         )
     except FileNotFoundError as exc:
         sessions = []
@@ -2686,11 +2693,13 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
                 "recommended_session chooses the highest-risk run",
                 "plain-text sessions output includes a Tool out column and a recommended-action block with top aggregate drivers, including largest tool output",
                 "recommendation_detail explains the risk, recency tie-breakers, structured aggregate drivers, and ordered driver_summary display labels",
+                "plain-text sessions output includes terminal Next commands for the recommended report exports",
                 "review_path turns the recommendation into report, compare, validation, and safe-feedback steps",
             ],
             "success_checks": [
                 "recommended_session targets the highest-risk run, not merely the latest run",
                 "recommendation_detail.driver_summary includes display labels for aggregate drivers",
+                "plain-text sessions output includes Next commands for Markdown and JSON report exports",
                 "review_path includes report JSON, comparison, next-run validation, and safe-feedback steps",
             ],
             "commands": [f"codex-observe sessions --db {db_path} --json"],

@@ -200,9 +200,15 @@ def session_review_path_lines(db_path: str, session_id: str) -> list[str]:
 def session_summary_lines(db_path: str) -> list[str]:
     summaries = session_summaries(db_path)
     if not summaries:
+        next_commands = [
+            f"codex-observe ingest ~/.codex/sessions --db {db_path}",
+            f"codex-observe demo --db {db_path}",
+        ]
         return [
             "No conversations found.",
-            f"Next: run `codex-observe ingest ~/.codex/sessions --db {db_path}` or `codex-observe demo`.",
+            "Next commands:",
+            *(f"- {command}" for command in next_commands),
+            f"Next: run `{next_commands[0]}` or `{next_commands[1]}`.",
         ]
     lines = [
         "Session ID | Last seen | Risk | Threads | Tools | Tool out | Tokens | Uncached"
@@ -226,6 +232,12 @@ def session_summary_lines(db_path: str) -> list[str]:
     recommended_session_id = str(recommended["session_id"])
     lines.extend(session_recommended_action_lines(recommended))
     lines.extend(session_review_path_lines(db_path, recommended_session_id))
+    next_commands = [
+        f"codex-observe report --db {db_path} --session-id {recommended_session_id} --out run-report.md",
+        f"codex-observe report --db {db_path} --session-id {recommended_session_id} --format json --out run-report.json",
+    ]
+    lines.append("Next commands:")
+    lines.extend(f"- {command}" for command in next_commands)
     lines.append(
         "Next: review the highest-risk run "
         f"({recommended['session_id']}, {recommended['triage_risk']} risk); "
