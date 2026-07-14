@@ -29,6 +29,7 @@ from codex_observe.dashboard import (
     risk_marker,
     order_conversations_for_review,
     metric_with_share,
+    risk_distribution_html,
     next_run_checklist_html,
     operator_briefing_html,
     pct_of_total,
@@ -100,6 +101,25 @@ def test_risk_marker_makes_sidebar_risk_scannable() -> None:
     assert risk_marker("low") == "OK"
     assert risk_marker("unknown") == "??"
     assert risk_marker("") == "??"
+
+
+def test_risk_distribution_html_renders_aggregate_counts_and_escapes() -> None:
+    rendered = risk_distribution_html(
+        {"high": 2, "medium": 1, "low": 3, "unknown": 0, "extra": "<bad>"}
+    )
+
+    assert 'class="co-risk-distribution"' in rendered
+    assert "Risk distribution" in rendered
+    assert "6 imported conversations" in rendered
+    assert "High risk" in rendered
+    assert "Medium risk" in rendered
+    assert "Low risk" in rendered
+    assert "Unknown" in rendered
+    assert "&lt;bad&gt;" not in rendered
+
+
+def test_risk_distribution_html_returns_empty_string_without_distribution() -> None:
+    assert risk_distribution_html(None) == ""
 
 
 def test_thread_brief_html_summarizes_selected_thread_and_escapes() -> None:

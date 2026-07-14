@@ -37,6 +37,7 @@ from codex_observe.report import (
     report_markdown,
     report_next_run_checklist,
     report_success_target,
+    session_risk_distribution,
     report_triage,
     session_summaries,
 )
@@ -337,6 +338,56 @@ def dashboard_css() -> str:
     grid-template-columns: 1fr;
   }
 }
+.co-risk-distribution {
+  background: color-mix(in srgb, var(--co-accent) 6%, var(--co-panel));
+  border: 1px solid var(--co-border);
+  border-radius: 8px;
+  margin: 0 0 1rem 0;
+  padding: 0.9rem 1rem;
+}
+
+.co-risk-distribution h3 {
+  font-size: 1rem;
+  letter-spacing: 0;
+  line-height: 1.25;
+  margin: 0 0 0.35rem 0;
+}
+
+.co-risk-distribution p {
+  color: var(--co-muted);
+  font-size: 0.88rem;
+  margin: 0.2rem 0 0.65rem 0;
+}
+
+.co-risk-distribution-grid {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(115px, 1fr));
+}
+
+.co-risk-distribution-item {
+  background: var(--co-surface);
+  border: 1px solid var(--co-border);
+  border-radius: 8px;
+  min-width: 0;
+  padding: 0.6rem 0.7rem;
+}
+
+.co-risk-distribution-item strong {
+  color: var(--co-ink);
+  display: block;
+  font-size: 1.15rem;
+  line-height: 1.1;
+}
+
+.co-risk-distribution-item span {
+  color: var(--co-muted);
+  display: block;
+  font-size: 0.78rem;
+  line-height: 1.2;
+  margin-top: 0.15rem;
+}
+
 .co-next-run-checklist {
   background: color-mix(in srgb, var(--co-accent-2) 6%, var(--co-panel));
   border: 1px solid var(--co-border);
@@ -1039,6 +1090,38 @@ def review_path_html(success_target: dict[str, object], has_comparison: bool) ->
             "  <p>Turn this run into a validated workflow change without exposing private content.</p>",
             '  <div class="co-review-steps">',
             *[f"    {step}" for step in rendered_steps],
+            "  </div>",
+            "</section>",
+        ]
+    )
+
+
+def risk_distribution_html(distribution: object) -> str:
+    if not isinstance(distribution, dict):
+        return ""
+    labels = [
+        ("high", "High risk"),
+        ("medium", "Medium risk"),
+        ("low", "Low risk"),
+        ("unknown", "Unknown"),
+    ]
+    items = []
+    for key, label in labels:
+        value = int(distribution.get(key, 0) or 0)
+        items.append(
+            '<div class="co-risk-distribution-item">'
+            f"<strong>{html.escape(fmt_int(value))}</strong>"
+            f"<span>{html.escape(label)}</span>"
+            "</div>"
+        )
+    total = sum(int(distribution.get(key, 0) or 0) for key, _ in labels)
+    return "\n".join(
+        [
+            '<section class="co-risk-distribution">',
+            "  <h3>Risk distribution</h3>",
+            f"  <p>{html.escape(fmt_int(total))} imported conversations grouped by aggregate triage risk.</p>",
+            '  <div class="co-risk-distribution-grid">',
+            *[f"    {item}" for item in items],
             "  </div>",
             "</section>",
         ]
@@ -1905,7 +1988,9 @@ def main() -> None:
         )
         return
 
-    conversations = order_conversations_for_review(conversations, session_summaries(db))
+    summaries = session_summaries(db)
+    risk_distribution = session_risk_distribution(summaries)
+    conversations = order_conversations_for_review(conversations, summaries)
 
     with st.sidebar:
         st.header("Database")
@@ -2106,6 +2191,10 @@ def main() -> None:
     with tab_overview:
         st.markdown(
             operator_briefing_html(triage, success_target, opportunities),
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            risk_distribution_html(risk_distribution),
             unsafe_allow_html=True,
         )
         comparison_options = [

@@ -22,6 +22,7 @@ evidence_path_label = visual_qa.evidence_path_label
 visual_manifest_failures = visual_qa.visual_manifest_failures
 verify_visual_manifest = visual_qa.verify_visual_manifest
 visual_manifest_file_failures = visual_qa.visual_manifest_file_failures
+risk_distribution_failures = visual_qa.risk_distribution_failures
 metric_card_failures = visual_qa.metric_card_failures
 metric_card_value_failures = visual_qa.metric_card_value_failures
 sidebar_risk_label_failures = visual_qa.sidebar_risk_label_failures
@@ -117,6 +118,21 @@ def test_layout_review_failures_accepts_clean_snapshot() -> None:
     )
 
 
+def test_layout_review_failures_ignores_transient_streamlit_stop_control() -> None:
+    assert (
+        layout_review_failures(
+            {
+                "viewport_width": 390,
+                "document_width": 390,
+                "overflowing_elements": [],
+                "clipped_text_elements": [{"label": "Stop", "tag": "button"}],
+            },
+            "empty_database narrow",
+        )
+        == []
+    )
+
+
 def test_metric_card_failures_require_key_overview_cards() -> None:
     cards = [
         {"label": "Threads", "value": "3"},
@@ -151,6 +167,32 @@ def test_metric_card_value_failures_reject_low_risk_default_selection() -> None:
         "desktop: metric card Uncached input expected 22.7k tokens (39.5%), got 1.2k tokens (14.3%)"
         in failures
     )
+
+
+def test_risk_distribution_failures_require_overview_distribution() -> None:
+    assert (
+        risk_distribution_failures(
+            [
+                {
+                    "label": "Risk distribution",
+                    "body": "Risk distribution 2 imported conversations High risk 1 Medium risk 0 Low risk 1 Unknown 0",
+                }
+            ],
+            "desktop",
+        )
+        == []
+    )
+
+    failures = risk_distribution_failures([], "narrow")
+
+    assert "narrow: risk distribution card not rendered" in failures
+
+    failures = risk_distribution_failures(
+        [{"label": "Risk distribution", "body": "Risk distribution"}], "desktop"
+    )
+
+    assert "desktop: risk distribution missing: High risk" in failures
+    assert "desktop: risk distribution missing: 2 imported conversations" in failures
 
 
 def test_sidebar_risk_label_failures_require_high_and_low_risk_labels() -> None:
@@ -368,6 +410,12 @@ def complete_viewport_results(tmp_path: Path) -> dict[str, dict[str, object]]:
             "quick_read_evidence": list(visual_qa.EXPECTED_QUICK_READ_EVIDENCE),
             "agent_detail_selector_exercised": True,
             "sidebar_risk_labels": ["High risk", "Low risk"],
+            "risk_distributions": [
+                {
+                    "label": "Risk distribution",
+                    "body": "Risk distribution 2 imported conversations High risk 1 Medium risk 0 Low risk 1 Unknown 0",
+                }
+            ],
             "metric_cards": [
                 {"label": "Threads", "value": "3"},
                 {"label": "Largest thread", "value": "33.2k tokens (57.7%)"},
@@ -526,6 +574,9 @@ def test_visual_manifest_records_review_evidence(tmp_path: Path) -> None:
         "High risk",
         "Low risk",
     ]
+    assert loaded["viewports"]["desktop"]["risk_distributions"][0]["label"] == (
+        "Risk distribution"
+    )
     assert loaded["viewports"]["desktop"]["metric_cards"][1] == {
         "label": "Largest thread",
         "value": "33.2k tokens (57.7%)",
@@ -619,6 +670,7 @@ def test_visual_manifest_failures_rejects_incomplete_evidence(tmp_path: Path) ->
                 "tabs_exercised": ["Overview"],
                 "agent_detail_selector_exercised": False,
                 "sidebar_risk_labels": ["High risk"],
+                "risk_distributions": [],
                 "metric_cards": [{"label": "Threads", "value": "3"}],
                 "success_targets": [],
                 "download_controls": ["Download report MD"],
@@ -648,6 +700,7 @@ def test_visual_manifest_failures_rejects_incomplete_evidence(tmp_path: Path) ->
     assert "manifest desktop screenshot width mismatch" in failures
     assert "manifest desktop screenshot is empty" in failures
     assert "manifest desktop sidebar risk label not found: Low risk" in failures
+    assert "manifest desktop risk distribution card not rendered" in failures
     assert "manifest desktop metric card not rendered: Largest thread" in failures
     assert "manifest desktop metric card not rendered: Uncached input" in failures
     assert "manifest desktop success target card not rendered" in failures

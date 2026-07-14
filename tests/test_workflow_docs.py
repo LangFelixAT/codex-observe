@@ -269,6 +269,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         "codex-observe tour",
         "codex-observe demo --serve --host 127.0.0.1 --port 8501",
         "Overview operator briefing",
+        "risk distribution card",
         "Overview triage card",
         "safe feedback handoff",
         "dashboard comparison quick-read, review-path, metric delta, safe feedback handoff, and next validation command cards plus report and comparison download controls",
@@ -359,6 +360,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         in release
     )
     assert "operator briefing" in release
+    assert "risk distribution" in release
     assert "safe feedback handoff" in release
     assert (
         "comparison quick-read, review-path, metric delta, safe feedback handoff, and next validation command cards plus report and comparison download controls"

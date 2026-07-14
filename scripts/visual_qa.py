@@ -89,6 +89,13 @@ EXPECTED_DEFAULT_METRIC_VALUES = {
 }
 
 
+EXPECTED_RISK_DISTRIBUTION = [
+    "Risk distribution",
+    "High risk",
+    "Low risk",
+    "2 imported conversations",
+]
+
 EXPECTED_SUCCESS_TARGET = {
     "metric": "largest_thread_share_pct",
     "current": "57.7%",
@@ -177,6 +184,8 @@ def layout_review_failures(
         if not isinstance(item, dict):
             continue
         label = str(item.get("label") or item.get("tag") or "text")[:80]
+        if label == "Stop":
+            continue
         failures.append(f"{viewport_name}: visible text appears clipped: {label}")
 
     return failures
@@ -309,6 +318,30 @@ def comparison_delta_failures(
                 f"{viewport_name}: comparison delta {label} missing direction: {direction}"
             )
     return failures
+
+
+def collect_risk_distributions(page) -> list[dict[str, str]]:
+    return page.evaluate(
+        r"""
+() => Array.from(document.querySelectorAll('.co-risk-distribution')).map((card) => ({
+  label: (card.querySelector('h3')?.innerText || '').replace(/\s+/g, ' ').trim(),
+  body: (card.innerText || '').replace(/\s+/g, ' ').trim(),
+})).filter((item) => item.label || item.body)
+        """
+    )
+
+
+def risk_distribution_failures(
+    distributions: list[dict[str, str]], viewport_name: str
+) -> list[str]:
+    if not distributions:
+        return [f"{viewport_name}: risk distribution card not rendered"]
+    body = str(distributions[0].get("body") or "")
+    return [
+        f"{viewport_name}: risk distribution missing: {expected}"
+        for expected in EXPECTED_RISK_DISTRIBUTION
+        if expected not in body
+    ]
 
 
 def collect_metric_cards(page) -> list[dict[str, str]]:
@@ -609,6 +642,8 @@ def validate_dashboard_page(
         pass
     sidebar_risk_labels = collect_sidebar_risk_labels(page)
     failures.extend(sidebar_risk_label_failures(sidebar_risk_labels, viewport_name))
+    risk_distributions = collect_risk_distributions(page)
+    failures.extend(risk_distribution_failures(risk_distributions, viewport_name))
     metric_cards = collect_metric_cards(page)
     failures.extend(metric_card_failures(metric_cards, viewport_name))
     failures.extend(metric_card_value_failures(metric_cards, viewport_name))
@@ -693,6 +728,7 @@ def validate_dashboard_page(
         "tabs_exercised": exercised_tabs,
         "quick_read_evidence": quick_read_evidence,
         "agent_detail_selector_exercised": agent_selector_exercised,
+        "risk_distributions": risk_distributions,
         "metric_cards": metric_cards,
         "sidebar_risk_labels": sidebar_risk_labels,
         "success_targets": success_targets,
@@ -1089,6 +1125,16 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
             failures.extend(
                 failure.replace(f"{name}: ", f"manifest {name} ")
                 for failure in risk_failures
+            )
+
+        risk_distributions = raw.get("risk_distributions")
+        if not isinstance(risk_distributions, list):
+            failures.append(f"manifest {name} missing risk distribution evidence")
+        else:
+            distribution_failures = risk_distribution_failures(risk_distributions, name)
+            failures.extend(
+                failure.replace(f"{name}: ", f"manifest {name} ")
+                for failure in distribution_failures
             )
 
         metric_cards = raw.get("metric_cards")

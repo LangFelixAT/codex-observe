@@ -65,6 +65,13 @@ EXPECTED_VISUAL_COMPARISON_REVIEW_PATH = {
     "Compare against this after run",
     "File safe feedback",
 }
+EXPECTED_VISUAL_RISK_DISTRIBUTION = {
+    "Risk distribution",
+    "High risk",
+    "Low risk",
+    "2 imported conversations",
+}
+
 EXPECTED_VISUAL_METRICS = {
     "Threads": "3",
     "Largest thread": "33.2k tokens (57.7%)",
@@ -1652,6 +1659,27 @@ def visual_manifest_evidence_failures(root: Path) -> list[str]:
                 failures.append(
                     f"visual QA manifest {viewport_name} missing risk labels: {', '.join(sorted(missing))}"
                 )
+        risk_distributions = viewport.get("risk_distributions")
+        if not isinstance(risk_distributions, list) or not risk_distributions:
+            failures.append(
+                f"visual QA manifest missing {viewport_name} risk distribution evidence"
+            )
+        else:
+            distribution_text = "\n".join(
+                str(item.get("body") or item.get("label") or "")
+                for item in risk_distributions
+                if isinstance(item, dict)
+            )
+            missing_distribution = EXPECTED_VISUAL_RISK_DISTRIBUTION - {
+                expected
+                for expected in EXPECTED_VISUAL_RISK_DISTRIBUTION
+                if expected in distribution_text
+            }
+            if missing_distribution:
+                failures.append(
+                    f"visual QA manifest {viewport_name} missing risk distribution evidence: {', '.join(sorted(missing_distribution))}"
+                )
+
         metric_cards = viewport.get("metric_cards")
         if not isinstance(metric_cards, list):
             failures.append(f"visual QA manifest missing {viewport_name} metric cards")
@@ -2706,7 +2734,7 @@ def release_audit_report(
         f"{VISUAL_MANIFEST.as_posix()}; "
         f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['desktop']).as_posix()}; "
         f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['narrow']).as_posix()}; "
-        "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, metric cards, dashboard quick reads, report and comparison downloads, comparison preview, comparison review path, deltas, operator briefing, next review path, next-run checklist, safe feedback handoff, and success target verified"
+        "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, risk distribution, metric cards, dashboard quick reads, report and comparison downloads, comparison preview, comparison review path, deltas, operator briefing, next review path, next-run checklist, safe feedback handoff, and success target verified"
         if not visual_manifest_failures
         else "; ".join(visual_manifest_failures[:3]),
     )
