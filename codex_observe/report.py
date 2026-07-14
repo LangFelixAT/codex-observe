@@ -217,6 +217,26 @@ def session_report_hint(db_path: str, session_id: str | None = None) -> str:
     )
 
 
+def session_risk_distribution(summaries: list[dict[str, Any]]) -> dict[str, int]:
+    distribution = {"high": 0, "medium": 0, "low": 0, "unknown": 0}
+    for row in summaries:
+        risk = str(row.get("triage_risk") or "unknown").lower()
+        if risk not in distribution:
+            risk = "unknown"
+        distribution[risk] += 1
+    return distribution
+
+
+def session_risk_distribution_line(distribution: dict[str, int]) -> str:
+    return (
+        "Risk distribution: "
+        f"high {int(distribution.get('high', 0))}, "
+        f"medium {int(distribution.get('medium', 0))}, "
+        f"low {int(distribution.get('low', 0))}, "
+        f"unknown {int(distribution.get('unknown', 0))}"
+    )
+
+
 def session_recommended_action_lines(recommended: dict[str, Any]) -> list[str]:
     share_drivers = [
         ("largest thread share", recommended.get("largest_thread_share_pct")),
@@ -268,8 +288,10 @@ def session_summary_lines(db_path: str, limit: int | None = 50) -> list[str]:
             *(f"- {command}" for command in next_commands),
             f"Next: run `{next_commands[0]}` or `{next_commands[1]}`.",
         ]
+    distribution = session_risk_distribution(summaries)
     lines = [
-        "Session ID | Last seen | Risk | Threads | Tools | Tool out | Tokens | Uncached"
+        session_risk_distribution_line(distribution),
+        "Session ID | Last seen | Risk | Threads | Tools | Tool out | Tokens | Uncached",
     ]
     display_limit = len(summaries) if limit is None else max(1, int(limit))
     displayed = summaries[:display_limit]

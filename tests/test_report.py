@@ -373,6 +373,7 @@ def test_session_summaries_are_aggregate_only(tmp_path: Path) -> None:
             "largest_tool_output_chars": 880,
         },
     ]
+    assert "Risk distribution: high 1, medium 0, low 1, unknown 0" in lines
     assert (
         "Session ID | Last seen | Risk | Threads | Tools | Tool out | Tokens | Uncached"
         in lines
@@ -388,6 +389,7 @@ def test_session_summaries_are_aggregate_only(tmp_path: Path) -> None:
     limited_lines = "\n".join(session_summary_lines(str(db), limit=1))
     assert "demo-session-cost-review | 2026-01-01T12:23:00Z" in limited_lines
     assert "demo-session-focused-followup | 2026-01-01T12:35:00Z" not in limited_lines
+    assert "Risk distribution: high 1, medium 0, low 1, unknown 0" in limited_lines
     assert "Showing 1 of 2 sessions." in limited_lines
     assert "Export report for session: demo-session-cost-review" in limited_lines
     assert "Recommended action:" in lines

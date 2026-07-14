@@ -321,6 +321,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
     assert "valid but empty" in readme
     assert "next ingest or demo command" in readme
     assert "--newest-files 25 --json" in readme
+    assert "risk_distribution" in readme
     for required_readme_gate in [
         "Ruff lint",
         "Ruff format checks",
@@ -370,6 +371,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
     assert "dashboard empty-state next actions" in release
     assert "private real-log checkpoint" in release
     assert "--newest-files <n>" in release
+    assert "risk_distribution" in release
     assert "docs/LIMITATIONS.md" in release
     assert "release branch is pushed to `origin`" in release
     assert "tracking snapshot" in release

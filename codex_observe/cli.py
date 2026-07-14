@@ -26,6 +26,7 @@ from .report import (
     report_json,
     report_markdown,
     session_report_hint,
+    session_risk_distribution,
     session_summaries,
     session_summary_lines,
 )
@@ -2092,6 +2093,12 @@ def release_audit_report(
             and sessions_payload.get("truncated") is False
             and sessions_payload.get("limit") == DEFAULT_SESSIONS_LIMIT
         )
+        sessions_has_risk_distribution = (
+            sessions_payload.get("risk_distribution", {}).get("high") == 1
+            and sessions_payload.get("risk_distribution", {}).get("low") == 1
+            and sessions_payload.get("risk_distribution", {}).get("medium") == 0
+            and sessions_payload.get("risk_distribution", {}).get("unknown") == 0
+        )
         sessions_has_recommendation = bool(sessions_payload.get("recommended_session"))
         recommended_session = sessions_payload.get("recommended_session")
         recommended_session_id = (
@@ -2156,6 +2163,7 @@ def release_audit_report(
             sessions_have_risk
             and sessions_has_schema
             and sessions_has_status
+            and sessions_has_risk_distribution
             and sessions_has_recommendation
             and sessions_has_limit_metadata
             and sessions_has_next_commands
@@ -2166,9 +2174,9 @@ def release_audit_report(
         add(
             "session listing",
             session_listing_ok,
-            f"{len(sessions)} sessions; triage risk, status, schema, limit metadata, text recommended action, session table tool-output column, tool-output driver, structured driver summary, recommendation detail, review path, text next commands, and next commands verified"
+            f"{len(sessions)} sessions; triage risk, risk distribution, status, schema, limit metadata, text recommended action, session table tool-output column, tool-output driver, structured driver summary, recommendation detail, review path, text next commands, and next commands verified"
             if session_listing_ok
-            else "session listing missing aggregate triage risk, status, schema_version, limit metadata, text recommended action, recommended_session, recommendation_detail, review_path, text next commands, session table tool-output column, tool-output driver, structured driver summary, or next_commands",
+            else "session listing missing aggregate triage risk, risk_distribution, status, schema_version, limit metadata, text recommended action, recommended_session, recommendation_detail, review_path, text next commands, session table tool-output column, tool-output driver, structured driver summary, or next_commands",
         )
     except FileNotFoundError as exc:
         sessions = []
@@ -2776,6 +2784,7 @@ def sessions_missing_json_payload(db_path: str) -> dict[str, object]:
         "returned_sessions": 0,
         "truncated": False,
         "limit": DEFAULT_SESSIONS_LIMIT,
+        "risk_distribution": {"high": 0, "medium": 0, "low": 0, "unknown": 0},
         "recommended_session": None,
         "recommendation_detail": None,
         "review_path": sessions_review_path(db_path),
@@ -2895,6 +2904,7 @@ def sessions_json_payload(
         "returned_sessions": len(displayed),
         "truncated": len(displayed) < len(summaries),
         "limit": effective_limit,
+        "risk_distribution": session_risk_distribution(summaries),
     }
     if summaries:
         recommended = summaries[0]
