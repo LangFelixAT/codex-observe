@@ -508,6 +508,7 @@ def backlog_draft_failures(root: Path | None = None) -> list[str]:
                 failures.append(
                     f"{relative} contains private or local-only pattern {pattern}"
                 )
+
     return failures
 
 
@@ -841,6 +842,7 @@ def public_evidence_bundle_artifact_failures(
         "bundle_readme": "README.md",
         "limitations_markdown": "LIMITATIONS.md",
         "feedback_runbook": "PUBLIC_TOUR_FEEDBACK.md",
+        "feedback_issue_template": ".github/ISSUE_TEMPLATE/public_tour_feedback.yml",
         "report_markdown": "demo/run-report.md",
         "comparison_markdown": "demo/run-comparison.md",
         "audit_json": "audit/audit.json",
@@ -887,6 +889,7 @@ def public_evidence_bundle_artifact_failures(
             "Do not collect",
             "LIMITATIONS.md",
             "PUBLIC_TOUR_FEEDBACK.md",
+            "Privacy-safe feedback issue template",
             "File feedback safely",
             "private Codex logs",
             "External publishing or attachment still requires explicit human approval",
@@ -919,6 +922,28 @@ def public_evidence_bundle_artifact_failures(
             if required not in feedback:
                 failures.append(
                     f"evidence bundle PUBLIC_TOUR_FEEDBACK.md missing {required}"
+                )
+
+    feedback_issue_template_path = (
+        bundle_dir / ".github" / "ISSUE_TEMPLATE" / "public_tour_feedback.yml"
+    )
+    if feedback_issue_template_path.exists():
+        feedback_issue_template = feedback_issue_template_path.read_text(
+            encoding="utf-8"
+        )
+        for required in [
+            "Public tour feedback",
+            "codex-observe tour --json",
+            "codex-observe evidence-bundle --out .artifacts/public-evidence",
+            "Do not paste private prompts",
+            "reviewer evidence bundle",
+            "Privacy review",
+            "docs/PUBLIC_TOUR_FEEDBACK.md",
+            "docs/LIMITATIONS.md",
+        ]:
+            if required not in feedback_issue_template:
+                failures.append(
+                    f"evidence bundle public_tour_feedback.yml missing {required}"
                 )
     return failures
 
@@ -2496,7 +2521,7 @@ def release_audit_report(
         add(
             "public evidence bundle artifacts",
             not public_bundle_failures,
-            "manifest, terminal and reviewer README action plan, key findings, review checklist, feedback handoff, feedback runbook, reproduce-local commands, validation commands, limitations doc, aggregate reports, and audit artifact verified"
+            "manifest, terminal and reviewer README action plan, key findings, review checklist, feedback handoff, feedback runbook, feedback issue template, reproduce-local commands, validation commands, limitations doc, aggregate reports, and audit artifact verified"
             if not public_bundle_failures
             else "; ".join(public_bundle_failures[:3]),
         )
@@ -3638,6 +3663,7 @@ def evidence_bundle_readme(manifest: dict[str, object]) -> str:
         recommended = [
             ("limitations_markdown", "Known limitations and next-work sources"),
             ("feedback_runbook", "Privacy-safe feedback runbook"),
+            ("feedback_issue_template", "Privacy-safe feedback issue template"),
             ("report_markdown", "Aggregate run report"),
             ("comparison_markdown", "Aggregate comparison report"),
             ("audit_json", "Release audit JSON"),
@@ -3780,6 +3806,9 @@ def public_evidence_bundle(
     readme_path = out / "README.md"
     limitations_path = out / "LIMITATIONS.md"
     feedback_path = out / "PUBLIC_TOUR_FEEDBACK.md"
+    feedback_issue_template_path = (
+        out / ".github" / "ISSUE_TEMPLATE" / "public_tour_feedback.yml"
+    )
 
     limitations_source = Path("docs") / "LIMITATIONS.md"
     if limitations_source.exists():
@@ -3802,6 +3831,27 @@ def public_evidence_bundle(
             "The source repository feedback runbook was not available when this synthetic bundle was generated. Review generated artifacts for private paths or aggregate clues before sharing.\n"
         )
     feedback_path.write_text(feedback_text, encoding="utf-8")
+
+    feedback_issue_template_path.parent.mkdir(parents=True, exist_ok=True)
+    feedback_issue_template_source = (
+        Path(".github") / "ISSUE_TEMPLATE" / "public_tour_feedback.yml"
+    )
+    if feedback_issue_template_source.exists():
+        feedback_issue_template_text = feedback_issue_template_source.read_text(
+            encoding="utf-8"
+        )
+    else:
+        feedback_issue_template_text = (
+            "name: Public tour feedback\n"
+            "description: Report privacy-safe feedback from trying the public tour or reviewer evidence bundle\n"
+            "body:\n"
+            "  - type: markdown\n"
+            "    attributes:\n"
+            "      value: Do not paste private prompts, raw logs, tool output, local paths, or unreviewed screenshots.\n"
+        )
+    feedback_issue_template_path.write_text(
+        feedback_issue_template_text, encoding="utf-8"
+    )
 
     commands = [
         f"codex-observe demo --db {bundle_path_label(db_path, out)} --sessions {bundle_path_label(sessions_path, out)} --keep-sessions",
@@ -3888,6 +3938,7 @@ def public_evidence_bundle(
         "bundle_readme": bundle_path_label(readme_path, out),
         "limitations_markdown": bundle_path_label(limitations_path, out),
         "feedback_runbook": bundle_path_label(feedback_path, out),
+        "feedback_issue_template": bundle_path_label(feedback_issue_template_path, out),
         "database": bundle_path_label(db_path, out),
         "sessions_dir": bundle_path_label(sessions_path, out),
         "report_markdown": bundle_path_label(report_md, out),

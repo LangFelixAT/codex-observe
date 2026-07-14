@@ -522,6 +522,10 @@ def test_public_evidence_bundle_artifact_failures_require_limitations(
     assert status == 0
     assert manifest["artifacts"]["limitations_markdown"] == "LIMITATIONS.md"
     assert manifest["artifacts"]["feedback_runbook"] == "PUBLIC_TOUR_FEEDBACK.md"
+    assert (
+        manifest["artifacts"]["feedback_issue_template"]
+        == ".github/ISSUE_TEMPLATE/public_tour_feedback.yml"
+    )
     assert cli.public_evidence_bundle_artifact_failures(Path.cwd(), bundle) == []
 
     (bundle / "LIMITATIONS.md").write_text(
@@ -541,6 +545,15 @@ def test_public_evidence_bundle_artifact_failures_require_limitations(
     failures = cli.public_evidence_bundle_artifact_failures(Path.cwd(), bundle)
 
     assert any("Do Not Collect" in failure for failure in failures)
+
+    (bundle / ".github" / "ISSUE_TEMPLATE" / "public_tour_feedback.yml").write_text(
+        "name: Public tour feedback\n",
+        encoding="utf-8",
+    )
+
+    failures = cli.public_evidence_bundle_artifact_failures(Path.cwd(), bundle)
+
+    assert any("Privacy review" in failure for failure in failures)
 
     loaded = json.loads((bundle / "evidence-bundle.json").read_text(encoding="utf-8"))
     without_summary = dict(loaded)
@@ -712,7 +725,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     )
     assert (
         checks["public evidence bundle artifacts"]["detail"]
-        == "manifest, terminal and reviewer README action plan, key findings, review checklist, feedback handoff, feedback runbook, reproduce-local commands, validation commands, limitations doc, aggregate reports, and audit artifact verified"
+        == "manifest, terminal and reviewer README action plan, key findings, review checklist, feedback handoff, feedback runbook, feedback issue template, reproduce-local commands, validation commands, limitations doc, aggregate reports, and audit artifact verified"
     )
     assert (
         "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, metric cards, dashboard quick reads, report and comparison downloads, comparison preview, comparison review path, deltas, operator briefing, next review path, and success target verified"
@@ -1314,6 +1327,7 @@ def test_public_evidence_bundle_writes_privacy_safe_manifest_and_artifacts(
     for key in [
         "bundle_readme",
         "feedback_runbook",
+        "feedback_issue_template",
         "database",
         "sessions_dir",
         "report_markdown",
@@ -1328,6 +1342,7 @@ def test_public_evidence_bundle_writes_privacy_safe_manifest_and_artifacts(
     assert "# Codex Observe Evidence Bundle" in readme
     assert "LIMITATIONS.md" in readme
     assert "PUBLIC_TOUR_FEEDBACK.md" in readme
+    assert ".github/ISSUE_TEMPLATE/public_tour_feedback.yml" in readme
     assert "File feedback safely" in readme
     assert "demo/run-report.md" in readme
     assert "audit/audit.json" in readme
@@ -1379,6 +1394,13 @@ def test_public_evidence_bundle_writes_privacy_safe_manifest_and_artifacts(
     assert "# Public Tour Feedback" in feedback
     assert "Do Not Collect" in feedback
     assert "Private prompts" in feedback
+    feedback_issue_template = (out / artifacts["feedback_issue_template"]).read_text(
+        encoding="utf-8"
+    )
+    assert "Public tour feedback" in feedback_issue_template
+    assert "Do not paste private prompts" in feedback_issue_template
+    assert "Privacy review" in feedback_issue_template
+    assert "docs/PUBLIC_TOUR_FEEDBACK.md" in feedback_issue_template
     limitations = (out / artifacts["limitations_markdown"]).read_text(encoding="utf-8")
     assert "# Limitations and Next Work" in limitations
     assert "approval-gated" in limitations
@@ -1415,6 +1437,10 @@ def test_evidence_bundle_cli_json_and_text_outputs_are_actionable(
         assert payload["artifacts"]["bundle_readme"] == "README.md"
         assert payload["artifacts"]["limitations_markdown"] == "LIMITATIONS.md"
         assert payload["artifacts"]["feedback_runbook"] == "PUBLIC_TOUR_FEEDBACK.md"
+        assert (
+            payload["artifacts"]["feedback_issue_template"]
+            == ".github/ISSUE_TEMPLATE/public_tour_feedback.yml"
+        )
         assert payload["artifacts"]["report_markdown"] == "demo/run-report.md"
         assert payload["review_summary"][0]["label"] == "Run triage"
         assert payload["review_checklist"][0]["label"] == "Confirm the bundle boundary"
@@ -1449,6 +1475,10 @@ def test_evidence_bundle_cli_json_and_text_outputs_are_actionable(
     assert "bundle_readme: README.md" in captured.out
     assert "limitations_markdown: LIMITATIONS.md" in captured.out
     assert "feedback_runbook: PUBLIC_TOUR_FEEDBACK.md" in captured.out
+    assert (
+        "feedback_issue_template: .github/ISSUE_TEMPLATE/public_tour_feedback.yml"
+        in captured.out
+    )
     assert "report_markdown: demo/run-report.md" in captured.out
     assert "Reviewer action plan:" in captured.out
     assert "1. Establish the safe review boundary: LIMITATIONS.md" in captured.out
