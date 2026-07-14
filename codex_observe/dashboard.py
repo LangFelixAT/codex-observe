@@ -35,6 +35,7 @@ from codex_observe.report import (
     comparison_markdown,
     report_json,
     report_markdown,
+    report_next_run_checklist,
     report_success_target,
     report_triage,
     session_summaries,
@@ -336,6 +337,63 @@ def dashboard_css() -> str:
     grid-template-columns: 1fr;
   }
 }
+.co-next-run-checklist {
+  background: color-mix(in srgb, var(--co-accent-2) 6%, var(--co-panel));
+  border: 1px solid var(--co-border);
+  border-radius: 8px;
+  margin: 0 0 1rem 0;
+  padding: 0.9rem 1rem;
+}
+
+.co-next-run-checklist h3 {
+  font-size: 1rem;
+  letter-spacing: 0;
+  line-height: 1.25;
+  margin: 0 0 0.35rem 0;
+}
+
+.co-next-run-checklist p {
+  color: var(--co-muted);
+  font-size: 0.88rem;
+  margin: 0.2rem 0 0.65rem 0;
+}
+
+.co-next-run-items {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
+}
+
+.co-next-run-item {
+  background: var(--co-surface);
+  border: 1px solid var(--co-border);
+  border-radius: 8px;
+  min-width: 0;
+  padding: 0.65rem 0.75rem;
+}
+
+.co-next-run-item strong {
+  color: var(--co-ink);
+  display: block;
+  font-size: 0.82rem;
+  line-height: 1.22;
+  margin-bottom: 0.24rem;
+}
+
+.co-next-run-item span {
+  color: var(--co-muted);
+  display: block;
+  font-size: 0.8rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.co-next-run-item .co-next-run-success {
+  color: var(--co-accent-2);
+  font-weight: 700;
+  margin-top: 0.28rem;
+}
+
 .co-feedback-handoff {
   background: color-mix(in srgb, var(--co-accent) 5%, var(--co-panel));
   border: 1px solid var(--co-border);
@@ -981,6 +1039,40 @@ def review_path_html(success_target: dict[str, object], has_comparison: bool) ->
             "  <p>Turn this run into a validated workflow change without exposing private content.</p>",
             '  <div class="co-review-steps">',
             *[f"    {step}" for step in rendered_steps],
+            "  </div>",
+            "</section>",
+        ]
+    )
+
+
+def next_run_checklist_html(checklist: object) -> str:
+    if not isinstance(checklist, list) or not checklist:
+        return ""
+    items = []
+    for step in checklist[:4]:
+        if not isinstance(step, dict):
+            continue
+        phase = str(step.get("phase") or "Next run step").strip()
+        action = str(step.get("action") or "Review the report.").strip()
+        success = str(step.get("success_check") or "Confirm the result.").strip()
+        if not phase and not action and not success:
+            continue
+        items.append(
+            '<div class="co-next-run-item">'
+            f"<strong>{html.escape(phase or 'Next run step')}</strong>"
+            f"<span>{html.escape(action)}</span>"
+            f'<span class="co-next-run-success">{html.escape(success)}</span>'
+            "</div>"
+        )
+    if not items:
+        return ""
+    return "\n".join(
+        [
+            '<section class="co-next-run-checklist">',
+            "  <h3>Next run checklist</h3>",
+            "  <p>Use this before, during, and after the next run to prove the workflow change.</p>",
+            '  <div class="co-next-run-items">',
+            *[f"    {item}" for item in items],
             "  </div>",
             "</section>",
         ]
@@ -2027,6 +2119,12 @@ def main() -> None:
         )
         st.markdown(triage_card_html(triage), unsafe_allow_html=True)
         report = build_report(str(db), session_id)
+        st.markdown(
+            next_run_checklist_html(
+                report.get("next_run_checklist") or report_next_run_checklist(report)
+            ),
+            unsafe_allow_html=True,
+        )
         st.markdown(
             feedback_handoff_html(report.get("feedback_handoff")),
             unsafe_allow_html=True,

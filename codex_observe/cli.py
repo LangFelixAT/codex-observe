@@ -89,6 +89,15 @@ EXPECTED_VISUAL_REVIEW_PATH = {
     "File safe feedback",
     "PUBLIC_TOUR_FEEDBACK.md",
 }
+EXPECTED_VISUAL_NEXT_RUN_CHECKLIST = {
+    "Next run checklist",
+    "Before next run",
+    "During next run",
+    "After next run",
+    "Set a stop condition for the dominant thread",
+    "largest_thread_share_pct",
+    "Export next-run-report.json",
+}
 
 EXPECTED_VISUAL_FEEDBACK_HANDOFF = {
     "Safe feedback handoff",
@@ -1703,6 +1712,27 @@ def visual_manifest_evidence_failures(root: Path) -> list[str]:
                     f"visual QA manifest {viewport_name} missing next review path evidence: {', '.join(sorted(missing_review_path))}"
                 )
 
+        next_run_checklists = viewport.get("next_run_checklists")
+        if not isinstance(next_run_checklists, list) or not next_run_checklists:
+            failures.append(
+                f"visual QA manifest missing {viewport_name} next run checklist evidence"
+            )
+        else:
+            checklist_text = "\n".join(
+                str(item.get("body") or item.get("label") or "")
+                for item in next_run_checklists
+                if isinstance(item, dict)
+            )
+            missing_checklist = EXPECTED_VISUAL_NEXT_RUN_CHECKLIST - {
+                expected
+                for expected in EXPECTED_VISUAL_NEXT_RUN_CHECKLIST
+                if expected in checklist_text
+            }
+            if missing_checklist:
+                failures.append(
+                    f"visual QA manifest {viewport_name} missing next run checklist evidence: {', '.join(sorted(missing_checklist))}"
+                )
+
         feedback_handoffs = viewport.get("feedback_handoffs")
         if not isinstance(feedback_handoffs, list) or not feedback_handoffs:
             failures.append(
@@ -2173,6 +2203,21 @@ def release_audit_report(
             and ".github/ISSUE_TEMPLATE/public_tour_feedback.yml"
             in report_markdown_text
         )
+        report_checklist = report_payload.get("next_run_checklist")
+        report_has_next_run_checklist = (
+            isinstance(report_checklist, list)
+            and len(report_checklist) >= 3
+            and all(
+                isinstance(step, dict)
+                and step.get("phase")
+                and step.get("action")
+                and step.get("success_check")
+                for step in report_checklist
+            )
+            and "## Next Run Checklist" in report_markdown_text
+            and "Before next run" in report_markdown_text
+            and "After next run" in report_markdown_text
+        )
         report_has_review_path = (
             isinstance(report_review_path, list)
             and len(report_review_path) >= 4
@@ -2220,6 +2265,7 @@ def release_audit_report(
             and report_payload.get("success_target", {}).get("metric")
             and report_payload.get("success_target", {}).get("target_value") is not None
             and report_has_review_path
+            and report_has_next_run_checklist
             and report_has_feedback_handoff
             and report_confirmation_has_success_target
             and any(
@@ -2238,12 +2284,13 @@ def release_audit_report(
             and '"next_commands"' in report_json_text
             and '"next_command_templates"' in report_json_text
             and '"review_path"' in report_json_text
+            and '"next_run_checklist"' in report_json_text
             and '"feedback_handoff"' in report_json_text
         )
         add(
             "aggregate report",
             report_has_cost_profile,
-            f"{out_path}; {json_out_path}; recommended action, cost profile, opportunity stack, terminal success target, terminal next commands, triage, review path, feedback handoff, follow-up commands, structured next action, and schema verified",
+            f"{out_path}; {json_out_path}; recommended action, cost profile, opportunity stack, terminal success target, next-run checklist, terminal next commands, triage, review path, feedback handoff, follow-up commands, structured next action, and schema verified",
         )
         comparison = compare_reports(report, report)
         comparison_out = out_path.with_name("run-comparison.md")
@@ -2635,7 +2682,7 @@ def release_audit_report(
         f"{VISUAL_MANIFEST.as_posix()}; "
         f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['desktop']).as_posix()}; "
         f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['narrow']).as_posix()}; "
-        "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, metric cards, dashboard quick reads, report and comparison downloads, comparison preview, comparison review path, deltas, operator briefing, next review path, safe feedback handoff, and success target verified"
+        "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, metric cards, dashboard quick reads, report and comparison downloads, comparison preview, comparison review path, deltas, operator briefing, next review path, next-run checklist, safe feedback handoff, and success target verified"
         if not visual_manifest_failures
         else "; ".join(visual_manifest_failures[:3]),
     )

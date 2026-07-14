@@ -29,6 +29,7 @@ from codex_observe.dashboard import (
     risk_marker,
     order_conversations_for_review,
     metric_with_share,
+    next_run_checklist_html,
     operator_briefing_html,
     pct_of_total,
     review_path_html,
@@ -661,6 +662,35 @@ def test_feedback_handoff_html_surfaces_safe_boundaries_and_escapes() -> None:
 
 def test_feedback_handoff_html_returns_empty_string_without_contract() -> None:
     assert feedback_handoff_html(None) == ""
+
+
+def test_next_run_checklist_html_renders_and_escapes_steps() -> None:
+    rendered = next_run_checklist_html(
+        [
+            {
+                "phase": "Before <next>",
+                "action": "Set a stop condition",
+                "success_check": "largest_thread_share_pct moves toward <50%",
+            },
+            {
+                "phase": "After next run",
+                "action": "Export next-run-report.json",
+                "success_check": "Compare against baseline",
+            },
+        ]
+    )
+
+    assert 'class="co-next-run-checklist"' in rendered
+    assert "Next run checklist" in rendered
+    assert "Before &lt;next&gt;" in rendered
+    assert "Set a stop condition" in rendered
+    assert "largest_thread_share_pct moves toward &lt;50%" in rendered
+    assert "Before <next>" not in rendered
+
+
+def test_next_run_checklist_html_returns_empty_string_without_steps() -> None:
+    assert next_run_checklist_html(None) == ""
+    assert next_run_checklist_html([]) == ""
 
 
 def test_review_path_html_guides_next_validation_and_escapes_content() -> None:

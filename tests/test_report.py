@@ -96,6 +96,19 @@ def test_build_report_returns_privacy_safe_diagnostics_and_playbook(
         "impact": "Targets the largest total-token driver.",
         "source": "Largest thread drives the run: Worker (Parser) used 33.2k tokens (57.7% of thread totals).",
     }
+    assert [step["phase"] for step in report["next_run_checklist"]] == [
+        "Before next run",
+        "During next run",
+        "After next run",
+    ]
+    assert (
+        report["next_run_checklist"][0]["action"]
+        == "Set a stop condition for the dominant thread"
+    )
+    assert (
+        "largest_thread_share_pct" in report["next_run_checklist"][1]["success_check"]
+    )
+    assert "Export next-run-report.json" in report["next_run_checklist"][2]["action"]
     assert report["next_commands"] == [
         f"codex-observe sessions --db {db} --json",
         f"codex-observe report --db {db} --session-id demo-session-cost-review --format json --out run-report.json",
@@ -153,6 +166,11 @@ def test_report_markdown_and_json_are_shareable_without_private_content(
     assert "Primary driver: Largest thread drives the run" in markdown
     assert "Why: Largest thread used 57.7% of total tokens." in markdown
     assert "## Next Run Success Target" in markdown
+    assert "## Next Run Checklist" in markdown
+    assert "Before next run" in markdown
+    assert "During next run" in markdown
+    assert "After next run" in markdown
+    assert "Set a stop condition for the dominant thread" in markdown
     assert "Metric: largest_thread_share_pct" in markdown
     assert "Target: below 50.0%" in markdown
     assert "## Next Run Playbook" in markdown
@@ -184,6 +202,8 @@ def test_report_markdown_and_json_are_shareable_without_private_content(
     assert payload["next_action_detail"]["target"] == (
         "Set a stop condition for the dominant thread"
     )
+    assert payload["next_run_checklist"][0]["phase"] == "Before next run"
+    assert payload["next_run_checklist"][2]["phase"] == "After next run"
     assert payload["review_path"][2]["label"] == "Export the next run"
     assert payload["review_path"][3]["success_check"] == (
         "Export the next run as report JSON and compare largest_thread_share_pct before adopting the workflow change."

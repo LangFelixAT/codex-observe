@@ -361,6 +361,40 @@ def report_review_path(
     ]
 
 
+def report_next_run_checklist(report: dict[str, Any]) -> list[dict[str, str]]:
+    success_target = report.get("success_target", {})
+    next_action = report.get("next_action_detail", {})
+    playbook = report.get("playbook", []) or []
+    habit = "Apply the highest-impact playbook habit."
+    if playbook and isinstance(playbook[0], dict) and playbook[0].get("Habit"):
+        habit = str(playbook[0]["Habit"])
+    target_metric = str(success_target.get("metric") or "target metric")
+    current = str(success_target.get("current") or "current value")
+    target = str(success_target.get("target") or "target value")
+    action_target = str(next_action.get("target") or habit)
+    verification = str(
+        success_target.get("verification")
+        or "Export the next run as report JSON and compare the target metric."
+    )
+    return [
+        {
+            "phase": "Before next run",
+            "action": habit,
+            "success_check": f"The run plan explicitly targets {action_target}.",
+        },
+        {
+            "phase": "During next run",
+            "action": "Pause or split the run when the same aggregate driver starts to dominate.",
+            "success_check": f"{target_metric} moves from {current} toward {target}.",
+        },
+        {
+            "phase": "After next run",
+            "action": "Export next-run-report.json and compare it with this baseline.",
+            "success_check": verification,
+        },
+    ]
+
+
 def build_report(db_path: str, session_id: str | None = None) -> dict[str, Any]:
     db = Path(db_path).expanduser()
     if not db.exists():
@@ -538,6 +572,7 @@ def build_report(db_path: str, session_id: str | None = None) -> dict[str, Any]:
     report["review_path"] = report_review_path(
         str(db), selected_session, report["success_target"]
     )
+    report["next_run_checklist"] = report_next_run_checklist(report)
     report["feedback_handoff"] = aggregate_feedback_handoff()
     return report
 
@@ -1468,6 +1503,24 @@ def report_markdown(report: dict[str, Any]) -> str:
         )
     if not report["playbook"]:
         lines.extend(["No playbook items available.", ""])
+
+    checklist = report.get("next_run_checklist", [])
+    if checklist:
+        lines.extend(["## Next Run Checklist", ""])
+        for index, step in enumerate(checklist, start=1):
+            if not isinstance(step, dict):
+                continue
+            phase = str(step.get("phase") or f"Step {index}")
+            action = str(step.get("action") or "Review the report.")
+            success_check = str(step.get("success_check") or "Confirm the result.")
+            lines.extend(
+                [
+                    f"{index}. **{phase}**",
+                    f"   Action: {action}",
+                    f"   Success check: {success_check}",
+                    "",
+                ]
+            )
 
     review_path = report.get("review_path", [])
     if review_path:

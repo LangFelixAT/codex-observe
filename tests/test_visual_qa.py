@@ -28,6 +28,7 @@ sidebar_risk_label_failures = visual_qa.sidebar_risk_label_failures
 operator_briefing_failures = visual_qa.operator_briefing_failures
 collect_review_paths = visual_qa.collect_review_paths
 review_path_failures = visual_qa.review_path_failures
+next_run_checklist_failures = visual_qa.next_run_checklist_failures
 feedback_handoff_failures = visual_qa.feedback_handoff_failures
 download_control_failures = visual_qa.download_control_failures
 comparison_preview_failures = visual_qa.comparison_preview_failures
@@ -268,6 +269,34 @@ def test_review_path_failures_require_next_review_path_contract() -> None:
     assert "narrow: next review path card not rendered" in failures
 
 
+def test_next_run_checklist_failures_require_operational_steps() -> None:
+    assert (
+        next_run_checklist_failures(
+            [
+                {
+                    "label": "Next run checklist",
+                    "body": "Next run checklist Before next run During next run After next run Set a stop condition for the dominant thread largest_thread_share_pct Export next-run-report.json",
+                }
+            ],
+            "desktop",
+        )
+        == []
+    )
+
+    failures = next_run_checklist_failures([], "narrow")
+
+    assert "narrow: next run checklist card not rendered" in failures
+
+    failures = next_run_checklist_failures(
+        [{"label": "Next run checklist", "body": "Next run checklist"}], "desktop"
+    )
+
+    assert "desktop: next run checklist missing: Before next run" in failures
+    assert (
+        "desktop: next run checklist missing: Export next-run-report.json" in failures
+    )
+
+
 def test_feedback_handoff_failures_require_safe_feedback_contract() -> None:
     assert (
         feedback_handoff_failures(
@@ -371,6 +400,12 @@ def complete_viewport_results(tmp_path: Path) -> dict[str, dict[str, object]]:
                 {
                     "label": "Next review path",
                     "body": "Next review path Save report JSON Compare workflow change Validate next run File safe feedback PUBLIC_TOUR_FEEDBACK.md",
+                }
+            ],
+            "next_run_checklists": [
+                {
+                    "label": "Next run checklist",
+                    "body": "Next run checklist Before next run During next run After next run Set a stop condition for the dominant thread largest_thread_share_pct Export next-run-report.json",
                 }
             ],
             "feedback_handoffs": [
@@ -520,6 +555,13 @@ def test_visual_manifest_records_review_evidence(tmp_path: Path) -> None:
     assert (
         "Validate next run" in loaded["viewports"]["desktop"]["review_paths"][0]["body"]
     )
+    assert loaded["viewports"]["desktop"]["next_run_checklists"][0]["label"] == (
+        "Next run checklist"
+    )
+    assert (
+        "Before next run"
+        in loaded["viewports"]["desktop"]["next_run_checklists"][0]["body"]
+    )
     assert loaded["viewports"]["desktop"]["feedback_handoffs"][0]["label"] == (
         "Safe feedback handoff"
     )
@@ -582,6 +624,7 @@ def test_visual_manifest_failures_rejects_incomplete_evidence(tmp_path: Path) ->
                 "download_controls": ["Download report MD"],
                 "operator_briefings": [],
                 "review_paths": [],
+                "next_run_checklists": [],
                 "feedback_handoffs": [],
                 "comparison_previews": [],
                 "comparison_review_paths": [],
@@ -610,6 +653,7 @@ def test_visual_manifest_failures_rejects_incomplete_evidence(tmp_path: Path) ->
     assert "manifest desktop success target card not rendered" in failures
     assert "manifest desktop operator briefing card not rendered" in failures
     assert "manifest desktop next review path card not rendered" in failures
+    assert "manifest desktop next run checklist card not rendered" in failures
     assert "manifest desktop safe feedback handoff card not rendered" in failures
     assert "manifest desktop comparison preview card not rendered" in failures
     assert "manifest desktop comparison review path not rendered" in failures
