@@ -46,5 +46,7 @@ The visual QA manifest records desktop and narrow screenshots, exercised tabs, s
 The completed `.github/backlog/009-public-evidence-bundle.md` draft was implemented locally as `codex-observe evidence-bundle` and deleted after closeout. There is currently no publishable local issue draft; attaching generated artifacts externally still requires explicit human approval.
 ## Private Real-Log Checkpoint
 
-The real-log parser feedback loop has now been exercised against a human-approved private input path. Raw logs, the local real-history database, reports, and redacted fixture candidates remain under ignored `.artifacts/` paths; do not commit raw logs or unreviewed redacted output.
+The real-log parser feedback loop has now been exercised against the human-approved private input path, specifically the local Codex sessions path (`%USERPROFILE%\.codex\sessions` on Windows). Use that real path for private parser, report, and dashboard validation when actual local coverage is needed, and keep synthetic demo data for public evidence bundles, CI, screenshots intended for sharing, and issue reproduction.
+
+Raw logs, local real-history databases, aggregate reports from private logs, and redacted fixture candidates must remain under ignored `.artifacts/` paths; do not commit raw logs, private aggregate databases, private aggregate metrics, private reports, or unreviewed redacted output.
 
