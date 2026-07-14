@@ -205,6 +205,7 @@ RELEASE_REQUIRED_COMMANDS = [
     "ruff check",
     "ruff format --check",
     "pytest -q",
+    "codex-observe paths --json",
     "python scripts/clean_install_smoke.py --extra dev",
     "codex-observe demo --sessions .artifacts/demo/sessions --keep-sessions --json",
     "codex-observe ingest .artifacts/demo/sessions --db .artifacts/demo/ingest-contract.sqlite --json",
@@ -2525,6 +2526,46 @@ def release_audit_report(
     except OSError as exc:
         add("CLI version command", False, str(exc))
 
+    paths_payload_check = paths_payload(
+        db_path=actual_db_path, sessions_path=sessions_path
+    )
+    paths_lines_text = "\n".join(
+        paths_lines(db_path=actual_db_path, sessions_path=sessions_path)
+    )
+    paths_commands = paths_payload_check.get("next_commands", [])
+    paths_review_path = paths_payload_check.get("review_path", [])
+    paths_ok = (
+        paths_payload_check.get("schema_version") == PATHS_SCHEMA_VERSION
+        and paths_payload_check.get("sessions_path")
+        == str(Path(sessions_path).expanduser())
+        and paths_payload_check.get("sessions_path_exists") is True
+        and paths_payload_check.get("database")
+        == str(Path(actual_db_path).expanduser())
+        and paths_payload_check.get("database_exists") is True
+        and paths_payload_check.get("privacy", {}).get("raw_content_included") is False
+        and paths_payload_check.get("privacy", {}).get("scans_sessions") is False
+        and paths_payload_check.get("privacy", {}).get("review_required_before_sharing")
+        is True
+        and isinstance(paths_commands, list)
+        and any("--newest-files 25" in str(command) for command in paths_commands)
+        and any("codex-observe doctor" in str(command) for command in paths_commands)
+        and isinstance(paths_review_path, list)
+        and any(
+            "Sample newest private logs" == str(step.get("label"))
+            for step in paths_review_path
+            if isinstance(step, dict)
+        )
+        and "Privacy: this command does not scan logs" in paths_lines_text
+        and "Next commands:" in paths_lines_text
+    )
+    add(
+        "paths handoff",
+        paths_ok,
+        "schema, existence checks, privacy no-scan metadata, sampled ingest command, review path, and text handoff verified"
+        if paths_ok
+        else "paths schema, existence checks, privacy no-scan metadata, sampled ingest command, review path, or text handoff missing",
+    )
+
     try:
         report_help = subprocess.run(
             [sys.executable, "-m", "codex_observe.cli", "report", "--help"],
@@ -2574,13 +2615,14 @@ def release_audit_report(
             for cmd in [
                 "codex-observe tour",
                 "codex-observe tour --json",
+                "codex-observe paths",
                 "codex-observe doctor",
                 "codex-observe sessions",
                 "codex-observe report",
                 "codex-observe compare",
             ]
         ),
-        "tour/doctor/sessions/report/compare",
+        "paths/tour/doctor/sessions/report/compare",
     )
 
     tour_payload = public_tour_payload(actual_db_path)
@@ -4426,7 +4468,7 @@ def main(argv: list[str] | None = None) -> int:
               codex-observe scan-and-serve ~/.codex/sessions
               codex-observe report --db ~/.codex-observe/codex_observe.sqlite --out run-report.md
 
-            Privacy: doctor, sessions, report, compare, and audit use aggregate-only outputs; dashboard screenshots and copied rows may still reveal private local content.
+            Privacy: paths, doctor, sessions, report, compare, and audit use aggregate-only outputs; dashboard screenshots and copied rows may still reveal private local content.
             """
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,

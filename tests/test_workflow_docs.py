@@ -153,9 +153,11 @@ def test_current_state_handoff_covers_gates_evidence_and_real_log_checkpoint() -
         "ruff check",
         "ruff format --check",
         "pytest -q",
+        "codex-observe paths --json",
         "codex-observe audit --json",
         "aggregate triage assessment",
         "required_commands",
+        "paths handoff evidence",
         "triage",
         "plain `codex-observe audit` prints",
         "python scripts/visual_qa.py",
@@ -260,6 +262,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         ".github/ISSUE_TEMPLATE/public_tour_feedback.yml",
         "docs/TRACKING.md",
         "codex-observe evidence-bundle --out .artifacts/public-evidence",
+        "codex-observe paths --json",
         "codex-observe audit --json",
         "events.payload_json",
         "explicit approval",
@@ -306,6 +309,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         "comparison quick-read, review-path, metric delta cards including usage snapshots, safe feedback handoff, and next validation command cards plus report and comparison download controls",
         "aggregate triage assessment",
         "required_commands",
+        "paths handoff evidence",
         ".artifacts/visual/visual-qa-manifest.json",
         "codex-observe evidence-bundle --out .artifacts/public-evidence",
         "reviewer README",
@@ -391,6 +395,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
     assert "git status --short --branch" in release
     for required_distribution_item in [
         "codex-observe evidence-bundle --out .artifacts/public-evidence",
+        "codex-observe paths --json",
         "codex-observe audit --json",
         "run-report.json",
         "run-comparison.md",
@@ -412,6 +417,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         "private aggregate artifacts are reviewed before sharing",
         "release audit validation",
         "PR checklist guidance",
+        "codex-observe paths --json",
     ]:
         assert required_changelog_item in changelog
     assert "\\n" not in contributing

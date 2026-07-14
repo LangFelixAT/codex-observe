@@ -20,12 +20,13 @@ The current core loop is printed by `codex-observe tour` with a top-level review
 
 ## Quality Gates
 
-Before treating a change as release-ready, run these commands. Generate `.artifacts/public-evidence` before the final audit so `codex-observe audit --json` can validate the public evidence bundle terminal handoff, README, manifest validation commands, `LIMITATIONS.md`, reports, and audit artifact. The audit reports `schema_version`, lists required commands in `required_commands` for automation, and reports actionable failures in `failed_checks`; plain `codex-observe audit` prints the same required command list for humans and a `Failed checks` section when a gate fails:
+Before treating a change as release-ready, run these commands. The `codex-observe paths --json` gate verifies the resolved local path handoff without scanning logs and provides paths handoff evidence. Generate `.artifacts/public-evidence` before the final audit so `codex-observe audit --json` can validate the public evidence bundle terminal handoff, README, manifest validation commands, `LIMITATIONS.md`, reports, and audit artifact. The audit reports `schema_version`, lists required commands in `required_commands` for automation, and reports actionable failures in `failed_checks`; plain `codex-observe audit` prints the same required command list for humans and a `Failed checks` section when a gate fails:
 
 ```bash
 ruff check
 ruff format --check
 pytest -q
+codex-observe paths --json
 python scripts/clean_install_smoke.py --extra dev
 codex-observe demo --sessions .artifacts/demo/sessions --keep-sessions --json
 codex-observe ingest .artifacts/demo/sessions --db .artifacts/demo/ingest-contract.sqlite --json

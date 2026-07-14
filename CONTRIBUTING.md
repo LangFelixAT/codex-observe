@@ -50,12 +50,14 @@ Run lint, formatting, and the regression suite:
 ```bash
 ruff check
 ruff format --check
+codex-observe paths --json
 pytest -q
 ```
 
-For CLI/report/privacy-facing changes, also exercise the demo commands:
+For CLI/report/privacy-facing changes, also exercise the privacy-safe path handoff and demo commands:
 
 ```bash
+codex-observe paths --json
 codex-observe demo
 codex-observe demo --sessions .artifacts/demo/sessions --keep-sessions --json
 codex-observe ingest .artifacts/demo/sessions --db .artifacts/demo/ingest-contract.sqlite --json
@@ -92,6 +94,7 @@ Release readiness is tracked in `docs/RELEASE.md`. Before calling a release cand
 - `ruff check`
 - `ruff format --check`
 - `pytest -q`
+- `codex-observe paths --json`
 - `python scripts/visual_qa.py`
 - `python scripts/visual_qa.py --verify-manifest .artifacts/visual/visual-qa-manifest.json`
 - `codex-observe evidence-bundle --out .artifacts/public-evidence`

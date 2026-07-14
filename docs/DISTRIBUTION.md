@@ -73,6 +73,7 @@ A source-distribution release candidate is ready when:
 - `ruff check` passes.
 - `ruff format --check` passes.
 - `pytest -q` passes.
+- `codex-observe paths --json` verifies the local path handoff without scanning private logs.
 - `codex-observe demo` creates the synthetic database.
 - `codex-observe doctor --db .artifacts/demo/codex_observe_demo.sqlite --json` returns `status: ok`.
 - `codex-observe sessions --db .artifacts/demo/codex_observe_demo.sqlite --json` lists aggregate-only session summaries.
