@@ -2042,8 +2042,17 @@ def release_audit_report(
         report_written_text = "\n".join(report_written_lines(out_path, report))
         report_confirmation_has_success_target = (
             "Success target:" in report_written_text
+            and "Next commands:" in report_written_text
             and str(report_payload.get("success_target", {}).get("metric"))
             in report_written_text
+            and all(
+                str(command) in report_written_text
+                for command in report_payload.get("next_commands", [])
+            )
+            and all(
+                str(command) in report_written_text
+                for command in report_payload.get("next_command_templates", [])
+            )
         )
         report_review_path = report_payload.get("review_path")
         report_has_review_path = (
@@ -2114,7 +2123,7 @@ def release_audit_report(
         add(
             "aggregate report",
             report_has_cost_profile,
-            f"{out_path}; {json_out_path}; recommended action, cost profile, opportunity stack, terminal success target, triage, review path, follow-up commands, structured next action, and schema verified",
+            f"{out_path}; {json_out_path}; recommended action, cost profile, opportunity stack, terminal success target, terminal next commands, triage, review path, follow-up commands, structured next action, and schema verified",
         )
         comparison = compare_reports(report, report)
         comparison_out = out_path.with_name("run-comparison.md")
@@ -2129,8 +2138,13 @@ def release_audit_report(
         )
         comparison_confirmation_has_validation_command = (
             "Next validation command:" in comparison_written_text
+            and "Next commands:" in comparison_written_text
             and "codex-observe report --db <db> --session-id <next-session-id>"
             in comparison_written_text
+            and all(
+                str(command) in comparison_written_text
+                for command in comparison_payload.get("next_command_templates", [])
+            )
         )
         comparison_review_path = comparison_payload.get("review_path")
         comparison_has_review_path = (
@@ -2199,7 +2213,7 @@ def release_audit_report(
         add(
             "aggregate comparison",
             comparison_has_quick_read,
-            f"{comparison_out}; {comparison_json_out}; quick read, recommended action, triage risk, opportunity change, terminal validation command, structured recommendation, review path, follow-up commands, and schema verified",
+            f"{comparison_out}; {comparison_json_out}; quick read, recommended action, triage risk, opportunity change, terminal validation command, terminal next commands, structured recommendation, review path, follow-up commands, and schema verified",
         )
     except (FileNotFoundError, ValueError, KeyError) as exc:
         add("aggregate report", False, str(exc))
@@ -3238,6 +3252,8 @@ def comparison_written_lines(path: Path, comparison: dict) -> list[str]:
     templates = comparison.get("next_command_templates", [])
     if isinstance(templates, list) and templates:
         lines.append(f"Next validation command: {templates[0]}")
+        lines.append("Next commands:")
+        lines.extend(f"- {command}" for command in templates)
     return lines
 
 
@@ -3296,6 +3312,16 @@ def report_written_lines(path: Path, report: dict) -> list[str]:
         lines.append(
             f"Success target: {success_target['metric']}: {current} -> {target}"
         )
+    commands = report.get("next_commands", [])
+    templates = report.get("next_command_templates", [])
+    next_commands = []
+    if isinstance(commands, list):
+        next_commands.extend(str(command) for command in commands)
+    if isinstance(templates, list):
+        next_commands.extend(str(command) for command in templates)
+    if next_commands:
+        lines.append("Next commands:")
+        lines.extend(f"- {command}" for command in next_commands)
     return lines
 
 

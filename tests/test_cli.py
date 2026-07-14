@@ -1123,6 +1123,14 @@ def test_report_and_comparison_written_lines_include_actionable_drivers(
                 "current": "57.7%",
                 "target": "below 50.0%",
             },
+            "next_commands": [
+                "codex-observe sessions --db demo.sqlite --json",
+                "codex-observe report --db demo.sqlite --session-id session-1 --format json --out run-report.json",
+            ],
+            "next_command_templates": [
+                "codex-observe report --db demo.sqlite --session-id <next-session-id> --format json --out next-run-report.json",
+                "codex-observe compare --before-report run-report.json --after-report next-run-report.json --out run-comparison.md",
+            ],
         },
     )
     comparison_lines = cli.comparison_written_lines(
@@ -1148,11 +1156,22 @@ def test_report_and_comparison_written_lines_include_actionable_drivers(
     assert (
         "Success target: largest_thread_share_pct: 57.7% -> below 50.0%" in report_lines
     )
+    assert "Next commands:" in report_lines
+    assert "- codex-observe sessions --db demo.sqlite --json" in report_lines
+    assert (
+        "- codex-observe compare --before-report run-report.json --after-report next-run-report.json --out run-comparison.md"
+        in report_lines
+    )
     assert "Triage risk: high -> moderate (improved)" in comparison_lines
     assert "Opportunity change: Largest thread improved." in comparison_lines
     assert "Next step: Keep the change." in comparison_lines
     assert (
         "Next validation command: codex-observe report --db <db> --session-id <next-session-id> --format json --out next-run-report.json"
+        in comparison_lines
+    )
+    assert "Next commands:" in comparison_lines
+    assert (
+        "- codex-observe report --db <db> --session-id <next-session-id> --format json --out next-run-report.json"
         in comparison_lines
     )
 

@@ -15,6 +15,7 @@ The project follows semantic versioning once release distribution is decided.
 - Added terminal next-command guidance to session listings and release audit coverage.
 - Added terminal next-command guidance to demo and ingest success output plus release audit coverage.
 - Added plain terminal handoff commands to the public tour and release audit coverage.
+- Added terminal next-command blocks to report and comparison write confirmations plus release audit coverage.
 - Added a top-level public-tour review path so text and JSON tour output expose the end-to-end evaluation checklist.
 - Added a structured session review path to sessions JSON and plain-text listings so terminal users can move from diagnosis to report, comparison, next-run validation, and safe feedback.
 - Added a dashboard next-review path card with visual QA evidence so users can move from diagnosis to validation without leaving the Overview.
