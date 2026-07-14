@@ -455,6 +455,9 @@ def test_issue_template_failures_require_evidence_privacy_and_limits(
         "Public tour feedback\n"
         "codex-observe tour\n"
         "codex-observe evidence-bundle --out .artifacts/public-evidence\n"
+        "codex-observe doctor --db .artifacts/demo/codex_observe_demo.sqlite\n"
+        "codex-observe sessions --db .artifacts/demo/codex_observe_demo.sqlite\n"
+        "report/comparison terminal `Next commands` blocks\n"
         "docs/PUBLIC_TOUR_FEEDBACK.md\n"
         "docs/LIMITATIONS.md\n"
         "Do not paste private prompts\n",

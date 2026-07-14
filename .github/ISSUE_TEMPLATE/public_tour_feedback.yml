@@ -1,4 +1,4 @@
-﻿name: Public tour feedback
+name: Public tour feedback
 description: Report privacy-safe feedback from trying the public tour or reviewer evidence bundle
 title: "[Feedback] "
 labels: ["type: feedback", "area: onboarding", "status: needs-triage"]
@@ -27,10 +27,13 @@ body:
       options:
         - label: `codex-observe tour`
         - label: `codex-observe demo --serve --host 127.0.0.1 --port 8501`
+        - label: `codex-observe doctor --db .artifacts/demo/codex_observe_demo.sqlite`
         - label: `codex-observe doctor --db .artifacts/demo/codex_observe_demo.sqlite --json`
+        - label: `codex-observe sessions --db .artifacts/demo/codex_observe_demo.sqlite`
         - label: `codex-observe sessions --db .artifacts/demo/codex_observe_demo.sqlite --json`
         - label: `codex-observe report --db .artifacts/demo/codex_observe_demo.sqlite --out .artifacts/demo/run-report.md`
         - label: `codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --out .artifacts/demo/run-comparison.md`
+        - label: report/comparison terminal `Next commands` blocks
         - label: `python scripts/visual_qa.py --verify-manifest .artifacts/visual/visual-qa-manifest.json`
         - label: `codex-observe evidence-bundle --out .artifacts/public-evidence`
   - type: textarea
