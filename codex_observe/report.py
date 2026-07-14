@@ -112,6 +112,38 @@ def session_summaries(db_path: str) -> list[dict[str, Any]]:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             """
+            WITH thread_rollups AS (
+              SELECT
+                session_id,
+                SUM(tool_call_count) AS tool_calls,
+                MAX(final_total_tokens) AS largest_thread_tokens
+              FROM threads
+              GROUP BY session_id
+            ),
+            tool_rollups AS (
+              SELECT
+                t.session_id,
+                MAX(tc.output_chars) AS largest_tool_output_chars
+              FROM threads t
+              JOIN tool_calls tc ON tc.thread_id = t.thread_id
+              GROUP BY t.session_id
+            ),
+            repeated_blocks AS (
+              SELECT
+                t.session_id,
+                SUM(pb.approx_tokens) AS approx_tokens_replayed
+              FROM threads t
+              JOIN prompt_blocks pb ON pb.thread_id = t.thread_id
+              GROUP BY t.session_id, pb.label, pb.block_hash
+              HAVING COUNT(*) > 1
+            ),
+            prompt_rollups AS (
+              SELECT
+                session_id,
+                SUM(approx_tokens_replayed) AS repeated_prompt_tokens
+              FROM repeated_blocks
+              GROUP BY session_id
+            )
             SELECT
               c.session_id,
               c.first_seen,
@@ -120,36 +152,14 @@ def session_summaries(db_path: str) -> list[dict[str, Any]]:
               c.total_tokens,
               c.total_uncached_input_tokens,
               c.total_cached_input_tokens,
-              COALESCE((
-                SELECT SUM(t.tool_call_count)
-                FROM threads t
-                WHERE t.session_id = c.session_id
-              ), 0) AS tool_calls,
-              COALESCE((
-                SELECT MAX(t.final_total_tokens)
-                FROM threads t
-                WHERE t.session_id = c.session_id
-              ), 0) AS largest_thread_tokens,
-              COALESCE((
-                SELECT MAX(tc.output_chars)
-                FROM tool_calls tc
-                WHERE tc.thread_id IN (
-                  SELECT t.thread_id FROM threads t WHERE t.session_id = c.session_id
-                )
-              ), 0) AS largest_tool_output_chars,
-              COALESCE((
-                SELECT SUM(replayed.approx_tokens_replayed)
-                FROM (
-                  SELECT SUM(pb.approx_tokens) AS approx_tokens_replayed
-                  FROM prompt_blocks pb
-                  WHERE pb.thread_id IN (
-                    SELECT t.thread_id FROM threads t WHERE t.session_id = c.session_id
-                  )
-                  GROUP BY pb.label, pb.block_hash
-                  HAVING COUNT(*) > 1
-                ) replayed
-              ), 0) AS repeated_prompt_tokens
+              COALESCE(tr.tool_calls, 0) AS tool_calls,
+              COALESCE(tr.largest_thread_tokens, 0) AS largest_thread_tokens,
+              COALESCE(tor.largest_tool_output_chars, 0) AS largest_tool_output_chars,
+              COALESCE(pr.repeated_prompt_tokens, 0) AS repeated_prompt_tokens
             FROM conversations c
+            LEFT JOIN thread_rollups tr ON tr.session_id = c.session_id
+            LEFT JOIN tool_rollups tor ON tor.session_id = c.session_id
+            LEFT JOIN prompt_rollups pr ON pr.session_id = c.session_id
             ORDER BY c.last_seen DESC
             """
         ).fetchall()
@@ -245,7 +255,7 @@ def session_review_path_lines(db_path: str, session_id: str) -> list[str]:
     ]
 
 
-def session_summary_lines(db_path: str) -> list[str]:
+def session_summary_lines(db_path: str, limit: int | None = 50) -> list[str]:
     summaries = session_summaries(db_path)
     if not summaries:
         next_commands = [
@@ -261,7 +271,9 @@ def session_summary_lines(db_path: str) -> list[str]:
     lines = [
         "Session ID | Last seen | Risk | Threads | Tools | Tool out | Tokens | Uncached"
     ]
-    for row in summaries:
+    display_limit = len(summaries) if limit is None else max(1, int(limit))
+    displayed = summaries[:display_limit]
+    for row in displayed:
         lines.append(
             " | ".join(
                 [
@@ -276,6 +288,8 @@ def session_summary_lines(db_path: str) -> list[str]:
                 ]
             )
         )
+    if len(displayed) < len(summaries):
+        lines.append(f"Showing {len(displayed)} of {len(summaries)} sessions.")
     recommended = summaries[0]
     recommended_session_id = str(recommended["session_id"])
     lines.extend(session_recommended_action_lines(recommended))

@@ -704,7 +704,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     assert report.with_name("run-comparison.json").exists()
     assert (
         checks["session listing"]["detail"]
-        == "2 sessions; triage risk, status, schema, text recommended action, session table tool-output column, tool-output driver, structured driver summary, recommendation detail, review path, text next commands, and next commands verified"
+        == "2 sessions; triage risk, status, schema, limit metadata, text recommended action, session table tool-output column, tool-output driver, structured driver summary, recommendation detail, review path, text next commands, and next commands verified"
     )
     assert checks["database doctor"]["detail"] == (
         "ok; schema, text next commands, next commands, and review path verified"
@@ -868,9 +868,33 @@ def test_sessions_missing_json_payload_is_actionable_and_schema_versioned() -> N
     assert payload["recommended_session"] is None
     assert payload["recommendation_detail"] is None
     assert payload["sessions"] == []
+    assert payload["total_sessions"] == 0
+    assert payload["returned_sessions"] == 0
+    assert payload["truncated"] is False
+    assert payload["limit"] == cli.DEFAULT_SESSIONS_LIMIT
     assert "codex-observe demo --db missing.sqlite" in payload["next_commands"]
     assert payload["review_path"][0]["label"] == "Create demo data"
     assert payload["review_path"][1]["label"] == "Ingest local logs"
+
+
+def test_sessions_json_payload_limits_rows_without_changing_recommendation(
+    tmp_path: Path,
+) -> None:
+    db = tmp_path / "demo.sqlite"
+    cli.create_demo_database(str(db), str(tmp_path / "sessions"))
+
+    payload = cli.sessions_json_payload(str(db), limit=1)
+
+    assert payload["schema_version"] == cli.SESSIONS_SCHEMA_VERSION
+    assert payload["status"] == "ok"
+    assert payload["total_sessions"] == 2
+    assert payload["returned_sessions"] == 1
+    assert payload["truncated"] is True
+    assert payload["limit"] == 1
+    assert len(payload["sessions"]) == 1
+    assert payload["sessions"][0]["session_id"] == "demo-session-cost-review"
+    assert payload["recommended_session"]["session_id"] == "demo-session-cost-review"
+    assert payload["recommendation_detail"]["target"] == "demo-session-cost-review"
 
 
 def test_demo_payload_and_text_include_review_path() -> None:

@@ -365,6 +365,11 @@ def test_session_summaries_are_aggregate_only(tmp_path: Path) -> None:
         "demo-session-focused-followup | 2026-01-01T12:35:00Z | low | 3 | 1 | 880 | 8.4k | 1.2k"
         in lines
     )
+    limited_lines = "\n".join(session_summary_lines(str(db), limit=1))
+    assert "demo-session-cost-review | 2026-01-01T12:23:00Z" in limited_lines
+    assert "demo-session-focused-followup | 2026-01-01T12:35:00Z" not in limited_lines
+    assert "Showing 1 of 2 sessions." in limited_lines
+    assert "Export report for session: demo-session-cost-review" in limited_lines
     assert "Recommended action:" in lines
     assert "Export report for session: demo-session-cost-review" in lines
     assert "Why: highest aggregate triage risk; latest run breaks ties" in lines

@@ -147,6 +147,7 @@ EXPECTED_VISUAL_EMPTY_STATE_COMMAND_SNIPPETS = {
     "codex-observe doctor --db",
 }
 SESSIONS_SCHEMA_VERSION = "codex-observe.sessions.v1"
+DEFAULT_SESSIONS_LIMIT = 50
 DOCTOR_SCHEMA_VERSION = "codex-observe.doctor.v1"
 AUDIT_SCHEMA_VERSION = "codex-observe.audit.v1"
 REPORT_FAILURE_SCHEMA_VERSION = "codex-observe.report-failure.v1"
@@ -2039,6 +2040,12 @@ def release_audit_report(
             sessions_payload.get("schema_version") == SESSIONS_SCHEMA_VERSION
         )
         sessions_has_status = sessions_payload.get("status") == "ok"
+        sessions_has_limit_metadata = (
+            sessions_payload.get("total_sessions") == 2
+            and sessions_payload.get("returned_sessions") == 2
+            and sessions_payload.get("truncated") is False
+            and sessions_payload.get("limit") == DEFAULT_SESSIONS_LIMIT
+        )
         sessions_has_recommendation = bool(sessions_payload.get("recommended_session"))
         recommended_session = sessions_payload.get("recommended_session")
         recommended_session_id = (
@@ -2104,6 +2111,7 @@ def release_audit_report(
             and sessions_has_schema
             and sessions_has_status
             and sessions_has_recommendation
+            and sessions_has_limit_metadata
             and sessions_has_next_commands
             and sessions_has_recommendation_detail
             and sessions_has_review_path
@@ -2112,9 +2120,9 @@ def release_audit_report(
         add(
             "session listing",
             session_listing_ok,
-            f"{len(sessions)} sessions; triage risk, status, schema, text recommended action, session table tool-output column, tool-output driver, structured driver summary, recommendation detail, review path, text next commands, and next commands verified"
+            f"{len(sessions)} sessions; triage risk, status, schema, limit metadata, text recommended action, session table tool-output column, tool-output driver, structured driver summary, recommendation detail, review path, text next commands, and next commands verified"
             if session_listing_ok
-            else "session listing missing aggregate triage risk, status, schema_version, text recommended action, recommended_session, recommendation_detail, review_path, text next commands, session table tool-output column, tool-output driver, structured driver summary, or next_commands",
+            else "session listing missing aggregate triage risk, status, schema_version, limit metadata, text recommended action, recommended_session, recommendation_detail, review_path, text next commands, session table tool-output column, tool-output driver, structured driver summary, or next_commands",
         )
     except FileNotFoundError as exc:
         sessions = []
@@ -2701,6 +2709,10 @@ def sessions_missing_json_payload(db_path: str) -> dict[str, object]:
         "database": db_path,
         "status": "missing",
         "sessions": [],
+        "total_sessions": 0,
+        "returned_sessions": 0,
+        "truncated": False,
+        "limit": DEFAULT_SESSIONS_LIMIT,
         "recommended_session": None,
         "recommendation_detail": None,
         "review_path": sessions_review_path(db_path),
@@ -2804,13 +2816,22 @@ def sessions_review_path(
     ]
 
 
-def sessions_json_payload(db_path: str) -> dict[str, object]:
+def sessions_json_payload(
+    db_path: str, limit: int | None = DEFAULT_SESSIONS_LIMIT
+) -> dict[str, object]:
     summaries = session_summaries(db_path)
+    effective_limit = None if limit is None else max(1, int(limit))
+    display_limit = len(summaries) if effective_limit is None else effective_limit
+    displayed = summaries[:display_limit]
     payload: dict[str, object] = {
         "schema_version": SESSIONS_SCHEMA_VERSION,
         "database": db_path,
         "status": "ok" if summaries else "empty",
-        "sessions": summaries,
+        "sessions": displayed,
+        "total_sessions": len(summaries),
+        "returned_sessions": len(displayed),
+        "truncated": len(displayed) < len(summaries),
+        "limit": effective_limit,
     }
     if summaries:
         recommended = summaries[0]
@@ -4321,6 +4342,12 @@ def main(argv: list[str] | None = None) -> int:
     p_sessions.add_argument(
         "--json", action="store_true", help="Emit aggregate-only JSON for automation"
     )
+    p_sessions.add_argument(
+        "--limit",
+        type=int,
+        default=DEFAULT_SESSIONS_LIMIT,
+        help="Maximum sessions to print or return; default 50",
+    )
 
     p_compare = sub.add_parser(
         "compare",
@@ -4435,10 +4462,14 @@ def main(argv: list[str] | None = None) -> int:
         try:
             if args.json:
                 print(
-                    json.dumps(sessions_json_payload(args.db), indent=2, sort_keys=True)
+                    json.dumps(
+                        sessions_json_payload(args.db, limit=args.limit),
+                        indent=2,
+                        sort_keys=True,
+                    )
                 )
             else:
-                print("\n".join(session_summary_lines(args.db)))
+                print("\n".join(session_summary_lines(args.db, limit=args.limit)))
         except FileNotFoundError:
             if args.json:
                 print(
