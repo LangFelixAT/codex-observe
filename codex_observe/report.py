@@ -620,13 +620,20 @@ def _safe_int(value: Any) -> int:
 
 
 def _metric_delta(
-    before: dict[str, Any], after: dict[str, Any], key: str, label: str
+    before: dict[str, Any],
+    after: dict[str, Any],
+    key: str,
+    label: str,
+    *,
+    direction_mode: str = "lower_is_better",
 ) -> dict[str, Any]:
     before_value = _safe_int(before.get(key))
     after_value = _safe_int(after.get(key))
     delta = after_value - before_value
     delta_pct = round(delta / before_value * 100, 1) if before_value else None
-    if delta < 0:
+    if direction_mode == "neutral":
+        direction = "changed" if delta else "unchanged"
+    elif delta < 0:
         direction = "improved"
     elif delta > 0:
         direction = "regressed"
@@ -1183,6 +1190,13 @@ def compare_reports(
     after_summary = after_report.get("summary", {})
     metrics = [
         _metric_delta(before_summary, after_summary, "total_tokens", "Total tokens"),
+        _metric_delta(
+            before_summary,
+            after_summary,
+            "usage_snapshots",
+            "Usage snapshots",
+            direction_mode="neutral",
+        ),
         _metric_delta(
             before_summary,
             after_summary,

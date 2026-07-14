@@ -53,7 +53,7 @@ Goal: let users check whether a workflow change actually reduced waste.
 Acceptance criteria:
 
 - [x] A CLI command compares two privacy-safe report JSON files or two session IDs from one database.
-- [x] The comparison highlights before/after values, absolute and percentage deltas for total tokens, uncached input, largest-thread tokens, repeated-prompt tokens, largest-tool-output chars, tool calls, compactions, opportunity-change movement, and diagnostic changes.
+- [x] The comparison highlights before/after values, absolute and percentage deltas for total tokens, usage snapshots, uncached input, largest-thread tokens, repeated-prompt tokens, largest-tool-output chars, tool calls, compactions, opportunity-change movement, and diagnostic changes.
 - [x] Markdown and JSON outputs exclude prompt text, tool commands, tool output, and raw event payloads.
 - [x] README copy links the next-run playbook/report workflow to the comparison workflow.
 - [x] Tests cover improved, regressed, report-file, session-ID, and missing-input comparisons.

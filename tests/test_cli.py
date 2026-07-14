@@ -768,6 +768,8 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     )
     assert checks["aggregate report"]["ok"] is True
     assert "success target" in checks["aggregate report"]["detail"]
+    assert checks["aggregate comparison"]["ok"] is True
+    assert "usage-snapshot deltas" in checks["aggregate comparison"]["detail"]
     assert checks["visual QA manifest evidence"]["ok"] is True
     assert checks["CI reviewer evidence bundle"]["ok"] is True
     assert checks["public evidence bundle artifacts"]["ok"] is True

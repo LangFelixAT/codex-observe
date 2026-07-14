@@ -6,6 +6,7 @@ The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
 
+- Added neutral usage-snapshot deltas to aggregate report comparisons.
 - Added usage snapshot counts to aggregate report summaries, headlines, and Markdown exports.
 - Added dashboard sidebar usage-snapshot context with visual QA and release audit evidence.
 - Added aggregate usage snapshot counts to session listings and JSON so long real-history scans show how many observations drove token totals.

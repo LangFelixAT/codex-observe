@@ -445,6 +445,7 @@ def test_compare_reports_marks_improved_metrics_and_privacy_safe_output(
     after = json.loads(json.dumps(before))
     after["session"]["session_id"] = "after-run"
     after["summary"]["total_tokens"] -= 10_000
+    after["summary"]["usage_snapshots"] += 2
     after["summary"]["uncached_input_tokens"] -= 5_000
     after["summary"]["largest_thread_tokens"] -= 8_000
     after["summary"]["repeated_prompt_tokens"] -= 2_000
@@ -496,7 +497,22 @@ def test_compare_reports_marks_improved_metrics_and_privacy_safe_output(
         "delta_pct": -17.4,
         "direction": "improved",
     }
+    snapshot_metric = next(
+        metric
+        for metric in comparison["metrics"]
+        if metric["label"] == "Usage snapshots"
+    )
+    assert snapshot_metric == {
+        "metric": "usage_snapshots",
+        "label": "Usage snapshots",
+        "before": 6,
+        "after": 8,
+        "delta": 2,
+        "delta_pct": 33.3,
+        "direction": "changed",
+    }
     labels = {metric["label"] for metric in comparison["metrics"]}
+    assert "Usage snapshots" in labels
     assert "Repeated prompt tokens" in labels
     assert "Largest tool output chars" in labels
     assert "# Codex Observe Run Comparison" in markdown
@@ -527,6 +543,7 @@ def test_compare_reports_marks_improved_metrics_and_privacy_safe_output(
     )
     assert "| Metric | Before | After | Delta | % change | Direction |" in markdown
     assert "| Total tokens | 57.5k | 47.5k | -10.0k | -17.4% | improved |" in markdown
+    assert "| Usage snapshots | 6 | 8 | 2 | +33.3% | changed |" in markdown
     assert (
         "Verdict: improved; largest change: Total tokens -10.0k (improved)." in markdown
     )
@@ -716,6 +733,7 @@ def test_compare_reports_marks_regressed_metrics() -> None:
         "session": {"session_id": "before"},
         "summary": {
             "total_tokens": 10,
+            "usage_snapshots": 4,
             "uncached_input_tokens": 5,
             "largest_thread_tokens": 8,
             "repeated_prompt_tokens": 3,
@@ -729,6 +747,7 @@ def test_compare_reports_marks_regressed_metrics() -> None:
         "session": {"session_id": "after"},
         "summary": {
             "total_tokens": 20,
+            "usage_snapshots": 4,
             "uncached_input_tokens": 15,
             "largest_thread_tokens": 18,
             "repeated_prompt_tokens": 6,
@@ -742,7 +761,18 @@ def test_compare_reports_marks_regressed_metrics() -> None:
     comparison = compare_reports(before, after)
 
     assert comparison["verdict"] == "regressed"
-    assert {metric["direction"] for metric in comparison["metrics"]} == {"regressed"}
+    cost_directions = {
+        metric["direction"]
+        for metric in comparison["metrics"]
+        if metric["metric"] != "usage_snapshots"
+    }
+    assert cost_directions == {"regressed"}
+    snapshot_metric = next(
+        metric
+        for metric in comparison["metrics"]
+        if metric["metric"] == "usage_snapshots"
+    )
+    assert snapshot_metric["direction"] == "unchanged"
     assert comparison["metrics"][0]["delta_pct"] == 100.0
     assert (
         comparison["recommendation"]
