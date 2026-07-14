@@ -2318,6 +2318,18 @@ def release_audit_report(
     tour_commands = tour_payload.get("next_commands")
     tour_steps = tour_payload.get("steps", [])
     tour_review_path = tour_payload.get("review_path", [])
+    tour_feedback_handoff = tour_payload.get("feedback_handoff", {})
+    tour_feedback_handoff_ok = (
+        isinstance(tour_feedback_handoff, dict)
+        and tour_feedback_handoff.get("runbook") == "docs/PUBLIC_TOUR_FEEDBACK.md"
+        and tour_feedback_handoff.get("issue_template")
+        == ".github/ISSUE_TEMPLATE/public_tour_feedback.yml"
+        and "synthetic or reviewed-redacted evidence"
+        in str(tour_feedback_handoff.get("evidence_rule"))
+        and "Feedback handoff:" in tour_lines_text
+        and ".github/ISSUE_TEMPLATE/public_tour_feedback.yml" in tour_lines_text
+        and "private prompts" in json.dumps(tour_feedback_handoff)
+    )
     tour_review_path_ok = (
         isinstance(tour_review_path, list)
         and len(tour_review_path) >= 6
@@ -2378,6 +2390,7 @@ def release_audit_report(
         in tour_commands
         and tour_steps_have_success_checks
         and tour_review_path_ok
+        and tour_feedback_handoff_ok
         and any("ranked opportunity stack" in item for item in tour_evidence)
         and any("opportunity-change" in item for item in tour_evidence)
         and any("docs/PUBLIC_TOUR_FEEDBACK.md" in item for item in tour_evidence)
@@ -2399,9 +2412,9 @@ def release_audit_report(
     add(
         "public tour JSON",
         tour_ok,
-        "schema, privacy, database, evidence bundle, recommended-action evidence, terminal handoff evidence, terminal validation evidence, dashboard quick-read and comparison review-path evidence, top-level review path, text next commands, per-step success checks, and next commands verified"
+        "schema, privacy, database, evidence bundle, recommended-action evidence, terminal handoff evidence, terminal validation evidence, dashboard quick-read and comparison review-path evidence, top-level review path, feedback handoff, text next commands, per-step success checks, and next commands verified"
         if tour_ok
-        else "tour JSON schema_version, privacy, database, evidence bundle key findings, recommended-action evidence, terminal handoff evidence, terminal validation evidence, dashboard quick-read evidence, comparison review-path evidence, comparison metric delta evidence, report/comparison-download evidence, feedback evidence, top-level review_path, text next commands, per-step success checks, or next_commands missing",
+        else "tour JSON schema_version, privacy, database, evidence bundle key findings, recommended-action evidence, terminal handoff evidence, terminal validation evidence, dashboard quick-read evidence, comparison review-path evidence, comparison metric delta evidence, report/comparison-download evidence, feedback evidence, top-level review_path, feedback_handoff, text next commands, per-step success checks, or next_commands missing",
     )
 
     ignore_failures = private_artifact_ignore_failures(root)
@@ -2892,6 +2905,28 @@ def public_tour_review_path(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, ob
     ]
 
 
+def public_tour_feedback_handoff() -> dict[str, object]:
+    return {
+        "runbook": "docs/PUBLIC_TOUR_FEEDBACK.md",
+        "issue_template": ".github/ISSUE_TEMPLATE/public_tour_feedback.yml",
+        "evidence_rule": "Use synthetic or reviewed-redacted evidence only; do not include private prompts, raw logs, tool output, local paths, or unreviewed screenshots.",
+        "safe_sources": [
+            "codex-observe tour output",
+            "synthetic demo dashboard",
+            "aggregate-only doctor, sessions, report, and compare output",
+            "reviewer evidence bundle",
+        ],
+        "do_not_collect": [
+            "private prompts",
+            "raw Codex logs",
+            "message text",
+            "tool commands or output",
+            "local paths",
+            "unreviewed screenshots",
+        ],
+    }
+
+
 def public_tour_payload(db_path: str = DEFAULT_DEMO_DB) -> dict[str, object]:
     steps = public_tour_steps(db_path)
     review_path = public_tour_review_path(db_path)
@@ -2906,6 +2941,7 @@ def public_tour_payload(db_path: str = DEFAULT_DEMO_DB) -> dict[str, object]:
         },
         "steps": steps,
         "review_path": review_path,
+        "feedback_handoff": public_tour_feedback_handoff(),
         "next_commands": [
             command
             for step in steps
@@ -2934,6 +2970,16 @@ def public_tour_lines(db_path: str = DEFAULT_DEMO_DB) -> list[str]:
         for check in step.get("success_checks", []):
             lines.append(f"   Success check: {check}")
         lines.extend(f"   {command}" for command in step["commands"])
+    feedback_handoff = public_tour_feedback_handoff()
+    lines.extend(
+        [
+            "",
+            "Feedback handoff:",
+            f"- Runbook: {feedback_handoff['runbook']}",
+            f"- Issue template: {feedback_handoff['issue_template']}",
+            f"- Evidence rule: {feedback_handoff['evidence_rule']}",
+        ]
+    )
     next_commands = [
         command
         for step in steps

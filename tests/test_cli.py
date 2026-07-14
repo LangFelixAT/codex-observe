@@ -677,7 +677,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     assert checks["tracking snapshot"]["ok"] is True
     assert (
         checks["public tour JSON"]["detail"]
-        == "schema, privacy, database, evidence bundle, recommended-action evidence, terminal handoff evidence, terminal validation evidence, dashboard quick-read and comparison review-path evidence, top-level review path, text next commands, per-step success checks, and next commands verified"
+        == "schema, privacy, database, evidence bundle, recommended-action evidence, terminal handoff evidence, terminal validation evidence, dashboard quick-read and comparison review-path evidence, top-level review path, feedback handoff, text next commands, per-step success checks, and next commands verified"
     )
     assert (
         checks["issue templates"]["detail"]
@@ -1028,6 +1028,16 @@ def test_public_tour_payload_is_private_log_free_and_points_to_visual_verificati
 
     assert payload["schema_version"] == cli.TOUR_SCHEMA_VERSION
     assert payload["privacy"]["private_log_required"] is False
+    feedback_handoff = payload["feedback_handoff"]
+    assert feedback_handoff["runbook"] == "docs/PUBLIC_TOUR_FEEDBACK.md"
+    assert (
+        feedback_handoff["issue_template"]
+        == ".github/ISSUE_TEMPLATE/public_tour_feedback.yml"
+    )
+    assert (
+        "synthetic or reviewed-redacted evidence" in feedback_handoff["evidence_rule"]
+    )
+    assert "private prompts" in feedback_handoff["do_not_collect"]
     assert (
         "python scripts/visual_qa.py --verify-manifest .artifacts/visual/visual-qa-manifest.json"
         in payload["next_commands"]
@@ -1043,6 +1053,13 @@ def test_public_tour_payload_is_private_log_free_and_points_to_visual_verificati
     assert "codex-observe sessions --db demo.sqlite --json" in payload["next_commands"]
     assert "codex-observe audit --json" in payload["next_commands"]
     text_lines = cli.public_tour_lines("demo.sqlite")
+    assert "Feedback handoff:" in text_lines
+    assert "- Runbook: docs/PUBLIC_TOUR_FEEDBACK.md" in text_lines
+    assert (
+        "- Issue template: .github/ISSUE_TEMPLATE/public_tour_feedback.yml"
+        in text_lines
+    )
+    assert text_lines.index("Feedback handoff:") < text_lines.index("Next commands:")
     assert "Next commands:" in text_lines
     for command in payload["next_commands"]:
         assert f"- {command}" in text_lines
