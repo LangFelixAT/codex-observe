@@ -53,6 +53,7 @@ def test_build_report_returns_privacy_safe_diagnostics_and_playbook(
     assert report["privacy"]["mode"] == "aggregate-only"
     assert report["session"]["session_id"] == "demo-session-cost-review"
     assert report["summary"]["total_tokens"] == 57510
+    assert report["summary"]["usage_snapshots"] == 6
     assert report["summary"]["repeated_prompt_tokens"] > 0
     assert report["summary"]["largest_tool_output_chars"] > 0
     assert report["summary"]["largest_thread_share_pct"] == 57.7
@@ -72,7 +73,7 @@ def test_build_report_returns_privacy_safe_diagnostics_and_playbook(
     )
     assert "Uncached input used 39.5% of total tokens." in report["triage"]["reasons"]
     assert report["headline"] == {
-        "headline": "57.5k total tokens; largest thread 33.2k (57.7%); repeated prompts 10.0k (17.4%); largest tool output 4.0k chars.",
+        "headline": "57.5k total tokens across 6 usage snapshots; largest thread 33.2k (57.7%); repeated prompts 10.0k (17.4%); largest tool output 4.0k chars.",
         "top_diagnostic": "Largest thread drives the run",
         "recommendation": "Set a stop condition for the dominant thread",
     }
@@ -147,6 +148,8 @@ def test_report_markdown_and_json_are_shareable_without_private_content(
     assert "# Codex Observe Run Report" in markdown
     assert "Privacy: aggregate-only export" in markdown
     assert "## Quick Read" in markdown
+    assert "57.5k total tokens across 6 usage snapshots" in markdown
+    assert "- Usage snapshots: 6" in markdown
     assert (
         "Recommended next habit: Set a stop condition for the dominant thread"
         in markdown

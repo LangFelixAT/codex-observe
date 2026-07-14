@@ -2317,6 +2317,8 @@ def release_audit_report(
             and "## Next Run Success Target" in report_markdown_text
             and "## Review Path" in report_markdown_text
             and "Save this report JSON" in report_markdown_text
+            and "Usage snapshots:" in report_markdown_text
+            and "usage_snapshots" in report_json_text
             and "## Follow-up Commands" in report_markdown_text
             and "codex-observe sessions --db" in report_markdown_text
             and "codex-observe compare --before-report" in report_markdown_text
@@ -2359,7 +2361,7 @@ def release_audit_report(
         add(
             "aggregate report",
             report_has_cost_profile,
-            f"{out_path}; {json_out_path}; recommended action, cost profile, opportunity stack, terminal success target, next-run checklist, terminal next commands, triage, review path, feedback handoff, follow-up commands, structured next action, and schema verified",
+            f"{out_path}; {json_out_path}; recommended action, usage-snapshot summary, cost profile, opportunity stack, terminal success target, next-run checklist, terminal next commands, triage, review path, feedback handoff, follow-up commands, structured next action, and schema verified",
         )
         comparison = compare_reports(report, report)
         comparison_out = out_path.with_name("run-comparison.md")

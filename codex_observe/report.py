@@ -575,6 +575,7 @@ def build_report(db_path: str, session_id: str | None = None) -> dict[str, Any]:
             "tool_calls": int(threads["tool_call_count"].fillna(0).sum())
             if not threads.empty
             else 0,
+            "usage_snapshots": int(len(usage)),
             "compactions": int(len(compactions)),
             "total_tokens": total_tokens,
             "input_tokens": total_input,
@@ -662,6 +663,7 @@ def report_headline(report: dict[str, Any]) -> dict[str, str]:
     diagnostics = report.get("diagnostics", [])
     playbook = report.get("playbook", [])
     total = fmt_short(summary.get("total_tokens", 0))
+    snapshots = fmt_short(summary.get("usage_snapshots", 0))
     largest = fmt_short(summary.get("largest_thread_tokens", 0))
     largest_share = float(summary.get("largest_thread_share_pct", 0) or 0)
     repeated = fmt_short(summary.get("repeated_prompt_tokens", 0))
@@ -678,7 +680,7 @@ def report_headline(report: dict[str, Any]) -> dict[str, str]:
         else "Inspect the largest thread before changing workflow."
     )
     return {
-        "headline": f"{total} total tokens; largest thread {largest} ({largest_share:.1f}%); repeated prompts {repeated} ({repeated_share:.1f}%); largest tool output {tool_chars} chars.",
+        "headline": f"{total} total tokens across {snapshots} usage snapshots; largest thread {largest} ({largest_share:.1f}%); repeated prompts {repeated} ({repeated_share:.1f}%); largest tool output {tool_chars} chars.",
         "top_diagnostic": top_diagnostic,
         "recommendation": recommendation,
     }
@@ -1475,6 +1477,7 @@ def report_markdown(report: dict[str, Any]) -> str:
             "",
             f"- Threads: {summary['threads']} ({summary['workers']} workers, {summary['explorers']} explorers, {summary['guardians']} guardians)",
             f"- Tool calls: {summary['tool_calls']}",
+            f"- Usage snapshots: {fmt_short(summary.get('usage_snapshots', 0))}",
             f"- Compactions: {summary['compactions']}",
             f"- Total tokens: {fmt_short(summary['total_tokens'])}",
             f"- Input tokens: {fmt_short(summary['input_tokens'])} ({fmt_short(summary['uncached_input_tokens'])} uncached, {summary['cache_pct']:.1f}% cache hit)",
