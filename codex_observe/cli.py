@@ -3722,6 +3722,7 @@ def public_evidence_bundle(
 def evidence_bundle_lines(output_dir: str, manifest: dict[str, object]) -> list[str]:
     artifacts = manifest.get("artifacts", {})
     review_summary = manifest.get("review_summary")
+    review_checklist = manifest.get("review_checklist")
     action_plan = manifest.get("action_plan")
     lines = [
         f"Evidence bundle: {Path(output_dir).expanduser()}",
@@ -3744,6 +3745,15 @@ def evidence_bundle_lines(output_dir: str, manifest: dict[str, object]) -> list[
             label = str(item.get("label") or "Finding")
             value = str(item.get("value") or "unknown")
             lines.append(f"- {label}: {value}")
+    if isinstance(review_checklist, list) and review_checklist:
+        lines.append("Review checklist:")
+        for item in review_checklist:
+            if not isinstance(item, dict):
+                continue
+            label = str(item.get("label") or "Review artifact")
+            artifact = str(item.get("artifact") or "unknown")
+            look_for = str(item.get("look_for") or "Review the artifact.").rstrip(".")
+            lines.append(f"- {label}: {artifact} - {look_for}")
     validation_commands = manifest.get("validation_commands")
     if isinstance(validation_commands, dict) and validation_commands:
         lines.append("Validation commands:")

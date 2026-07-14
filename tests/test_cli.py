@@ -1270,11 +1270,18 @@ def test_evidence_bundle_cli_json_and_text_outputs_are_actionable(
     assert captured.out.index("Reviewer action plan:") < captured.out.index(
         "Key findings:"
     )
-    assert captured.out.index("Key findings:") < captured.out.index("Artifacts:")
+    assert "Review checklist:" in captured.out
+    assert captured.out.index("Key findings:") < captured.out.index("Review checklist:")
+    assert captured.out.index("Review checklist:") < captured.out.index(
+        "Validation commands:"
+    )
     assert "Run triage: high risk - Largest thread drives the run" in captured.out
     assert "Top opportunity: Largest thread - 33.2k tokens" in captured.out
     assert "Next-run target: largest_thread_share_pct" in captured.out
     assert "Audit status: ok with 0 failed checks" in captured.out
+    assert "Confirm the bundle boundary: LIMITATIONS.md" in captured.out
+    assert "Check workflow-change evidence: demo/run-comparison.md" in captured.out
+    assert "comparison review path" in captured.out
     assert "Validation commands:" in captured.out
     assert (
         "next_report: codex-observe report --db <db> --session-id <next-session-id>"
