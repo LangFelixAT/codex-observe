@@ -28,11 +28,11 @@ def test_evidence_bundle_check_verifies_manifest_readme_and_skipped_visual(
     bundle = tmp_path / "bundle"
     bundle.mkdir()
     (bundle / "evidence-bundle.json").write_text(
-        '{"schema_version":"codex-observe.evidence-bundle.v1","artifacts":{"bundle_readme":"README.md","limitations_markdown":"LIMITATIONS.md","feedback_runbook":"PUBLIC_TOUR_FEEDBACK.md"},"review_summary":[{"label":"Run triage","value":"high risk"}],"review_checklist":[{"label":"Confirm the bundle boundary","look_for":"Synthetic-only scope"}]}',
+        '{"schema_version":"codex-observe.evidence-bundle.v1","artifacts":{"bundle_readme":"README.md","limitations_markdown":"LIMITATIONS.md","feedback_runbook":"PUBLIC_TOUR_FEEDBACK.md","feedback_issue_template":".github/ISSUE_TEMPLATE/public_tour_feedback.yml"},"review_summary":[{"label":"Run triage","value":"high risk"}],"review_checklist":[{"label":"Confirm the bundle boundary","look_for":"Synthetic-only scope"}]}',
         encoding="utf-8",
     )
     (bundle / "README.md").write_text(
-        "# Codex Observe Evidence Bundle\nprivate Codex logs\n## Key Findings\n## Review Checklist\nPUBLIC_TOUR_FEEDBACK.md\n",
+        "# Codex Observe Evidence Bundle\nprivate Codex logs\n## Key Findings\n## Review Checklist\nPUBLIC_TOUR_FEEDBACK.md\n.github/ISSUE_TEMPLATE/public_tour_feedback.yml\n",
         encoding="utf-8",
     )
     (bundle / "LIMITATIONS.md").write_text(
@@ -41,6 +41,15 @@ def test_evidence_bundle_check_verifies_manifest_readme_and_skipped_visual(
 
     (bundle / "PUBLIC_TOUR_FEEDBACK.md").write_text(
         "# Public Tour Feedback\n", encoding="utf-8"
+    )
+    issue_template = bundle / ".github" / "ISSUE_TEMPLATE" / "public_tour_feedback.yml"
+    issue_template.parent.mkdir(parents=True)
+    issue_template.write_text(
+        "Public tour feedback\n"
+        "Do not paste private prompts\n"
+        "Privacy review\n"
+        "docs/PUBLIC_TOUR_FEEDBACK.md\n",
+        encoding="utf-8",
     )
     check = clean_install_smoke.evidence_bundle_check(bundle)
 
@@ -57,8 +66,11 @@ def test_evidence_bundle_check_verifies_manifest_readme_and_skipped_visual(
     assert "## Key Findings" in check
     assert "## Review Checklist" in check
     assert "PUBLIC_TOUR_FEEDBACK.md" in check
+    assert ".github/ISSUE_TEMPLATE/public_tour_feedback.yml" in check
     assert "approval-gated" in check
     assert "Public Tour Feedback" in check
+    assert "Public tour feedback" in check
+    assert "Privacy review" in check
 
 
 def test_smoke_commands_verify_console_script_demo_audit_bundle_and_imports(

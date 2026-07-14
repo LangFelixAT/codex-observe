@@ -67,7 +67,7 @@ The local `sample_from_uploaded.sqlite` file is treated as a private local artif
 
 A source-distribution release candidate is ready when:
 
-- `python scripts/clean_install_smoke.py --extra dev` succeeds.
+- `python scripts/clean_install_smoke.py --extra dev` succeeds and verifies the reviewer evidence bundle README, manifest, limitations doc, and feedback issue template.
 - `codex-observe evidence-bundle --out .artifacts/public-evidence` creates a synthetic reviewer bundle.
 - `codex-observe audit --json` passes after the public evidence bundle exists.
 - `ruff check` passes.
