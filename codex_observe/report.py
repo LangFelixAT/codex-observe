@@ -23,6 +23,54 @@ REPORT_SCHEMA_VERSION = "codex-observe.report.v1"
 COMPARISON_SCHEMA_VERSION = "codex-observe.comparison.v1"
 
 
+def aggregate_feedback_handoff() -> dict[str, object]:
+    return {
+        "runbook": "docs/PUBLIC_TOUR_FEEDBACK.md",
+        "issue_template": ".github/ISSUE_TEMPLATE/public_tour_feedback.yml",
+        "evidence_rule": "Use synthetic or reviewed-redacted aggregate evidence only; do not include private prompts, raw logs, message text, tool commands, tool output, local paths, or unreviewed screenshots.",
+        "safe_sources": [
+            "codex-observe report JSON or Markdown",
+            "codex-observe comparison JSON or Markdown",
+            "reviewer evidence bundle",
+        ],
+        "do_not_collect": [
+            "private prompts",
+            "raw Codex logs",
+            "message text",
+            "tool commands or output",
+            "local paths",
+            "unreviewed screenshots",
+        ],
+    }
+
+
+def feedback_handoff_markdown_lines(handoff: object) -> list[str]:
+    if not isinstance(handoff, dict):
+        return []
+    lines = ["## Feedback Handoff", ""]
+    runbook = handoff.get("runbook")
+    issue_template = handoff.get("issue_template")
+    evidence_rule = handoff.get("evidence_rule")
+    if isinstance(runbook, str):
+        lines.append(f"- Runbook: `{runbook}`")
+    if isinstance(issue_template, str):
+        lines.append(f"- Issue template: `{issue_template}`")
+    if isinstance(evidence_rule, str):
+        lines.append(f"- Evidence rule: {evidence_rule}")
+    safe_sources = handoff.get("safe_sources")
+    if isinstance(safe_sources, list) and safe_sources:
+        lines.append(
+            "- Safe feedback sources: " + "; ".join(str(item) for item in safe_sources)
+        )
+    do_not_collect = handoff.get("do_not_collect")
+    if isinstance(do_not_collect, list) and do_not_collect:
+        lines.append(
+            "- Do not collect: " + "; ".join(str(item) for item in do_not_collect)
+        )
+    lines.append("")
+    return lines
+
+
 def _read_sql(conn: sqlite3.Connection, query: str, params: tuple = ()) -> pd.DataFrame:
     return pd.read_sql_query(query, conn, params=params)
 
@@ -476,6 +524,7 @@ def build_report(db_path: str, session_id: str | None = None) -> dict[str, Any]:
     report["review_path"] = report_review_path(
         str(db), selected_session, report["success_target"]
     )
+    report["feedback_handoff"] = aggregate_feedback_handoff()
     return report
 
 
@@ -1135,6 +1184,7 @@ def compare_reports(
     comparison["recommendation"] = comparison_recommendation(comparison)
     comparison["next_command_templates"] = comparison_next_command_templates(comparison)
     comparison["review_path"] = comparison_review_path(comparison)
+    comparison["feedback_handoff"] = aggregate_feedback_handoff()
     return comparison
 
 
@@ -1208,6 +1258,8 @@ def comparison_markdown(comparison: dict[str, Any]) -> str:
             "- Export the next run as report JSON and compare it against the after report."
         )
         lines.append("")
+
+    lines.extend(feedback_handoff_markdown_lines(comparison.get("feedback_handoff")))
 
     lines.extend(["## Follow-up Commands", ""])
     templates = comparison.get("next_command_templates", [])
@@ -1420,6 +1472,8 @@ def report_markdown(report: dict[str, Any]) -> str:
                     "",
                 ]
             )
+
+    lines.extend(feedback_handoff_markdown_lines(report.get("feedback_handoff")))
 
     lines.extend(["## Follow-up Commands", ""])
     for command in report.get("next_commands", []):

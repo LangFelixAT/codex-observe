@@ -738,6 +738,18 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     assert report_payload["next_commands"]
     assert report_payload["next_command_templates"]
     assert report_payload["review_path"][0]["label"] == "Save this report JSON"
+    report_handoff = report_payload["feedback_handoff"]
+    assert report_handoff["runbook"] == "docs/PUBLIC_TOUR_FEEDBACK.md"
+    assert (
+        report_handoff["issue_template"]
+        == ".github/ISSUE_TEMPLATE/public_tour_feedback.yml"
+    )
+    assert (
+        "synthetic or reviewed-redacted aggregate evidence"
+        in report_handoff["evidence_rule"]
+    )
+    assert "codex-observe report JSON or Markdown" in report_handoff["safe_sources"]
+    assert "private prompts" in report_handoff["do_not_collect"]
     report_text = report.read_text(encoding="utf-8")
     assert "## Next Run Success Target" in report_text
     assert "## Recommended Action" in report_text
@@ -745,6 +757,35 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     assert "## Review Path" in report_text
     assert "Save this report JSON" in report_text
     assert "## Follow-up Commands" in report_text
+    assert "## Feedback Handoff" in report_text
+    assert "docs/PUBLIC_TOUR_FEEDBACK.md" in report_text
+    assert ".github/ISSUE_TEMPLATE/public_tour_feedback.yml" in report_text
+    assert "synthetic or reviewed-redacted aggregate evidence" in report_text
+    assert "Do not collect" in report_text
+    comparison_payload = json.loads(
+        report.with_name("run-comparison.json").read_text(encoding="utf-8")
+    )
+    comparison_handoff = comparison_payload["feedback_handoff"]
+    assert comparison_handoff["runbook"] == "docs/PUBLIC_TOUR_FEEDBACK.md"
+    assert (
+        comparison_handoff["issue_template"]
+        == ".github/ISSUE_TEMPLATE/public_tour_feedback.yml"
+    )
+    assert (
+        "synthetic or reviewed-redacted aggregate evidence"
+        in comparison_handoff["evidence_rule"]
+    )
+    assert (
+        "codex-observe comparison JSON or Markdown"
+        in comparison_handoff["safe_sources"]
+    )
+    assert "private prompts" in comparison_handoff["do_not_collect"]
+    comparison_text = report.with_name("run-comparison.md").read_text(encoding="utf-8")
+    assert "## Feedback Handoff" in comparison_text
+    assert "docs/PUBLIC_TOUR_FEEDBACK.md" in comparison_text
+    assert ".github/ISSUE_TEMPLATE/public_tour_feedback.yml" in comparison_text
+    assert "synthetic or reviewed-redacted aggregate evidence" in comparison_text
+    assert "Do not collect" in comparison_text
 
 
 def test_audit_cli_json_and_text_outputs_are_privacy_safe(

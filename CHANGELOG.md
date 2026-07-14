@@ -6,6 +6,7 @@ The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
 
+- Added structured feedback handoff metadata to aggregate report and comparison Markdown/JSON artifacts plus release audit validation.
 - Added structured comparison review paths so comparison outputs guide verdict review, next-run validation, repeat comparison, and safe feedback.
 - Added structured report review paths so exported run reports guide next-run validation and comparison.
 - Added structured demo review paths so synthetic first-run output guides users through health checks, session selection, report export, and dashboard review.

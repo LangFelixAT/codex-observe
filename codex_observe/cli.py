@@ -2118,6 +2118,22 @@ def release_audit_report(
             )
         )
         report_review_path = report_payload.get("review_path")
+        report_feedback_handoff = report_payload.get("feedback_handoff")
+        report_feedback_text = json.dumps(report_feedback_handoff)
+        report_has_feedback_handoff = (
+            isinstance(report_feedback_handoff, dict)
+            and report_feedback_handoff.get("runbook") == "docs/PUBLIC_TOUR_FEEDBACK.md"
+            and report_feedback_handoff.get("issue_template")
+            == ".github/ISSUE_TEMPLATE/public_tour_feedback.yml"
+            and "synthetic or reviewed-redacted aggregate evidence"
+            in str(report_feedback_handoff.get("evidence_rule"))
+            and "codex-observe report JSON or Markdown" in report_feedback_text
+            and "private prompts" in report_feedback_text
+            and "## Feedback Handoff" in report_markdown_text
+            and "docs/PUBLIC_TOUR_FEEDBACK.md" in report_markdown_text
+            and ".github/ISSUE_TEMPLATE/public_tour_feedback.yml"
+            in report_markdown_text
+        )
         report_has_review_path = (
             isinstance(report_review_path, list)
             and len(report_review_path) >= 4
@@ -2165,6 +2181,7 @@ def release_audit_report(
             and report_payload.get("success_target", {}).get("metric")
             and report_payload.get("success_target", {}).get("target_value") is not None
             and report_has_review_path
+            and report_has_feedback_handoff
             and report_confirmation_has_success_target
             and any(
                 str(command).startswith("codex-observe sessions --db ")
@@ -2182,11 +2199,12 @@ def release_audit_report(
             and '"next_commands"' in report_json_text
             and '"next_command_templates"' in report_json_text
             and '"review_path"' in report_json_text
+            and '"feedback_handoff"' in report_json_text
         )
         add(
             "aggregate report",
             report_has_cost_profile,
-            f"{out_path}; {json_out_path}; recommended action, cost profile, opportunity stack, terminal success target, terminal next commands, triage, review path, follow-up commands, structured next action, and schema verified",
+            f"{out_path}; {json_out_path}; recommended action, cost profile, opportunity stack, terminal success target, terminal next commands, triage, review path, feedback handoff, follow-up commands, structured next action, and schema verified",
         )
         comparison = compare_reports(report, report)
         comparison_out = out_path.with_name("run-comparison.md")
@@ -2210,6 +2228,23 @@ def release_audit_report(
             )
         )
         comparison_review_path = comparison_payload.get("review_path")
+        comparison_feedback_handoff = comparison_payload.get("feedback_handoff")
+        comparison_feedback_text = json.dumps(comparison_feedback_handoff)
+        comparison_has_feedback_handoff = (
+            isinstance(comparison_feedback_handoff, dict)
+            and comparison_feedback_handoff.get("runbook")
+            == "docs/PUBLIC_TOUR_FEEDBACK.md"
+            and comparison_feedback_handoff.get("issue_template")
+            == ".github/ISSUE_TEMPLATE/public_tour_feedback.yml"
+            and "synthetic or reviewed-redacted aggregate evidence"
+            in str(comparison_feedback_handoff.get("evidence_rule"))
+            and "codex-observe comparison JSON or Markdown" in comparison_feedback_text
+            and "private prompts" in comparison_feedback_text
+            and "## Feedback Handoff" in comparison_markdown_text
+            and "docs/PUBLIC_TOUR_FEEDBACK.md" in comparison_markdown_text
+            and ".github/ISSUE_TEMPLATE/public_tour_feedback.yml"
+            in comparison_markdown_text
+        )
         comparison_has_review_path = (
             isinstance(comparison_review_path, list)
             and len(comparison_review_path) >= 5
@@ -2259,6 +2294,7 @@ def release_audit_report(
             and comparison.get("recommendation")
             and comparison.get("recommendation_detail", {}).get("action")
             and comparison_has_review_path
+            and comparison_has_feedback_handoff
             and comparison_confirmation_has_validation_command
             and any(
                 "codex-observe compare --before-report" in str(command)
@@ -2269,6 +2305,7 @@ def release_audit_report(
             and '"recommendation_detail"' in comparison_json_text
             and '"next_command_templates"' in comparison_json_text
             and '"review_path"' in comparison_json_text
+            and '"feedback_handoff"' in comparison_json_text
             and '"opportunity_change"' in comparison_json_text
             and comparison_payload.get("opportunity_change", {}).get("summary")
             and '"delta_pct"' in comparison_json_text
@@ -2276,7 +2313,7 @@ def release_audit_report(
         add(
             "aggregate comparison",
             comparison_has_quick_read,
-            f"{comparison_out}; {comparison_json_out}; quick read, recommended action, triage risk, opportunity change, terminal validation command, terminal next commands, structured recommendation, review path, follow-up commands, and schema verified",
+            f"{comparison_out}; {comparison_json_out}; quick read, recommended action, triage risk, opportunity change, terminal validation command, terminal next commands, structured recommendation, review path, feedback handoff, follow-up commands, and schema verified",
         )
     except (FileNotFoundError, ValueError, KeyError) as exc:
         add("aggregate report", False, str(exc))
