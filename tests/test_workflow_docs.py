@@ -127,6 +127,9 @@ def test_backlog_records_completed_slices_no_publishable_drafts_and_external_wri
 def test_current_state_handoff_covers_gates_evidence_and_real_log_checkpoint() -> None:
     current = read("docs/CURRENT.md")
     readme = read("README.md")
+    amazing = read("docs/AMAZING.md")
+
+    assert "terminal sharing warnings" in amazing
 
     for required in [
         "docs/AMAZING.md",
@@ -140,6 +143,9 @@ def test_current_state_handoff_covers_gates_evidence_and_real_log_checkpoint() -
         "structured `next_commands`",
         "follow-up command templates",
         "next validation command",
+        "terminal privacy warning",
+        "privacy-warning",
+        "private reports or comparisons",
         "copy-pasteable",
         "copy-pasteable next actions",
         "same `--db` path",
