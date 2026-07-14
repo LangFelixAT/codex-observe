@@ -2174,6 +2174,7 @@ def release_audit_report(
             and "Export report for session:" in session_lines_text
             and "Top drivers:" in session_lines_text
             and "Tool out" in session_lines_text
+            and "Snapshots" in session_lines_text
             and "largest tool output:" in session_lines_text
             and "Review path:" in session_lines_text
             and "Save report JSON:" in session_lines_text
@@ -2186,6 +2187,7 @@ def release_audit_report(
                 )
             )
             and all("largest_tool_output_chars" in row for row in sessions)
+            and all("usage_snapshots" in row for row in sessions)
         )
         session_listing_ok = (
             sessions_have_risk
@@ -2202,9 +2204,9 @@ def release_audit_report(
         add(
             "session listing",
             session_listing_ok,
-            f"{len(sessions)} sessions; triage risk, risk distribution, status, schema, limit metadata, text recommended action, session table tool-output column, tool-output driver, structured driver summary, recommendation detail, review path, text next commands, and next commands verified"
+            f"{len(sessions)} sessions; triage risk, risk distribution, status, schema, limit metadata, usage snapshots, text recommended action, session table tool-output column, tool-output driver, structured driver summary, recommendation detail, review path, text next commands, and next commands verified"
             if session_listing_ok
-            else "session listing missing aggregate triage risk, risk_distribution, status, schema_version, limit metadata, text recommended action, recommended_session, recommendation_detail, review_path, text next commands, session table tool-output column, tool-output driver, structured driver summary, or next_commands",
+            else "session listing missing aggregate triage risk, risk_distribution, status, schema_version, limit metadata, usage snapshots, text recommended action, recommended_session, recommendation_detail, review_path, text next commands, session table tool-output column, tool-output driver, structured driver summary, or next_commands",
         )
     except FileNotFoundError as exc:
         sessions = []
@@ -2997,7 +2999,7 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
             "title": "List aggregate-only sessions and the recommended high-risk run",
             "evidence": [
                 "recommended_session chooses the highest-risk run",
-                "plain-text sessions output includes a Tool out column and a recommended-action block with top aggregate drivers, including largest tool output",
+                "plain-text sessions output includes Snapshots and Tool out columns plus a recommended-action block with top aggregate drivers, including largest tool output",
                 "recommendation_detail explains the risk, recency tie-breakers, structured aggregate drivers, and ordered driver_summary display labels",
                 "plain-text sessions output includes terminal Next commands for the recommended report exports",
                 "review_path turns the recommendation into report, compare, validation, and safe-feedback steps",

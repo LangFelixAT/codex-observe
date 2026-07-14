@@ -349,6 +349,7 @@ def test_session_summaries_are_aggregate_only(tmp_path: Path) -> None:
             "last_seen": "2026-01-01T12:23:00Z",
             "threads": 3,
             "tool_calls": 2,
+            "usage_snapshots": 6,
             "total_tokens": 57510,
             "uncached_input_tokens": 22700,
             "cached_input_tokens": 32000,
@@ -364,6 +365,7 @@ def test_session_summaries_are_aggregate_only(tmp_path: Path) -> None:
             "last_seen": "2026-01-01T12:35:00Z",
             "threads": 3,
             "tool_calls": 1,
+            "usage_snapshots": 3,
             "total_tokens": 8400,
             "uncached_input_tokens": 1200,
             "cached_input_tokens": 6300,
@@ -376,15 +378,15 @@ def test_session_summaries_are_aggregate_only(tmp_path: Path) -> None:
     ]
     assert "Risk distribution: high 1, medium 0, low 1, unknown 0" in lines
     assert (
-        "Session ID | Last seen | Risk | Threads | Tools | Tool out | Tokens | Uncached"
+        "Session ID | Last seen | Risk | Threads | Tools | Snapshots | Tool out | Tokens | Uncached"
         in lines
     )
     assert (
-        "demo-session-cost-review | 2026-01-01T12:23:00Z | high | 3 | 2 | 4.0k | 57.5k | 22.7k"
+        "demo-session-cost-review | 2026-01-01T12:23:00Z | high | 3 | 2 | 6 | 4.0k | 57.5k | 22.7k"
         in lines
     )
     assert (
-        "demo-session-focused-followup | 2026-01-01T12:35:00Z | low | 3 | 1 | 880 | 8.4k | 1.2k"
+        "demo-session-focused-followup | 2026-01-01T12:35:00Z | low | 3 | 1 | 3 | 880 | 8.4k | 1.2k"
         in lines
     )
     limited_lines = "\n".join(session_summary_lines(str(db), limit=1))

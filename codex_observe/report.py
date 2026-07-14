@@ -120,6 +120,14 @@ def session_summaries(db_path: str) -> list[dict[str, Any]]:
               FROM threads
               GROUP BY session_id
             ),
+            usage_rollups AS (
+              SELECT
+                t.session_id,
+                COUNT(us.thread_id) AS usage_snapshots
+              FROM threads t
+              JOIN usage_snapshots us ON us.thread_id = t.thread_id
+              GROUP BY t.session_id
+            ),
             tool_rollups AS (
               SELECT
                 t.session_id,
@@ -153,11 +161,13 @@ def session_summaries(db_path: str) -> list[dict[str, Any]]:
               c.total_uncached_input_tokens,
               c.total_cached_input_tokens,
               COALESCE(tr.tool_calls, 0) AS tool_calls,
+              COALESCE(ur.usage_snapshots, 0) AS usage_snapshots,
               COALESCE(tr.largest_thread_tokens, 0) AS largest_thread_tokens,
               COALESCE(tor.largest_tool_output_chars, 0) AS largest_tool_output_chars,
               COALESCE(pr.repeated_prompt_tokens, 0) AS repeated_prompt_tokens
             FROM conversations c
             LEFT JOIN thread_rollups tr ON tr.session_id = c.session_id
+            LEFT JOIN usage_rollups ur ON ur.session_id = c.session_id
             LEFT JOIN tool_rollups tor ON tor.session_id = c.session_id
             LEFT JOIN prompt_rollups pr ON pr.session_id = c.session_id
             ORDER BY c.last_seen DESC
@@ -196,6 +206,7 @@ def session_summaries(db_path: str) -> list[dict[str, Any]]:
                 "last_seen": row["last_seen"],
                 "threads": int(row["thread_count"] or 0),
                 "tool_calls": int(row["tool_calls"] or 0),
+                "usage_snapshots": int(row["usage_snapshots"] or 0),
                 "total_tokens": total_tokens,
                 "uncached_input_tokens": uncached_input_tokens,
                 "cached_input_tokens": int(row["total_cached_input_tokens"] or 0),
@@ -291,7 +302,7 @@ def session_summary_lines(db_path: str, limit: int | None = 50) -> list[str]:
     distribution = session_risk_distribution(summaries)
     lines = [
         session_risk_distribution_line(distribution),
-        "Session ID | Last seen | Risk | Threads | Tools | Tool out | Tokens | Uncached",
+        "Session ID | Last seen | Risk | Threads | Tools | Snapshots | Tool out | Tokens | Uncached",
     ]
     display_limit = len(summaries) if limit is None else max(1, int(limit))
     displayed = summaries[:display_limit]
@@ -304,6 +315,7 @@ def session_summary_lines(db_path: str, limit: int | None = 50) -> list[str]:
                     str(row["triage_risk"]),
                     str(row["threads"]),
                     str(row["tool_calls"]),
+                    fmt_short(row.get("usage_snapshots", 0)),
                     fmt_short(row.get("largest_tool_output_chars", 0)),
                     fmt_short(row["total_tokens"]),
                     fmt_short(row["uncached_input_tokens"]),
