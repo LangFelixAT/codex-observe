@@ -2312,8 +2312,7 @@ def release_audit_report(
             for item in tour_review_path
         )
         and any(
-            "codex-observe sessions" in str(item.get("command"))
-            and "--json" in str(item.get("command"))
+            str(item.get("command")) == f"codex-observe sessions --db {actual_db_path}"
             for item in tour_review_path
             if isinstance(item, dict)
         )
@@ -2348,7 +2347,10 @@ def release_audit_report(
         and tour_payload.get("database") == actual_db_path
         and tour_payload.get("privacy", {}).get("private_log_required") is False
         and isinstance(tour_commands, list)
+        and f"codex-observe demo --db {actual_db_path}" in tour_commands
+        and f"codex-observe doctor --db {actual_db_path}" in tour_commands
         and f"codex-observe doctor --db {actual_db_path} --json" in tour_commands
+        and f"codex-observe sessions --db {actual_db_path}" in tour_commands
         and f"codex-observe sessions --db {actual_db_path} --json" in tour_commands
         and "python scripts/visual_qa.py --verify-manifest .artifacts/visual/visual-qa-manifest.json"
         in tour_commands
@@ -2377,9 +2379,9 @@ def release_audit_report(
     add(
         "public tour JSON",
         tour_ok,
-        "schema, privacy, database, evidence bundle, recommended-action evidence, terminal validation evidence, dashboard quick-read and comparison review-path evidence, top-level review path, per-step success checks, and next commands verified"
+        "schema, privacy, database, evidence bundle, recommended-action evidence, terminal handoff evidence, terminal validation evidence, dashboard quick-read and comparison review-path evidence, top-level review path, per-step success checks, and next commands verified"
         if tour_ok
-        else "tour JSON schema_version, privacy, database, evidence bundle key findings, recommended-action evidence, terminal validation evidence, dashboard quick-read evidence, comparison review-path evidence, comparison metric delta evidence, report/comparison-download evidence, feedback evidence, top-level review_path, per-step success checks, or next_commands missing",
+        else "tour JSON schema_version, privacy, database, evidence bundle key findings, recommended-action evidence, terminal handoff evidence, terminal validation evidence, dashboard quick-read evidence, comparison review-path evidence, comparison metric delta evidence, report/comparison-download evidence, feedback evidence, top-level review_path, per-step success checks, or next_commands missing",
     )
 
     ignore_failures = private_artifact_ignore_failures(root)
@@ -2675,26 +2677,33 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
                 "dashboard quick reads cover Overview operator briefing, Agent detail thread brief, Timeline quick read, Tools quick read, Duplication quick read, and Raw tables data inventory",
             ],
             "success_checks": [
+                "plain demo output includes terminal Review path and Next commands guidance",
                 "demo JSON reports status ok with schema_version codex-observe.demo.v1",
                 "dashboard opens on the synthetic database without private logs",
             ],
             "commands": [
                 "codex-observe demo --serve --host 127.0.0.1 --port 8501",
+                f"codex-observe demo --db {db_path}",
                 "codex-observe demo --json",
             ],
         },
         {
             "title": "Verify the demo database contract",
             "evidence": [
+                "plain doctor output includes terminal Review path and Next commands guidance",
                 "doctor JSON includes schema_version, structured next_commands, and review_path",
                 "recovery hints preserve the selected database path",
             ],
             "success_checks": [
+                "plain doctor output includes copy-pasteable terminal Next commands",
                 "doctor JSON status is ok for the demo database",
                 "next_commands include sessions and serve commands for the same database",
                 "review_path points to sessions JSON, dashboard inspection, and report export",
             ],
-            "commands": [f"codex-observe doctor --db {db_path} --json"],
+            "commands": [
+                f"codex-observe doctor --db {db_path}",
+                f"codex-observe doctor --db {db_path} --json",
+            ],
         },
         {
             "title": "List aggregate-only sessions and the recommended high-risk run",
@@ -2711,7 +2720,10 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
                 "plain-text sessions output includes Next commands for Markdown and JSON report exports",
                 "review_path includes report JSON, comparison, next-run validation, and safe-feedback steps",
             ],
-            "commands": [f"codex-observe sessions --db {db_path} --json"],
+            "commands": [
+                f"codex-observe sessions --db {db_path}",
+                f"codex-observe sessions --db {db_path} --json",
+            ],
         },
         {
             "title": "Export shareable aggregate reports",
@@ -2818,14 +2830,14 @@ def public_tour_review_path(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, ob
         {
             "step": 2,
             "label": "Verify database health",
-            "command": f"codex-observe doctor --db {db_path} --json",
-            "success_check": "Doctor JSON status is ok with schema_version codex-observe.doctor.v1.",
+            "command": f"codex-observe doctor --db {db_path}",
+            "success_check": "Doctor text includes Review path and Next commands; JSON status is ok with schema_version codex-observe.doctor.v1.",
         },
         {
             "step": 3,
             "label": "Choose the recommended run",
-            "command": f"codex-observe sessions --db {db_path} --json",
-            "success_check": "Sessions JSON includes recommended_session and review_path.",
+            "command": f"codex-observe sessions --db {db_path}",
+            "success_check": "Sessions text includes the recommended high-risk run, review path, and terminal Next commands.",
         },
         {
             "step": 4,

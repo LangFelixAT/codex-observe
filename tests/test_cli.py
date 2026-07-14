@@ -674,7 +674,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     assert checks["tracking snapshot"]["ok"] is True
     assert (
         checks["public tour JSON"]["detail"]
-        == "schema, privacy, database, evidence bundle, recommended-action evidence, terminal validation evidence, dashboard quick-read and comparison review-path evidence, top-level review path, per-step success checks, and next commands verified"
+        == "schema, privacy, database, evidence bundle, recommended-action evidence, terminal handoff evidence, terminal validation evidence, dashboard quick-read and comparison review-path evidence, top-level review path, per-step success checks, and next commands verified"
     )
     assert (
         checks["issue templates"]["detail"]
@@ -1033,6 +1033,11 @@ def test_public_tour_payload_is_private_log_free_and_points_to_visual_verificati
         "codex-observe evidence-bundle --out .artifacts/public-evidence"
         in payload["next_commands"]
     )
+    assert "codex-observe demo --db demo.sqlite" in payload["next_commands"]
+    assert "codex-observe doctor --db demo.sqlite" in payload["next_commands"]
+    assert "codex-observe doctor --db demo.sqlite --json" in payload["next_commands"]
+    assert "codex-observe sessions --db demo.sqlite" in payload["next_commands"]
+    assert "codex-observe sessions --db demo.sqlite --json" in payload["next_commands"]
     assert any("key findings" in item for item in evidence)
     assert any("review_summary" in item for item in evidence)
     assert any("codex-observe.evidence-bundle.v1" in item for item in evidence)
@@ -1046,6 +1051,17 @@ def test_public_tour_payload_is_private_log_free_and_points_to_visual_verificati
     assert any("structured aggregate drivers" in item for item in evidence)
     assert any("driver_summary" in item for item in evidence)
     assert any("review_path" in item for item in evidence)
+    assert any(
+        "plain doctor output includes terminal Review path" in item for item in evidence
+    )
+    assert any(
+        "plain demo output includes terminal Review path" in item
+        for item in success_checks
+    )
+    assert any(
+        "plain doctor output includes copy-pasteable terminal Next commands" in item
+        for item in success_checks
+    )
     assert any(
         "doctor JSON includes schema_version, structured next_commands, and review_path"
         in item
@@ -1061,8 +1077,11 @@ def test_public_tour_payload_is_private_log_free_and_points_to_visual_verificati
         "Run release audit",
         "File safe feedback",
     ]
+    assert payload["review_path"][1]["command"] == (
+        "codex-observe doctor --db demo.sqlite"
+    )
     assert payload["review_path"][2]["command"] == (
-        "codex-observe sessions --db demo.sqlite --json"
+        "codex-observe sessions --db demo.sqlite"
     )
     assert payload["review_path"][-1]["command"] == "docs/PUBLIC_TOUR_FEEDBACK.md"
     assert any("Recommended Action" in item for item in evidence)
