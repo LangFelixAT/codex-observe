@@ -148,4 +148,4 @@ python scripts/backlog_publish_plan.py
 python scripts/backlog_publish_plan.py --json
 ```
 
-The historical draft files were deleted because the slices are complete or because the remaining work is blocked on explicit human input. The completed `009` draft was also deleted after local implementation; do not publish it as a new issue.
+The historical draft files were deleted because the slices are complete or retired from publishable issue state. Future real-log work should come from reviewed-redacted evidence or explicit human approval, not from republishing old reminder drafts. The completed `009` draft was also deleted after local implementation; do not publish it as a new issue.
