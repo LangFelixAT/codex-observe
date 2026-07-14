@@ -2623,7 +2623,7 @@ def release_audit_report(
     add(
         "release workflow docs",
         not workflow_doc_failures,
-        "real-log feedback, visual QA evidence, and text hygiene aligned"
+        "real-log checkpoint, privacy gate, visual QA evidence, and text hygiene aligned"
         if not workflow_doc_failures
         else "; ".join(workflow_doc_failures[:3]),
     )
@@ -3630,7 +3630,7 @@ def evidence_bundle_review_checklist(
         {
             "label": "Confirm the bundle boundary",
             "artifact": str(artifacts.get("limitations_markdown", "LIMITATIONS.md")),
-            "look_for": "Synthetic-only scope, approval-gated distribution, and human-approved private input requirements.",
+            "look_for": "Synthetic-only scope, approval-gated distribution, and real-log privacy gate requirements.",
         },
         {
             "label": "Read the run outcome",

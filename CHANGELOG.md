@@ -6,6 +6,7 @@ The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
 
+- Aligned real-log checkpoint documentation and release audit wording so future work is framed as reviewed-redacted fixture promotion, not a blocked parser loop.
 - Bounded session listing output by default, added truncation metadata, and optimized aggregate summary queries for large real histories.
 - Added a dashboard safe feedback handoff card plus visual QA and release audit evidence for its privacy boundary.
 - Added structured feedback handoff metadata to aggregate report and comparison Markdown/JSON artifacts plus release audit validation.

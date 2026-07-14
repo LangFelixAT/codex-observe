@@ -1,6 +1,6 @@
 # Next Wave Plan
 
-The first local backlog, this next wave, and the risk-aware public-demo evidence hardening are implemented and verified locally. Do not publish completed local drafts or human-input reminders as new GitHub issues. The real-log parser feedback loop remains HITL-only until a human-approved private input path exists; completed fresh records `006`, `008`, and `009`, plus the blocked reminder record `007`, were deleted after closeout. Future work should continue to come from real-user feedback, redacted fixture gaps, or explicitly approved distribution work.
+The first local backlog, this next wave, risk-aware public-demo evidence hardening, and first private real-log checkpoint are implemented and verified locally. Do not publish completed local drafts or human-input reminders as new GitHub issues. Future real-log parser expansion remains HITL-only for reviewed-redacted fixture promotion; completed fresh records `006`, `008`, and `009`, plus the former reminder record `007`, were deleted after closeout. Future work should continue to come from real-user feedback, redacted fixture gaps, or explicitly approved distribution work.
 
 ## 1. Redacted real-log fixture workflow
 
@@ -76,9 +76,9 @@ Acceptance criteria:
 
 There is no current publishable draft record. The completed `009` evidence-bundle draft was implemented locally as `codex-observe evidence-bundle` and deleted after closeout.
 
-The remaining parser feedback loop is tracked as a blocker in `docs/CURRENT.md` and `docs/REAL_LOG_FEEDBACK.md`, not as issue content ready to publish:
+Future parser-shape promotion is tracked through `docs/REAL_LOG_FEEDBACK.md` and reviewed-redacted evidence, not as issue content ready to publish until there is a concrete new gap:
 
-- Real-log parser feedback loop. Status: tooling and runbook improved; human-approved local input path still required before any new parser-shape issue or fixture can be created.
+- Real-log parser feedback loop. Status: tooling, runbook, and the first human-approved private checkpoint are complete; any new parser-shape issue or fixture still requires human-reviewed redacted evidence before promotion.
 ## Closeout
 
 The completed local draft files were deleted after explicit confirmation because they no longer represented open work; `009` was deleted after the evidence-bundle command shipped locally.

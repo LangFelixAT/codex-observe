@@ -124,7 +124,7 @@ def test_backlog_records_completed_slices_no_publishable_drafts_and_external_wri
     assert "codex-observe.evidence-bundle.v1" in backlog
 
 
-def test_current_state_handoff_covers_gates_evidence_and_remaining_blocker() -> None:
+def test_current_state_handoff_covers_gates_evidence_and_real_log_checkpoint() -> None:
     current = read("docs/CURRENT.md")
     readme = read("README.md")
 
@@ -367,7 +367,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
     assert "follow-up command templates" in release
     assert "docs/CURRENT.md" in release
     assert "dashboard empty-state next actions" in release
-    assert "remaining HITL blocker" in release
+    assert "private real-log checkpoint" in release
     assert "docs/LIMITATIONS.md" in release
     assert "release branch is pushed to `origin`" in release
     assert "tracking snapshot" in release
@@ -449,6 +449,8 @@ def test_limitations_doc_covers_current_boundaries_and_next_work_sources() -> No
         "telemetry",
         "approval-gated",
         "human-approved private input path",
+        "first real-log feedback checkpoint",
+        "reviewed-redacted fixtures",
         "docs/REAL_LOG_FEEDBACK.md",
         "reviewer evidence bundle",
         "explicit human approval",
@@ -510,14 +512,15 @@ def test_completed_fresh_draft_records_are_not_publishable_ready() -> None:
     next_wave = read("docs/NEXT_WAVE.md")
 
     assert (
-        "completed fresh records `006`, `008`, and `009`, plus the blocked reminder record `007`, were deleted after closeout"
+        "completed fresh records `006`, `008`, and `009`, plus the former reminder record `007`, were deleted after closeout"
         in next_wave
     )
     assert "saved manifest schema/contract evidence" in next_wave
     assert "There is no current publishable draft record" in next_wave
     assert "codex-observe evidence-bundle" in next_wave
     assert "009" in next_wave
-    assert "human-approved local input path still required" in next_wave
+    assert "first human-approved private checkpoint are complete" in next_wave
+    assert "Future parser-shape promotion" in next_wave
 
 
 def test_tracking_snapshot_records_current_issue_state_and_publish_guard() -> None:
