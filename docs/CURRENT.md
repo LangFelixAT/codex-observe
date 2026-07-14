@@ -15,7 +15,8 @@ The current core loop is printed by `codex-observe tour` with a top-level review
 5. Compare report JSON files into `.artifacts/demo/run-comparison.md` and `.artifacts/demo/run-comparison.json` with triage-risk movement, opportunity-change movement, metric deltas, terminal next validation command, terminal next-command guidance, structured recommendation targets, structured review path, follow-up command templates, and priority-preserving next-step recommendations for persisted diagnostics.
 6. Run `python scripts/visual_qa.py` and verify `.artifacts/visual/visual-qa-manifest.json`.
 7. Run `codex-observe evidence-bundle --out .artifacts/public-evidence` when reviewers need one synthetic local directory whose terminal output and reviewer README both surface an ordered action plan, key findings, a review checklist with comparison review-path guidance, reproduce-local commands, next-run validation commands, `LIMITATIONS.md`, `PUBLIC_TOUR_FEEDBACK.md`, report, comparison, audit, visual QA artifacts, and the `codex-observe.evidence-bundle.v1` manifest.
-8. Use `docs/PUBLIC_TOUR_FEEDBACK.md` and `.github/ISSUE_TEMPLATE/public_tour_feedback.yml` for privacy-safe public-tour, terminal-handoff, or reviewer-bundle feedback before turning observations into implementation issues.
+8. Run `codex-observe audit --json` to verify the generated synthetic evidence, visual manifest, public bundle, tour contract, issue templates, release metadata, and required command list before treating the result as release evidence.
+9. Use `docs/PUBLIC_TOUR_FEEDBACK.md` and `.github/ISSUE_TEMPLATE/public_tour_feedback.yml` for privacy-safe public-tour, terminal-handoff, or reviewer-bundle feedback before turning observations into implementation issues.
 
 ## Quality Gates
 

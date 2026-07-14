@@ -2821,7 +2821,7 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
                 "audit status is ok and failed_checks is empty",
                 "required_commands lists the full local release gate",
             ],
-            "commands": ["codex-observe audit"],
+            "commands": ["codex-observe audit --json"],
         },
         {
             "title": "File privacy-safe public-tour feedback",

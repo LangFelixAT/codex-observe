@@ -1041,6 +1041,7 @@ def test_public_tour_payload_is_private_log_free_and_points_to_visual_verificati
     assert "codex-observe doctor --db demo.sqlite --json" in payload["next_commands"]
     assert "codex-observe sessions --db demo.sqlite" in payload["next_commands"]
     assert "codex-observe sessions --db demo.sqlite --json" in payload["next_commands"]
+    assert "codex-observe audit --json" in payload["next_commands"]
     text_lines = cli.public_tour_lines("demo.sqlite")
     assert "Next commands:" in text_lines
     for command in payload["next_commands"]:
