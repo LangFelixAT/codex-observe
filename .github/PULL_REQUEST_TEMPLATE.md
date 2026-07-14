@@ -16,7 +16,7 @@
 - [ ] `codex-observe audit --json`
 - [ ] `codex-observe demo`
 - [ ] `codex-observe demo --sessions .artifacts/demo/sessions --keep-sessions --json` emits `codex-observe.demo.v1` with counts and next commands
-- [ ] `codex-observe ingest .artifacts/demo/sessions --db .artifacts/demo/ingest-contract.sqlite --json` emits aggregate-only `codex-observe.ingest.v1` counts and skipped categories
+- [ ] `codex-observe ingest .artifacts/demo/sessions --db .artifacts/demo/ingest-contract.sqlite --json` emits aggregate-only `codex-observe.ingest.v1` counts, skipped categories, and `review_required_before_sharing` privacy metadata
 - [ ] `codex-observe sessions --db .artifacts/demo/codex_observe_demo.sqlite --json` includes aggregate-only session summaries, `schema_version`, and `recommended_session` for the highest-risk run
 - [ ] `codex-observe doctor --db .artifacts/demo/codex_observe_demo.sqlite --json` includes `schema_version`
 - [ ] `codex-observe report --db .artifacts/demo/codex_observe_demo.sqlite --out .artifacts/demo/run-report.md`

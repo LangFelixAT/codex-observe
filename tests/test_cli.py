@@ -762,7 +762,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     )
     assert (
         checks["synthetic ingest JSON"]["detail"]
-        == "schema, counts, scan limit, skipped categories, text next commands, next commands, text review path, and review path verified"
+        == "schema, counts, scan limit, skipped categories, privacy review metadata, text privacy warning, text next commands, next commands, text review path, and review path verified"
     )
     assert report.exists()
     assert report.with_suffix(".json").exists()

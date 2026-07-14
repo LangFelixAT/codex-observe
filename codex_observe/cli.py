@@ -2041,6 +2041,10 @@ def release_audit_report(
         ingest_payload.get("schema_version") == INGEST_SCHEMA_VERSION
         and ingest_payload.get("status") == "ok"
         and ingest_payload.get("privacy", {}).get("raw_content_included") is False
+        and ingest_payload.get("privacy", {}).get("review_required_before_sharing")
+        is True
+        and "aggregate metrics"
+        in str(ingest_payload.get("privacy", {}).get("share_warning", ""))
         and ingest_payload.get("counts", {}).get("files_matched")
         == result.files_imported
         and ingest_payload.get("counts", {}).get("files_seen") == result.files_imported
@@ -2054,6 +2058,8 @@ def release_audit_report(
         and ingest_payload.get("next_commands")
         == ingest_next_commands(str(ingest_contract_path))
         and ingest_has_review_path
+        and "Privacy: ingest output is aggregate-only" in ingest_lines_text
+        and "aggregate metrics before sharing" in ingest_lines_text
         and "Review path:" in ingest_lines_text
         and "Verify database health:" in ingest_lines_text
         and "Next commands:" in ingest_lines_text
@@ -2065,9 +2071,9 @@ def release_audit_report(
     add(
         "synthetic ingest JSON",
         ingest_json_ok,
-        "schema, counts, scan limit, skipped categories, text next commands, next commands, text review path, and review path verified"
+        "schema, counts, scan limit, skipped categories, privacy review metadata, text privacy warning, text next commands, next commands, text review path, and review path verified"
         if ingest_json_ok
-        else "synthetic ingest JSON schema_version, counts, scan limit, skipped categories, text next commands, next_commands, text review path, or review_path missing",
+        else "synthetic ingest JSON schema_version, counts, scan limit, skipped categories, privacy review metadata, text privacy warning, text next_commands, next_commands, text review path, or review_path missing",
     )
 
     doctor_status, doctor = doctor_report(actual_db_path)
