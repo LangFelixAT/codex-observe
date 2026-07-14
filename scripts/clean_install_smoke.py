@@ -78,7 +78,7 @@ def evidence_bundle_check(bundle_dir: Path) -> str:
         "assert 'PUBLIC_TOUR_FEEDBACK.md' in readme; "
         "assert '# Limitations and Next Work' in limitations; "
         "assert 'approval-gated' in limitations; "
-        "assert '# Public Tour Feedback Runbook' in feedback; "
+        "assert '# Public Tour Feedback' in feedback; "
         "print('evidence bundle ok')"
     )
 

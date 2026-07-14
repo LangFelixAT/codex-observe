@@ -74,6 +74,14 @@ EXPECTED_COMPARISON_DELTAS = [
     {"label": "Total tokens", "direction": "regressed"},
     {"label": "Largest thread tokens", "direction": "regressed"},
 ]
+EXPECTED_COMPARISON_REVIEW_PATH = [
+    "Comparison review path",
+    "Read the verdict",
+    "Act on the recommendation",
+    "Export the next run",
+    "Compare against this after run",
+    "File safe feedback",
+]
 EXPECTED_DEFAULT_METRIC_VALUES = {
     "Threads": "3",
     "Largest thread": "33.2k tokens (57.7%)",
@@ -219,6 +227,30 @@ def comparison_preview_failures(
                 f"{viewport_name}: comparison preview missing {key}: {expected}"
             )
     return failures
+
+
+def collect_comparison_review_paths(page) -> list[dict[str, str]]:
+    return page.evaluate(
+        r"""
+() => Array.from(document.querySelectorAll('.co-comparison-review-path')).map((card) => ({
+  label: (card.querySelector('strong')?.innerText || '').replace(/\s+/g, ' ').trim(),
+  body: (card.innerText || '').replace(/\s+/g, ' ').trim(),
+})).filter((item) => item.label || item.body)
+        """
+    )
+
+
+def comparison_review_path_failures(
+    paths: list[dict[str, str]], viewport_name: str
+) -> list[str]:
+    if not paths:
+        return [f"{viewport_name}: comparison review path not rendered"]
+    body = str(paths[0].get("body") or "")
+    return [
+        f"{viewport_name}: comparison review path missing: {expected}"
+        for expected in EXPECTED_COMPARISON_REVIEW_PATH
+        if expected not in body
+    ]
 
 
 def collect_comparison_deltas(page) -> list[dict[str, str]]:
@@ -522,6 +554,7 @@ def validate_dashboard_page(
     review_paths = collect_review_paths(page)
     download_controls = collect_download_controls(page)
     comparison_previews = collect_comparison_previews(page)
+    comparison_review_paths = collect_comparison_review_paths(page)
     comparison_deltas = collect_comparison_deltas(page)
     page.evaluate("window.scrollTo(0, 0)")
     failures.extend(success_target_failures(success_targets, viewport_name))
@@ -529,6 +562,9 @@ def validate_dashboard_page(
     failures.extend(review_path_failures(review_paths, viewport_name))
     failures.extend(download_control_failures(download_controls, viewport_name))
     failures.extend(comparison_preview_failures(comparison_previews, viewport_name))
+    failures.extend(
+        comparison_review_path_failures(comparison_review_paths, viewport_name)
+    )
     failures.extend(comparison_delta_failures(comparison_deltas, viewport_name))
     for metric_label in ["Largest thread", "Uncached input"]:
         if metric_label not in text:
@@ -593,6 +629,7 @@ def validate_dashboard_page(
         "review_paths": review_paths,
         "download_controls": download_controls,
         "comparison_previews": comparison_previews,
+        "comparison_review_paths": comparison_review_paths,
         "comparison_deltas": comparison_deltas,
         "layout_review": layout_snapshot,
     }
@@ -1034,6 +1071,17 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
                 for failure in preview_failures
             )
 
+        comparison_review_paths = raw.get("comparison_review_paths")
+        if not isinstance(comparison_review_paths, list):
+            failures.append(f"manifest {name} missing comparison review path evidence")
+        else:
+            comparison_path_failures = comparison_review_path_failures(
+                comparison_review_paths, name
+            )
+            failures.extend(
+                failure.replace(f"{name}: ", f"manifest {name} ")
+                for failure in comparison_path_failures
+            )
         comparison_deltas = raw.get("comparison_deltas")
         if not isinstance(comparison_deltas, list):
             failures.append(f"manifest {name} missing comparison delta evidence")

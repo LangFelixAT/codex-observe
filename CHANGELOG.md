@@ -21,7 +21,7 @@ The project follows semantic versioning once release distribution is decided.
 - Added largest-tool-output evidence to structured session recommendation drivers.
 - Added largest-tool-output evidence to session summaries and the recommended-action driver list.
 - Added structured next-run validation commands to the public evidence bundle manifest, README, CLI output, and audit validation.
-- Added dashboard comparison quick-read, metric delta, and next validation command cards plus Markdown/JSON report and comparison downloads for the selected Overview session and visual/audit evidence that the controls render.
+- Added dashboard comparison quick-read, review-path, metric delta, and next validation command cards plus Markdown/JSON report and comparison downloads for the selected Overview session and visual/audit evidence that the controls render.
 - Added an Agent detail thread brief that surfaces the selected thread's cost share, uncached input, tool count, and first inspection action.
 - Added a Tools quick read that highlights the noisiest captured output and the first command to tighten.
 - Added a Duplication quick read that turns replayed prompt-block estimates into a first cleanup action.
@@ -30,8 +30,8 @@ The project follows semantic versioning once release distribution is decided.
 - Updated the public tour to point reviewers at the dashboard quick-read surfaces now covered by visual QA.
 - Strengthened visual QA manifests and release audit checks to require structured dashboard quick-read evidence.
 - Strengthened release audit checks for public tour dashboard quick-read guidance.
-- Added dashboard comparison metric delta cards and visual/audit evidence that they render.
-- Updated the public tour to point reviewers at dashboard comparison metric delta cards.
+- Added dashboard comparison review-path and metric delta cards and visual/audit evidence that they render.
+- Updated the public tour to point reviewers at dashboard comparison review-path and metric delta cards.
 - Added reproduce-local commands to the reviewer evidence bundle README and release audit validation.
 - Added follow-up command templates to aggregate comparison Markdown/JSON exports.
 - Added the comparison next validation command to the dashboard Overview quick-read card and visual/audit evidence.

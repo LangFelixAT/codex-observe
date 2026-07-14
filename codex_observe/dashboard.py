@@ -638,6 +638,52 @@ def dashboard_css() -> str:
   white-space: normal;
 }
 
+.co-comparison-review-path {
+  background: color-mix(in srgb, var(--co-accent) 6%, var(--co-surface));
+  border: 1px solid var(--co-border);
+  border-radius: 8px;
+  margin-top: 0.75rem;
+  padding: 0.65rem 0.75rem;
+}
+
+.co-comparison-review-path > strong {
+  display: block;
+  font-size: 0.82rem;
+  line-height: 1.2;
+  margin-bottom: 0.3rem;
+}
+
+.co-comparison-review-path ol {
+  margin: 0.35rem 0 0 1.05rem;
+  padding: 0;
+}
+
+.co-comparison-review-path li {
+  color: var(--co-muted);
+  font-size: 0.82rem;
+  line-height: 1.3;
+  margin: 0.24rem 0;
+}
+
+.co-comparison-review-path li strong {
+  display: block;
+  font-size: 0.82rem;
+}
+
+.co-comparison-review-path code {
+  color: var(--co-ink);
+  display: block;
+  font-size: 0.78rem;
+  margin-top: 0.12rem;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.co-comparison-review-path span {
+  display: block;
+  margin-top: 0.12rem;
+}
+
 .co-thread-brief {
   background: var(--co-panel);
   border: 1px solid var(--co-border);
@@ -1060,6 +1106,42 @@ def comparison_followup_html(comparison: dict[str, object]) -> str:
     )
 
 
+def comparison_review_path_html(comparison: dict[str, object], limit: int = 5) -> str:
+    review_path = comparison.get("review_path")
+    if not isinstance(review_path, list):
+        return ""
+    items = []
+    for step in review_path[:limit]:
+        if not isinstance(step, dict):
+            continue
+        label = str(step.get("label") or "").strip()
+        command = str(step.get("command") or "").strip()
+        success = str(step.get("success_check") or "").strip()
+        if not label and not command and not success:
+            continue
+        body = command or success
+        success_part = (
+            f"<span>{html.escape(success)}</span>"
+            if success and success != body
+            else ""
+        )
+        items.append(
+            "<li>"
+            f"<strong>{html.escape(label or 'Review step')}</strong>"
+            f"<code>{html.escape(body)}</code>"
+            f"{success_part}"
+            "</li>"
+        )
+    if not items:
+        return ""
+    return (
+        '<div class="co-comparison-review-path">'
+        "<strong>Comparison review path</strong>"
+        "<ol>" + "".join(items) + "</ol>"
+        "</div>"
+    )
+
+
 def comparison_preview_html(comparison: dict[str, object]) -> str:
     triage = comparison.get("triage_risk", {})
     opportunity = comparison.get("opportunity_change", {})
@@ -1093,6 +1175,7 @@ def comparison_preview_html(comparison: dict[str, object]) -> str:
             f"  <p><strong>Opportunity movement:</strong> {opportunity_summary}</p>",
             f"  <p><strong>Next step:</strong> {recommendation}</p>",
             comparison_delta_cards_html(comparison),
+            comparison_review_path_html(comparison),
             comparison_followup_html(comparison),
             "</section>",
         ]

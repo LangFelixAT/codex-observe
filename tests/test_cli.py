@@ -205,6 +205,12 @@ def write_valid_visual_manifest(root: Path) -> None:
                     "body": "Comparison quick read: regressed Verdict: regressed; largest change: Total tokens +49.1k (regressed). Triage movement: regressed Next step: Inspect new diagnostic first: Repeated prompt blocks. Next validation command codex-observe report --db <db> --session-id <next-session-id> --format json --out next-run-report.json",
                 }
             ],
+            "comparison_review_paths": [
+                {
+                    "label": "Comparison review path",
+                    "body": "Comparison review path Read the verdict Act on the recommendation Export the next run Compare against this after run File safe feedback",
+                }
+            ],
             "comparison_deltas": [
                 {
                     "label": "Total tokens",
@@ -407,6 +413,9 @@ def test_visual_manifest_evidence_rejects_stale_minimal_manifest_shape(
     assert "visual QA manifest desktop missing layout review" in failures
     assert "visual QA manifest missing desktop operator briefing evidence" in failures
     assert "visual QA manifest missing desktop comparison preview evidence" in failures
+    assert (
+        "visual QA manifest missing desktop comparison review path evidence" in failures
+    )
     assert "visual QA manifest missing desktop comparison delta evidence" in failures
     assert (
         "visual QA manifest narrow agent detail selector was not exercised" in failures
@@ -630,7 +639,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
         == "manifest, reviewer README action plan and key findings, review checklist, feedback runbook, reproduce-local commands, validation commands, limitations doc, aggregate reports, and audit artifact verified"
     )
     assert (
-        "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, metric cards, dashboard quick reads, report and comparison downloads, comparison preview and deltas, operator briefing, next review path, and success target verified"
+        "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, metric cards, dashboard quick reads, report and comparison downloads, comparison preview, comparison review path, deltas, operator briefing, next review path, and success target verified"
         in checks["visual QA manifest evidence"]["detail"]
     )
     report_payload = json.loads(report.with_suffix(".json").read_text(encoding="utf-8"))

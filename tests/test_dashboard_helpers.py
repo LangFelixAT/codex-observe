@@ -19,6 +19,7 @@ from codex_observe.dashboard import (
     comparison_download_payloads,
     comparison_followup_html,
     comparison_preview_html,
+    comparison_review_path_html,
     conversation_button_label,
     dashboard_css,
     data_inventory_html,
@@ -530,6 +531,7 @@ def test_dashboard_css_contains_polish_hooks_without_viewport_scaled_type() -> N
     assert ".co-comparison-deltas" in css
     assert ".co-comparison-delta" in css
     assert ".co-comparison-followup" in css
+    assert ".co-comparison-review-path" in css
     assert ".co-thread-brief" in css
     assert ".co-tool-brief" in css
     assert ".co-duplication-brief" in css
@@ -775,6 +777,13 @@ def test_comparison_preview_html_summarizes_and_escapes_quick_read() -> None:
             "next_command_templates": [
                 "codex-observe report --db <db> --session-id <next-session-id> --format json --out next-run-report.json"
             ],
+            "review_path": [
+                {
+                    "label": "Read the verdict",
+                    "command": "Review comparison <Quick Read>",
+                    "success_check": "Verdict is actionable",
+                }
+            ],
         }
     )
 
@@ -787,11 +796,45 @@ def test_comparison_preview_html_summarizes_and_escapes_quick_read() -> None:
     assert "Top opportunity stayed &lt;largest&gt;." in rendered
     assert "Keep change &amp; compare again." in rendered
     assert "Next validation command" in rendered
+    assert "Comparison review path" in rendered
+    assert "Read the verdict" in rendered
     assert (
         "codex-observe report --db &lt;db&gt; --session-id &lt;next-session-id&gt; --format json --out next-run-report.json"
         in rendered
     )
     assert "improved <ok>" not in rendered
+
+
+def test_comparison_review_path_html_renders_ordered_steps_and_escapes() -> None:
+    rendered = comparison_review_path_html(
+        {
+            "review_path": [
+                {
+                    "label": "Read <verdict>",
+                    "command": "Review <Quick Read>",
+                    "success_check": "Verdict is <mixed>",
+                },
+                {
+                    "label": "Compare again",
+                    "command": "codex-observe compare --before-report <after> --after-report next.json",
+                    "success_check": "Next comparison has deltas",
+                },
+            ]
+        }
+    )
+
+    assert 'class="co-comparison-review-path"' in rendered
+    assert "Comparison review path" in rendered
+    assert "Read &lt;verdict&gt;" in rendered
+    assert "<code>Review &lt;Quick Read&gt;</code>" in rendered
+    assert "Verdict is &lt;mixed&gt;" in rendered
+    assert "codex-observe compare --before-report &lt;after&gt;" in rendered
+    assert "Read <verdict>" not in rendered
+
+
+def test_comparison_review_path_html_returns_empty_string_without_steps() -> None:
+    assert comparison_review_path_html({}) == ""
+    assert comparison_review_path_html({"review_path": [{"ignored": ""}]}) == ""
 
 
 def test_comparison_followup_html_escapes_command_template() -> None:

@@ -30,6 +30,7 @@ collect_review_paths = visual_qa.collect_review_paths
 review_path_failures = visual_qa.review_path_failures
 download_control_failures = visual_qa.download_control_failures
 comparison_preview_failures = visual_qa.comparison_preview_failures
+comparison_review_path_failures = visual_qa.comparison_review_path_failures
 comparison_delta_failures = visual_qa.comparison_delta_failures
 visual_empty_state_failures = visual_qa.visual_empty_state_failures
 
@@ -195,6 +196,32 @@ def test_comparison_preview_failures_require_quick_read_contract() -> None:
     assert "narrow: comparison preview card not rendered" in failures
 
 
+def test_comparison_review_path_failures_require_ordered_steps() -> None:
+    assert (
+        comparison_review_path_failures(
+            [
+                {
+                    "body": "Comparison review path Read the verdict Act on the recommendation Export the next run Compare against this after run File safe feedback"
+                }
+            ],
+            "desktop",
+        )
+        == []
+    )
+
+    failures = comparison_review_path_failures([], "narrow")
+
+    assert "narrow: comparison review path not rendered" in failures
+
+    failures = comparison_review_path_failures(
+        [{"body": "Comparison review path Read the verdict"}], "desktop"
+    )
+
+    assert (
+        "desktop: comparison review path missing: Act on the recommendation" in failures
+    )
+
+
 def test_comparison_delta_failures_require_metric_delta_cards() -> None:
     assert (
         comparison_delta_failures(
@@ -323,6 +350,12 @@ def complete_viewport_results(tmp_path: Path) -> dict[str, dict[str, object]]:
                 {
                     "label": "Comparison quick read: regressed",
                     "body": "Comparison quick read: regressed Verdict: regressed; largest change: Total tokens +49.1k (regressed). Triage movement: regressed Next step: Inspect new diagnostic first: Repeated prompt blocks. Next validation command codex-observe report --db <db> --session-id <next-session-id> --format json --out next-run-report.json",
+                }
+            ],
+            "comparison_review_paths": [
+                {
+                    "label": "Comparison review path",
+                    "body": "Comparison review path Read the verdict Act on the recommendation Export the next run Compare against this after run File safe feedback",
                 }
             ],
             "comparison_deltas": [
@@ -457,6 +490,13 @@ def test_visual_manifest_records_review_evidence(tmp_path: Path) -> None:
     assert loaded["viewports"]["desktop"]["comparison_previews"][0]["label"] == (
         "Comparison quick read: regressed"
     )
+    assert loaded["viewports"]["desktop"]["comparison_review_paths"][0]["label"] == (
+        "Comparison review path"
+    )
+    assert (
+        "Act on the recommendation"
+        in loaded["viewports"]["desktop"]["comparison_review_paths"][0]["body"]
+    )
     assert loaded["viewports"]["desktop"]["comparison_deltas"][0] == {
         "label": "Total tokens",
         "before_after": "8.4k -> 57.5k",
@@ -499,6 +539,7 @@ def test_visual_manifest_failures_rejects_incomplete_evidence(tmp_path: Path) ->
                 "operator_briefings": [],
                 "review_paths": [],
                 "comparison_previews": [],
+                "comparison_review_paths": [],
                 "comparison_deltas": [],
                 "layout_review": {
                     "viewport_width": 390,
@@ -525,6 +566,7 @@ def test_visual_manifest_failures_rejects_incomplete_evidence(tmp_path: Path) ->
     assert "manifest desktop operator briefing card not rendered" in failures
     assert "manifest desktop next review path card not rendered" in failures
     assert "manifest desktop comparison preview card not rendered" in failures
+    assert "manifest desktop comparison review path not rendered" in failures
     assert "manifest desktop comparison delta cards not rendered" in failures
     assert (
         "manifest desktop report download control not found: Download report JSON"

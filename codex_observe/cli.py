@@ -56,6 +56,14 @@ EXPECTED_VISUAL_COMPARISON_DELTAS = {
     "Total tokens": "regressed",
     "Largest thread tokens": "regressed",
 }
+EXPECTED_VISUAL_COMPARISON_REVIEW_PATH = {
+    "Comparison review path",
+    "Read the verdict",
+    "Act on the recommendation",
+    "Export the next run",
+    "Compare against this after run",
+    "File safe feedback",
+}
 EXPECTED_VISUAL_METRICS = {
     "Threads": "3",
     "Largest thread": "33.2k tokens (57.7%)",
@@ -1606,6 +1614,26 @@ def visual_manifest_evidence_failures(root: Path) -> list[str]:
                 failures.append(
                     f"visual QA manifest {viewport_name} missing comparison preview evidence: {', '.join(sorted(missing_preview))}"
                 )
+        comparison_review_paths = viewport.get("comparison_review_paths")
+        if not isinstance(comparison_review_paths, list) or not comparison_review_paths:
+            failures.append(
+                f"visual QA manifest missing {viewport_name} comparison review path evidence"
+            )
+        else:
+            comparison_review_text = "\n".join(
+                str(item.get("body") or item.get("label") or "")
+                for item in comparison_review_paths
+                if isinstance(item, dict)
+            )
+            missing_comparison_review_path = EXPECTED_VISUAL_COMPARISON_REVIEW_PATH - {
+                expected
+                for expected in EXPECTED_VISUAL_COMPARISON_REVIEW_PATH
+                if expected in comparison_review_text
+            }
+            if missing_comparison_review_path:
+                failures.append(
+                    f"visual QA manifest {viewport_name} missing comparison review path evidence: {', '.join(sorted(missing_comparison_review_path))}"
+                )
         comparison_deltas = viewport.get("comparison_deltas")
         if not isinstance(comparison_deltas, list) or not comparison_deltas:
             failures.append(
@@ -2371,7 +2399,7 @@ def release_audit_report(
         f"{VISUAL_MANIFEST.as_posix()}; "
         f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['desktop']).as_posix()}; "
         f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['narrow']).as_posix()}; "
-        "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, metric cards, dashboard quick reads, report and comparison downloads, comparison preview and deltas, operator briefing, next review path, and success target verified"
+        "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, metric cards, dashboard quick reads, report and comparison downloads, comparison preview, comparison review path, deltas, operator briefing, next review path, and success target verified"
         if not visual_manifest_failures
         else "; ".join(visual_manifest_failures[:3]),
     )
@@ -2660,7 +2688,7 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
             "title": "Capture and verify UI evidence",
             "evidence": [
                 "visual manifest records desktop and narrow screenshots",
-                "layout review, sidebar risk labels, metric cards, comparison metric delta cards, report and comparison download controls, operator briefing, next review path, dashboard quick reads, and success target are verified",
+                "layout review, sidebar risk labels, metric cards, comparison metric delta cards, comparison review path, report and comparison download controls, operator briefing, next review path, dashboard quick reads, and success target are verified",
                 "tab checks cover Agent detail thread brief, Timeline quick read, Tools quick read, Duplication quick read, and Raw tables data inventory",
             ],
             "success_checks": [
