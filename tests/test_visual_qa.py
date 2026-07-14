@@ -26,6 +26,7 @@ risk_distribution_failures = visual_qa.risk_distribution_failures
 metric_card_failures = visual_qa.metric_card_failures
 metric_card_value_failures = visual_qa.metric_card_value_failures
 sidebar_risk_label_failures = visual_qa.sidebar_risk_label_failures
+sidebar_session_detail_failures = visual_qa.sidebar_session_detail_failures
 operator_briefing_failures = visual_qa.operator_briefing_failures
 collect_review_paths = visual_qa.collect_review_paths
 review_path_failures = visual_qa.review_path_failures
@@ -201,6 +202,14 @@ def test_sidebar_risk_label_failures_require_high_and_low_risk_labels() -> None:
     failures = sidebar_risk_label_failures(["High risk"], "narrow")
 
     assert "narrow: sidebar risk label not found: Low risk" in failures
+
+
+def test_sidebar_session_detail_failures_require_snapshot_context() -> None:
+    assert sidebar_session_detail_failures(["6 snapshots"], "desktop") == []
+
+    failures = sidebar_session_detail_failures([], "narrow")
+
+    assert "narrow: sidebar session detail not found: 6 snapshots" in failures
 
 
 def test_download_control_failures_require_report_exports() -> None:
@@ -410,6 +419,7 @@ def complete_viewport_results(tmp_path: Path) -> dict[str, dict[str, object]]:
             "quick_read_evidence": list(visual_qa.EXPECTED_QUICK_READ_EVIDENCE),
             "agent_detail_selector_exercised": True,
             "sidebar_risk_labels": ["High risk", "Low risk"],
+            "sidebar_session_details": ["6 snapshots"],
             "risk_distributions": [
                 {
                     "label": "Risk distribution",
@@ -574,6 +584,7 @@ def test_visual_manifest_records_review_evidence(tmp_path: Path) -> None:
         "High risk",
         "Low risk",
     ]
+    assert loaded["viewports"]["desktop"]["sidebar_session_details"] == ["6 snapshots"]
     assert loaded["viewports"]["desktop"]["risk_distributions"][0]["label"] == (
         "Risk distribution"
     )

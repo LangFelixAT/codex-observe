@@ -211,6 +211,9 @@ def write_valid_visual_manifest(root: Path) -> None:
                 "clipped_text_elements": [],
             },
             "sidebar_risk_labels": sorted(cli.EXPECTED_VISUAL_RISK_LABELS),
+            "sidebar_session_details": sorted(
+                cli.EXPECTED_VISUAL_SIDEBAR_SESSION_DETAILS
+            ),
             "risk_distributions": [
                 {
                     "label": "Risk distribution",
@@ -383,6 +386,7 @@ def test_visual_manifest_evidence_failures_validate_saved_sidebar_metric_and_suc
 
     payload = json.loads(manifest_path.read_text(encoding="utf-8"))
     payload["viewports"]["desktop"]["sidebar_risk_labels"] = ["High risk"]
+    payload["viewports"]["desktop"]["sidebar_session_details"] = []
     payload["viewports"]["desktop"]["quick_read_evidence"] = [
         {"tab": "Overview", "text": "Run triage"}
     ]
@@ -401,6 +405,10 @@ def test_visual_manifest_evidence_failures_validate_saved_sidebar_metric_and_suc
     failures = cli.visual_manifest_evidence_failures(tmp_path)
 
     assert "visual QA manifest desktop missing risk labels: Low risk" in failures
+    assert (
+        "visual QA manifest desktop missing sidebar session details: 6 snapshots"
+        in failures
+    )
     assert (
         "visual QA manifest desktop quick-read evidence missing Agent detail: Thread brief"
         in failures
@@ -446,6 +454,7 @@ def test_visual_manifest_evidence_rejects_stale_minimal_manifest_shape(
                 "viewports": {
                     name: {
                         "sidebar_risk_labels": ["High risk", "Low risk"],
+                        "sidebar_session_details": ["6 snapshots"],
                         "metric_cards": [
                             {"label": label, "value": value}
                             for label, value in cli.EXPECTED_VISUAL_METRICS.items()
@@ -789,7 +798,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
         == "manifest, terminal and reviewer README action plan, key findings, review checklist, feedback handoff, feedback runbook, feedback issue template, reproduce-local commands, validation commands, limitations doc, aggregate reports, and audit artifact verified"
     )
     assert (
-        "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, risk distribution, metric cards, dashboard quick reads, report and comparison downloads, comparison preview, comparison review path, deltas, operator briefing, next review path, next-run checklist, safe feedback handoff, and success target verified"
+        "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, sidebar session details, risk distribution, metric cards, dashboard quick reads, report and comparison downloads, comparison preview, comparison review path, deltas, operator briefing, next review path, next-run checklist, safe feedback handoff, and success target verified"
         in checks["visual QA manifest evidence"]["detail"]
     )
     report_payload = json.loads(report.with_suffix(".json").read_text(encoding="utf-8"))

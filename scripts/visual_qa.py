@@ -56,6 +56,7 @@ EXPECTED_QUICK_READ_EVIDENCE = [
 
 EXPECTED_METRIC_CARDS = ["Threads", "Largest thread", "Uncached input"]
 EXPECTED_SIDEBAR_RISK_LABELS = ["High risk", "Low risk"]
+EXPECTED_SIDEBAR_SESSION_DETAILS = ["6 snapshots"]
 EXPECTED_DOWNLOAD_CONTROLS = [
     "Download report MD",
     "Download report JSON",
@@ -208,6 +209,28 @@ def sidebar_risk_label_failures(labels: list[str], viewport_name: str) -> list[s
         f"{viewport_name}: sidebar risk label not found: {label}"
         for label in EXPECTED_SIDEBAR_RISK_LABELS
         if label not in observed
+    ]
+
+
+def collect_sidebar_session_details(page) -> list[str]:
+    return page.evaluate(
+        r"""
+() => {
+  const text = document.body.innerText || '';
+  return ['6 snapshots'].filter((label) => text.includes(label));
+}
+        """
+    )
+
+
+def sidebar_session_detail_failures(
+    details: list[str], viewport_name: str
+) -> list[str]:
+    observed = set(details)
+    return [
+        f"{viewport_name}: sidebar session detail not found: {detail}"
+        for detail in EXPECTED_SIDEBAR_SESSION_DETAILS
+        if detail not in observed
     ]
 
 
@@ -642,6 +665,10 @@ def validate_dashboard_page(
         pass
     sidebar_risk_labels = collect_sidebar_risk_labels(page)
     failures.extend(sidebar_risk_label_failures(sidebar_risk_labels, viewport_name))
+    sidebar_session_details = collect_sidebar_session_details(page)
+    failures.extend(
+        sidebar_session_detail_failures(sidebar_session_details, viewport_name)
+    )
     risk_distributions = collect_risk_distributions(page)
     failures.extend(risk_distribution_failures(risk_distributions, viewport_name))
     metric_cards = collect_metric_cards(page)
@@ -731,6 +758,7 @@ def validate_dashboard_page(
         "risk_distributions": risk_distributions,
         "metric_cards": metric_cards,
         "sidebar_risk_labels": sidebar_risk_labels,
+        "sidebar_session_details": sidebar_session_details,
         "success_targets": success_targets,
         "operator_briefings": operator_briefings,
         "review_paths": review_paths,
@@ -1125,6 +1153,18 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
             failures.extend(
                 failure.replace(f"{name}: ", f"manifest {name} ")
                 for failure in risk_failures
+            )
+
+        sidebar_session_details = raw.get("sidebar_session_details")
+        if not isinstance(sidebar_session_details, list):
+            failures.append(f"manifest {name} missing sidebar session detail evidence")
+        else:
+            detail_failures = sidebar_session_detail_failures(
+                sidebar_session_details, name
+            )
+            failures.extend(
+                failure.replace(f"{name}: ", f"manifest {name} ")
+                for failure in detail_failures
             )
 
         risk_distributions = raw.get("risk_distributions")

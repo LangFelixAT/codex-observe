@@ -1549,12 +1549,20 @@ def order_conversations_for_review(
         str(summary.get("session_id")): str(summary.get("triage_risk") or "unknown")
         for summary in summaries
     }
+    usage_snapshots_by_session = {
+        str(summary.get("session_id")): int(summary.get("usage_snapshots") or 0)
+        for summary in summaries
+    }
     if not order_by_session:
         return conversations
     ordered = conversations.copy()
     fallback_start = len(order_by_session)
     ordered["triage_risk"] = [
         risk_by_session.get(str(session_id), "unknown")
+        for session_id in ordered["session_id"]
+    ]
+    ordered["usage_snapshots"] = [
+        usage_snapshots_by_session.get(str(session_id), 0)
         for session_id in ordered["session_id"]
     ]
     ordered["_review_order"] = [
@@ -2022,6 +2030,7 @@ def main() -> None:
                     bits.append(t)
                 bits.append(f"{int(row.get('thread_count') or 0)} threads")
                 bits.append(f"{fmt_int(row.get('sidebar_tool_calls') or 0)} tools")
+                bits.append(f"{fmt_int(row.get('usage_snapshots') or 0)} snapshots")
                 bits.append(f"{fmt_short(row.get('total_tokens') or 0)} tokens")
                 st.caption(" | ".join(bits))
         session_id = st.session_state["selected_session_id"]

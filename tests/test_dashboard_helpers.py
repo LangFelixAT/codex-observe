@@ -59,14 +59,15 @@ def test_order_conversations_for_review_uses_risk_aware_session_summaries() -> N
         ]
     )
     summaries = [
-        {"session_id": "older-high", "triage_risk": "high"},
-        {"session_id": "newer-low", "triage_risk": "low"},
+        {"session_id": "older-high", "triage_risk": "high", "usage_snapshots": 6},
+        {"session_id": "newer-low", "triage_risk": "low", "usage_snapshots": 3},
     ]
 
     ordered = order_conversations_for_review(conversations, summaries)
 
     assert ordered["session_id"].tolist() == ["older-high", "newer-low"]
     assert ordered["triage_risk"].tolist() == ["high", "low"]
+    assert ordered["usage_snapshots"].tolist() == [6, 3]
     assert "_review_order" not in ordered.columns
 
 

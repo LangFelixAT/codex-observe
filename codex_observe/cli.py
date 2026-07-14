@@ -39,6 +39,7 @@ VISUAL_MANIFEST_RECOVERY = (
     f"`python scripts/visual_qa.py --verify-manifest {VISUAL_MANIFEST.as_posix()}`"
 )
 EXPECTED_VISUAL_RISK_LABELS = {"High risk", "Low risk"}
+EXPECTED_VISUAL_SIDEBAR_SESSION_DETAILS = {"6 snapshots"}
 EXPECTED_VISUAL_DOWNLOAD_CONTROLS = {
     "Download report MD",
     "Download report JSON",
@@ -1659,6 +1660,20 @@ def visual_manifest_evidence_failures(root: Path) -> list[str]:
                 failures.append(
                     f"visual QA manifest {viewport_name} missing risk labels: {', '.join(sorted(missing))}"
                 )
+        session_details = viewport.get("sidebar_session_details")
+        if not isinstance(session_details, list):
+            failures.append(
+                f"visual QA manifest missing {viewport_name} sidebar session details"
+            )
+        else:
+            missing_details = EXPECTED_VISUAL_SIDEBAR_SESSION_DETAILS - {
+                str(detail) for detail in session_details
+            }
+            if missing_details:
+                failures.append(
+                    f"visual QA manifest {viewport_name} missing sidebar session details: {', '.join(sorted(missing_details))}"
+                )
+
         risk_distributions = viewport.get("risk_distributions")
         if not isinstance(risk_distributions, list) or not risk_distributions:
             failures.append(
@@ -2736,7 +2751,7 @@ def release_audit_report(
         f"{VISUAL_MANIFEST.as_posix()}; "
         f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['desktop']).as_posix()}; "
         f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['narrow']).as_posix()}; "
-        "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, risk distribution, metric cards, dashboard quick reads, report and comparison downloads, comparison preview, comparison review path, deltas, operator briefing, next review path, next-run checklist, safe feedback handoff, and success target verified"
+        "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, sidebar session details, risk distribution, metric cards, dashboard quick reads, report and comparison downloads, comparison preview, comparison review path, deltas, operator briefing, next review path, next-run checklist, safe feedback handoff, and success target verified"
         if not visual_manifest_failures
         else "; ".join(visual_manifest_failures[:3]),
     )
@@ -3054,7 +3069,7 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
             "title": "Capture and verify UI evidence",
             "evidence": [
                 "visual manifest records desktop and narrow screenshots",
-                "layout review, sidebar risk labels, metric cards, comparison metric delta cards, comparison review path, report and comparison download controls, operator briefing, next review path, safe feedback handoff, dashboard quick reads, and success target are verified",
+                "layout review, sidebar risk labels, sidebar session details, metric cards, comparison metric delta cards, comparison review path, report and comparison download controls, operator briefing, next review path, safe feedback handoff, dashboard quick reads, and success target are verified",
                 "tab checks cover Agent detail thread brief, Timeline quick read, Tools quick read, Duplication quick read, and Raw tables data inventory",
             ],
             "success_checks": [
