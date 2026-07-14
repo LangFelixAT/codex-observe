@@ -576,6 +576,16 @@ def test_public_evidence_bundle_artifact_failures_require_limitations(
 
     assert "evidence bundle manifest missing validation_commands" in failures
 
+    without_handoff = dict(manifest)
+    without_handoff.pop("feedback_handoff")
+    (bundle / "evidence-bundle.json").write_text(
+        json.dumps(without_handoff), encoding="utf-8"
+    )
+
+    failures = cli.public_evidence_bundle_artifact_failures(Path.cwd(), bundle)
+
+    assert "evidence bundle manifest missing feedback_handoff" in failures
+
 
 def test_public_evidence_bundle_audit_accepts_absolute_bundle_paths(
     tmp_path: Path,
@@ -702,7 +712,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     )
     assert (
         checks["public evidence bundle artifacts"]["detail"]
-        == "manifest, terminal and reviewer README action plan, key findings, review checklist, feedback runbook, reproduce-local commands, validation commands, limitations doc, aggregate reports, and audit artifact verified"
+        == "manifest, terminal and reviewer README action plan, key findings, review checklist, feedback handoff, feedback runbook, reproduce-local commands, validation commands, limitations doc, aggregate reports, and audit artifact verified"
     )
     assert (
         "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, metric cards, dashboard quick reads, report and comparison downloads, comparison preview, comparison review path, deltas, operator briefing, next review path, and success target verified"
@@ -1265,6 +1275,18 @@ def test_public_evidence_bundle_writes_privacy_safe_manifest_and_artifacts(
     assert "Verify reproducibility gates" in action_plan_text
     assert "Validate the next real run" in action_plan_text
     assert "File feedback safely" in action_plan_text
+    feedback_handoff = loaded["feedback_handoff"]
+    assert feedback_handoff["runbook"] == "docs/PUBLIC_TOUR_FEEDBACK.md"
+    assert (
+        feedback_handoff["issue_template"]
+        == ".github/ISSUE_TEMPLATE/public_tour_feedback.yml"
+    )
+    assert (
+        "synthetic or reviewed-redacted evidence" in feedback_handoff["evidence_rule"]
+    )
+    assert "reviewer evidence bundle" in feedback_handoff["safe_sources"]
+    assert "private prompts" in feedback_handoff["do_not_collect"]
+    assert str(tmp_path) not in json.dumps(feedback_handoff)
     assert "success_check" in action_plan_text
     assert str(tmp_path) not in action_plan_text
     validation_commands = loaded["validation_commands"]
@@ -1327,6 +1349,12 @@ def test_public_evidence_bundle_writes_privacy_safe_manifest_and_artifacts(
     assert "Verify release gates" in readme
     assert "next validation command" in readme
     assert "comparison review path" in readme
+    assert "## Feedback Handoff" in readme
+    assert "docs/PUBLIC_TOUR_FEEDBACK.md" in readme
+    assert ".github/ISSUE_TEMPLATE/public_tour_feedback.yml" in readme
+    assert "synthetic or reviewed-redacted evidence" in readme
+    assert "Safe feedback sources" in readme
+    assert "Do not collect" in readme
     assert "## Validate The Next Run" in readme
     assert "Next Report" in readme
     assert "Next Comparison" in readme
@@ -1393,6 +1421,11 @@ def test_evidence_bundle_cli_json_and_text_outputs_are_actionable(
         assert (
             payload["action_plan"][0]["label"] == "Establish the safe review boundary"
         )
+        assert payload["feedback_handoff"]["runbook"] == "docs/PUBLIC_TOUR_FEEDBACK.md"
+        assert (
+            payload["feedback_handoff"]["issue_template"]
+            == ".github/ISSUE_TEMPLATE/public_tour_feedback.yml"
+        )
         assert "next_report" in payload["validation_commands"]
         assert payload["validation_commands"]["next_report"].startswith(
             "codex-observe report --db <db> --session-id <next-session-id>"
@@ -1437,6 +1470,19 @@ def test_evidence_bundle_cli_json_and_text_outputs_are_actionable(
     assert "Check workflow-change evidence: demo/run-comparison.md" in captured.out
     assert "comparison review path" in captured.out
     assert "Validation commands:" in captured.out
+    assert "Feedback handoff:" in captured.out
+    assert "Runbook: docs/PUBLIC_TOUR_FEEDBACK.md" in captured.out
+    assert (
+        "Issue template: .github/ISSUE_TEMPLATE/public_tour_feedback.yml"
+        in captured.out
+    )
+    assert "Safe feedback sources:" in captured.out
+    assert "Do not collect:" in captured.out
+    assert "private prompts" in captured.out
+    assert captured.out.index("Validation commands:") < captured.out.index(
+        "Feedback handoff:"
+    )
+    assert captured.out.index("Feedback handoff:") < captured.out.index("Artifacts:")
     assert (
         "next_report: codex-observe report --db <db> --session-id <next-session-id>"
         in captured.out

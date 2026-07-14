@@ -22,6 +22,7 @@ The project follows semantic versioning once release distribution is decided.
 - Added a public-tour `feedback_handoff` contract for the safe feedback runbook, issue template, and evidence rules.
 - Expanded the public-tour feedback template to capture tour JSON, audit JSON, visual QA generation, and JSON report/comparison review steps.
 - Expanded plain public-tour feedback handoff text with safe feedback sources and do-not-collect guidance.
+- Added structured feedback handoff metadata to reviewer evidence bundles and audit validation.
 - Added a top-level public-tour review path so text and JSON tour output expose the end-to-end evaluation checklist.
 - Added a structured session review path to sessions JSON and plain-text listings so terminal users can move from diagnosis to report, comparison, next-run validation, and safe feedback.
 - Added a dashboard next-review path card with visual QA evidence so users can move from diagnosis to validation without leaving the Overview.
@@ -112,3 +113,5 @@ The project follows semantic versioning once release distribution is decided.
 - `codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --format json --out .artifacts/demo/run-comparison.json`
 - `codex-observe evidence-bundle --out .artifacts/public-evidence --skip-visual --json`
 - `python scripts/visual_qa.py`
+
+

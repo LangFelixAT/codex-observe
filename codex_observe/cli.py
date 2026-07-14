@@ -742,6 +742,7 @@ def public_evidence_bundle_artifact_failures(
     review_checklist = manifest.get("review_checklist")
     action_plan = manifest.get("action_plan")
     validation_commands = manifest.get("validation_commands")
+    feedback_handoff = manifest.get("feedback_handoff")
     if not isinstance(review_checklist, list) or not review_checklist:
         failures.append("evidence bundle manifest missing review_checklist")
     else:
@@ -786,6 +787,22 @@ def public_evidence_bundle_artifact_failures(
                     f"evidence bundle validation_commands {key} missing {snippet}"
                 )
 
+    if not isinstance(feedback_handoff, dict):
+        failures.append("evidence bundle manifest missing feedback_handoff")
+    else:
+        handoff_text = json.dumps(feedback_handoff)
+        for required in [
+            "docs/PUBLIC_TOUR_FEEDBACK.md",
+            ".github/ISSUE_TEMPLATE/public_tour_feedback.yml",
+            "synthetic or reviewed-redacted evidence",
+            "reviewer evidence bundle",
+            "private prompts",
+            "raw logs",
+            "unreviewed screenshots",
+        ]:
+            if required not in handoff_text:
+                failures.append(f"evidence bundle feedback_handoff missing {required}")
+
     terminal_lines = evidence_bundle_lines(str(bundle_dir), manifest)
     terminal_text = "\n".join(terminal_lines)
     for required in [
@@ -793,6 +810,12 @@ def public_evidence_bundle_artifact_failures(
         "Key findings:",
         "Review checklist:",
         "Validation commands:",
+        "Feedback handoff:",
+        "Runbook: docs/PUBLIC_TOUR_FEEDBACK.md",
+        "Issue template: .github/ISSUE_TEMPLATE/public_tour_feedback.yml",
+        "Safe feedback sources:",
+        "Do not collect:",
+        "private prompts",
         "Artifacts:",
         "Confirm the bundle boundary: LIMITATIONS.md",
         "Check workflow-change evidence: demo/run-comparison.md",
@@ -806,7 +829,8 @@ def public_evidence_bundle_artifact_failures(
         ("Reviewer action plan:", "Key findings:"),
         ("Key findings:", "Review checklist:"),
         ("Review checklist:", "Validation commands:"),
-        ("Validation commands:", "Artifacts:"),
+        ("Validation commands:", "Feedback handoff:"),
+        ("Feedback handoff:", "Artifacts:"),
     ]:
         if before in terminal_text and after in terminal_text:
             if terminal_text.index(before) > terminal_text.index(after):
@@ -855,6 +879,12 @@ def public_evidence_bundle_artifact_failures(
             "codex-observe report --db demo/codex_observe_demo.sqlite --out demo/run-report.md",
             "codex-observe compare --before-report demo/run-report.json --after-report demo/run-report.json --out demo/run-comparison.md",
             "codex-observe audit --json",
+            "## Feedback Handoff",
+            "docs/PUBLIC_TOUR_FEEDBACK.md",
+            ".github/ISSUE_TEMPLATE/public_tour_feedback.yml",
+            "synthetic or reviewed-redacted evidence",
+            "Safe feedback sources",
+            "Do not collect",
             "LIMITATIONS.md",
             "PUBLIC_TOUR_FEEDBACK.md",
             "File feedback safely",
@@ -2466,7 +2496,7 @@ def release_audit_report(
         add(
             "public evidence bundle artifacts",
             not public_bundle_failures,
-            "manifest, terminal and reviewer README action plan, key findings, review checklist, feedback runbook, reproduce-local commands, validation commands, limitations doc, aggregate reports, and audit artifact verified"
+            "manifest, terminal and reviewer README action plan, key findings, review checklist, feedback handoff, feedback runbook, reproduce-local commands, validation commands, limitations doc, aggregate reports, and audit artifact verified"
             if not public_bundle_failures
             else "; ".join(public_bundle_failures[:3]),
         )
@@ -3591,6 +3621,7 @@ def evidence_bundle_readme(manifest: dict[str, object]) -> str:
     review_checklist = manifest.get("review_checklist")
     validation_commands = manifest.get("validation_commands")
     action_plan = manifest.get("action_plan")
+    feedback_handoff = manifest.get("feedback_handoff")
     lines = [
         "# Codex Observe Evidence Bundle",
         "",
@@ -3663,6 +3694,29 @@ def evidence_bundle_readme(manifest: dict[str, object]) -> str:
             if isinstance(command, str) and command:
                 label = key.replace("_", " ").title()
                 lines.append(f"- {label}: `{command}`")
+
+    if isinstance(feedback_handoff, dict) and feedback_handoff:
+        lines.extend(["", "## Feedback Handoff", ""])
+        runbook = feedback_handoff.get("runbook")
+        issue_template = feedback_handoff.get("issue_template")
+        evidence_rule = feedback_handoff.get("evidence_rule")
+        if isinstance(runbook, str):
+            lines.append(f"- Runbook: `{runbook}`")
+        if isinstance(issue_template, str):
+            lines.append(f"- Issue template: `{issue_template}`")
+        if isinstance(evidence_rule, str):
+            lines.append(f"- Evidence rule: {evidence_rule}")
+        safe_sources = feedback_handoff.get("safe_sources")
+        if isinstance(safe_sources, list) and safe_sources:
+            lines.append(
+                "- Safe feedback sources: "
+                + "; ".join(str(item) for item in safe_sources)
+            )
+        do_not_collect = feedback_handoff.get("do_not_collect")
+        if isinstance(do_not_collect, list) and do_not_collect:
+            lines.append(
+                "- Do not collect: " + "; ".join(str(item) for item in do_not_collect)
+            )
 
     commands = manifest.get("commands")
     if isinstance(commands, list) and commands:
@@ -3890,6 +3944,7 @@ def public_evidence_bundle(
         "review_checklist": review_checklist,
         "action_plan": action_plan,
         "validation_commands": validation_commands,
+        "feedback_handoff": public_tour_feedback_handoff(),
         "checks": statuses,
         "next": next_step,
     }
@@ -3903,6 +3958,7 @@ def evidence_bundle_lines(output_dir: str, manifest: dict[str, object]) -> list[
     review_summary = manifest.get("review_summary")
     review_checklist = manifest.get("review_checklist")
     action_plan = manifest.get("action_plan")
+    feedback_handoff = manifest.get("feedback_handoff")
     lines = [
         f"Evidence bundle: {Path(output_dir).expanduser()}",
         f"Status: {manifest.get('status', 'unknown')}",
@@ -3940,6 +3996,25 @@ def evidence_bundle_lines(output_dir: str, manifest: dict[str, object]) -> list[
             command = validation_commands.get(key)
             if isinstance(command, str) and command:
                 lines.append(f"- {key}: {command}")
+    if isinstance(feedback_handoff, dict) and feedback_handoff:
+        lines.append("Feedback handoff:")
+        runbook = feedback_handoff.get("runbook")
+        issue_template = feedback_handoff.get("issue_template")
+        evidence_rule = feedback_handoff.get("evidence_rule")
+        if isinstance(runbook, str):
+            lines.append(f"- Runbook: {runbook}")
+        if isinstance(issue_template, str):
+            lines.append(f"- Issue template: {issue_template}")
+        if isinstance(evidence_rule, str):
+            lines.append(f"- Evidence rule: {evidence_rule}")
+        safe_sources = feedback_handoff.get("safe_sources")
+        if isinstance(safe_sources, list) and safe_sources:
+            lines.append("- Safe feedback sources:")
+            lines.extend(f"  - {item}" for item in safe_sources)
+        do_not_collect = feedback_handoff.get("do_not_collect")
+        if isinstance(do_not_collect, list) and do_not_collect:
+            lines.append("- Do not collect:")
+            lines.extend(f"  - {item}" for item in do_not_collect)
     lines.append("Artifacts:")
     if isinstance(artifacts, dict):
         for key, value in artifacts.items():
