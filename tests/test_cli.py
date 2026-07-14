@@ -569,6 +569,36 @@ def test_public_evidence_bundle_artifact_failures_require_limitations(
     assert "evidence bundle manifest missing validation_commands" in failures
 
 
+def test_public_evidence_bundle_audit_requires_terminal_handoff(
+    tmp_path: Path, monkeypatch
+) -> None:
+    bundle = tmp_path / "public-evidence"
+    manifest_path, previous_manifest = preserve_visual_manifest()
+    try:
+        write_valid_visual_manifest(Path.cwd())
+        status, _manifest = cli.public_evidence_bundle(str(bundle), run_visual=False)
+    finally:
+        restore_visual_manifest(manifest_path, previous_manifest)
+
+    assert status == 0
+
+    monkeypatch.setattr(
+        cli,
+        "evidence_bundle_lines",
+        lambda _output_dir, _manifest: [
+            "Evidence bundle: public-evidence",
+            "Status: ok",
+            "Artifacts:",
+        ],
+    )
+
+    failures = cli.public_evidence_bundle_artifact_failures(Path.cwd(), bundle)
+
+    assert "evidence bundle terminal output missing Reviewer action plan:" in failures
+    assert "evidence bundle terminal output missing Review checklist:" in failures
+    assert "evidence bundle terminal output missing Validation commands:" in failures
+
+
 def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     db = tmp_path / "demo.sqlite"
     sessions = tmp_path / "sessions"
@@ -636,7 +666,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     )
     assert (
         checks["public evidence bundle artifacts"]["detail"]
-        == "manifest, reviewer README action plan and key findings, review checklist, feedback runbook, reproduce-local commands, validation commands, limitations doc, aggregate reports, and audit artifact verified"
+        == "manifest, terminal and reviewer README action plan, key findings, review checklist, feedback runbook, reproduce-local commands, validation commands, limitations doc, aggregate reports, and audit artifact verified"
     )
     assert (
         "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, metric cards, dashboard quick reads, report and comparison downloads, comparison preview, comparison review path, deltas, operator briefing, next review path, and success target verified"

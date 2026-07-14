@@ -772,6 +772,40 @@ def public_evidence_bundle_artifact_failures(
                 failures.append(
                     f"evidence bundle validation_commands {key} missing {snippet}"
                 )
+
+    terminal_lines = evidence_bundle_lines(str(bundle_dir), manifest)
+    terminal_text = "\n".join(terminal_lines)
+    try:
+        root_label = str(root.resolve())
+    except OSError:
+        root_label = str(root)
+    for required in [
+        "Reviewer action plan:",
+        "Key findings:",
+        "Review checklist:",
+        "Validation commands:",
+        "Artifacts:",
+        "Confirm the bundle boundary: LIMITATIONS.md",
+        "Check workflow-change evidence: demo/run-comparison.md",
+        "comparison review path",
+        "next_report: codex-observe report --db <db> --session-id <next-session-id>",
+        "bundle_readme: README.md",
+    ]:
+        if required not in terminal_text:
+            failures.append(f"evidence bundle terminal output missing {required}")
+    for before, after in [
+        ("Reviewer action plan:", "Key findings:"),
+        ("Key findings:", "Review checklist:"),
+        ("Review checklist:", "Validation commands:"),
+        ("Validation commands:", "Artifacts:"),
+    ]:
+        if before in terminal_text and after in terminal_text:
+            if terminal_text.index(before) > terminal_text.index(after):
+                failures.append(
+                    f"evidence bundle terminal output orders {before} after {after}"
+                )
+    if root_label and root_label in terminal_text:
+        failures.append("evidence bundle terminal output includes local root path")
     expected_artifacts = {
         "bundle_readme": "README.md",
         "limitations_markdown": "LIMITATIONS.md",
@@ -2363,7 +2397,7 @@ def release_audit_report(
         add(
             "public evidence bundle artifacts",
             not public_bundle_failures,
-            "manifest, reviewer README action plan and key findings, review checklist, feedback runbook, reproduce-local commands, validation commands, limitations doc, aggregate reports, and audit artifact verified"
+            "manifest, terminal and reviewer README action plan, key findings, review checklist, feedback runbook, reproduce-local commands, validation commands, limitations doc, aggregate reports, and audit artifact verified"
             if not public_bundle_failures
             else "; ".join(public_bundle_failures[:3]),
         )

@@ -19,7 +19,7 @@ The current core loop is printed by `codex-observe tour` with a top-level review
 
 ## Quality Gates
 
-Before treating a change as release-ready, run these commands. Generate `.artifacts/public-evidence` before the final audit so `codex-observe audit --json` can validate the public evidence bundle README, manifest validation commands, `LIMITATIONS.md`, reports, and audit artifact. The audit reports `schema_version`, lists required commands in `required_commands` for automation, and reports actionable failures in `failed_checks`; plain `codex-observe audit` prints the same required command list for humans and a `Failed checks` section when a gate fails:
+Before treating a change as release-ready, run these commands. Generate `.artifacts/public-evidence` before the final audit so `codex-observe audit --json` can validate the public evidence bundle terminal handoff, README, manifest validation commands, `LIMITATIONS.md`, reports, and audit artifact. The audit reports `schema_version`, lists required commands in `required_commands` for automation, and reports actionable failures in `failed_checks`; plain `codex-observe audit` prints the same required command list for humans and a `Failed checks` section when a gate fails:
 
 ```bash
 ruff check
@@ -36,7 +36,7 @@ codex-observe audit --json
 
 The ingest contract gate verifies `codex-observe.ingest.v1` counts, skipped categories, structured `next_commands`, and structured `review_path` evidence.
 
-The visual QA manifest records desktop and narrow screenshots, exercised tabs, structured quick-read evidence, Agent detail selector exercise, missing/empty database onboarding states, sidebar risk labels, metric card evidence, comparison review-path and metric delta evidence, operator-briefing evidence, next-review path evidence, report-and-comparison-download-control evidence, success-target evidence, screenshot metadata, and layout review; the final audit verifies the saved manifest schema/contract, referenced screenshots, missing/empty database onboarding states, layout review, sidebar risk labels, high-risk metric evidence, structured quick-read evidence, operator-briefing evidence, next-review path evidence, comparison review-path and metric delta evidence, report-and-comparison-download-control evidence, success-target evidence, and generated public evidence bundle artifacts.
+The visual QA manifest records desktop and narrow screenshots, exercised tabs, structured quick-read evidence, Agent detail selector exercise, missing/empty database onboarding states, sidebar risk labels, metric card evidence, comparison review-path and metric delta evidence, operator-briefing evidence, next-review path evidence, report-and-comparison-download-control evidence, success-target evidence, screenshot metadata, and layout review; the final audit verifies the saved manifest schema/contract, referenced screenshots, missing/empty database onboarding states, layout review, sidebar risk labels, high-risk metric evidence, structured quick-read evidence, operator-briefing evidence, next-review path evidence, comparison review-path and metric delta evidence, report-and-comparison-download-control evidence, success-target evidence, and generated public evidence bundle artifacts, including the terminal handoff checklist.
 
 ## Tracking State
 
