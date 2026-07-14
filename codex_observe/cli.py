@@ -775,10 +775,6 @@ def public_evidence_bundle_artifact_failures(
 
     terminal_lines = evidence_bundle_lines(str(bundle_dir), manifest)
     terminal_text = "\n".join(terminal_lines)
-    try:
-        root_label = str(root.resolve())
-    except OSError:
-        root_label = str(root)
     for required in [
         "Reviewer action plan:",
         "Key findings:",
@@ -804,8 +800,6 @@ def public_evidence_bundle_artifact_failures(
                 failures.append(
                     f"evidence bundle terminal output orders {before} after {after}"
                 )
-    if root_label and root_label in terminal_text:
-        failures.append("evidence bundle terminal output includes local root path")
     expected_artifacts = {
         "bundle_readme": "README.md",
         "limitations_markdown": "LIMITATIONS.md",

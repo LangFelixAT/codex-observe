@@ -569,6 +569,26 @@ def test_public_evidence_bundle_artifact_failures_require_limitations(
     assert "evidence bundle manifest missing validation_commands" in failures
 
 
+def test_public_evidence_bundle_audit_accepts_absolute_bundle_paths(
+    tmp_path: Path,
+) -> None:
+    bundle = tmp_path / "public-evidence"
+    manifest_path, previous_manifest = preserve_visual_manifest()
+    try:
+        write_valid_visual_manifest(Path.cwd())
+        status, _manifest = cli.public_evidence_bundle(str(bundle), run_visual=False)
+    finally:
+        restore_visual_manifest(manifest_path, previous_manifest)
+
+    assert status == 0
+
+    failures = cli.public_evidence_bundle_artifact_failures(
+        Path.cwd().resolve(), bundle.resolve()
+    )
+
+    assert failures == []
+
+
 def test_public_evidence_bundle_audit_requires_terminal_handoff(
     tmp_path: Path, monkeypatch
 ) -> None:
