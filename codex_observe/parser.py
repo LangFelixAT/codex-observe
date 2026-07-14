@@ -325,6 +325,9 @@ def prompt_blocks_for_message(text: str) -> list[tuple[str, str]]:
 
 @dataclass
 class IngestResult:
+    files_matched: int = 0
+    files_skipped_by_limit: int = 0
+    newest_files_limit: int | None = None
     files_seen: int = 0
     files_imported: int = 0
     duplicate_files: int = 0
@@ -347,8 +350,10 @@ class CodexIngestor:
     def close(self) -> None:
         self.conn.close()
 
-    def ingest_paths(self, roots: Iterable[Path]) -> IngestResult:
-        result = IngestResult()
+    def ingest_paths(
+        self, roots: Iterable[Path], newest_files: int | None = None
+    ) -> IngestResult:
+        result = IngestResult(newest_files_limit=newest_files)
         paths: list[Path] = []
         for root in roots:
             root = Path(root).expanduser()
@@ -356,7 +361,17 @@ class CodexIngestor:
                 paths.append(root)
             elif root.is_dir():
                 paths.extend(root.rglob("*.jsonl"))
-        for path in sorted(set(paths)):
+        selected_paths = sorted(set(paths))
+        result.files_matched = len(selected_paths)
+        if newest_files is not None:
+            limit = max(1, int(newest_files))
+            selected_paths = sorted(
+                selected_paths, key=lambda path: (_path_mtime_sort_key(path), str(path))
+            )[:limit]
+            result.files_skipped_by_limit = max(
+                0, result.files_matched - len(selected_paths)
+            )
+        for path in selected_paths:
             try:
                 r = self.ingest_file(path)
             except OSError:
@@ -684,9 +699,18 @@ class CodexIngestor:
         )
 
 
-def ingest(sessions_path: str, db_path: str) -> IngestResult:
+def _path_mtime_sort_key(path: Path) -> float:
+    try:
+        return -path.stat().st_mtime
+    except OSError:
+        return float("inf")
+
+
+def ingest(
+    sessions_path: str, db_path: str, newest_files: int | None = None
+) -> IngestResult:
     ing = CodexIngestor(Path(db_path).expanduser())
     try:
-        return ing.ingest_paths([Path(sessions_path).expanduser()])
+        return ing.ingest_paths([Path(sessions_path).expanduser()], newest_files)
     finally:
         ing.close()

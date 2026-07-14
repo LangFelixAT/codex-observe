@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -750,6 +751,43 @@ def test_unreadable_jsonl_file_is_counted_without_aborting_scan(
     assert result.files_seen == 1
     assert result.unreadable_files == 1
     assert result.files_imported == 0
+
+
+def test_ingest_newest_files_limits_large_history_without_paths(
+    tmp_path: Path,
+) -> None:
+    sessions = tmp_path / "sessions"
+    sessions.mkdir()
+    older = sessions / "older.jsonl"
+    middle = sessions / "middle.jsonl"
+    newest = sessions / "newest.jsonl"
+    write_jsonl(older, rows_for_session(thread_id="older", session_id="older-session"))
+    write_jsonl(
+        middle, rows_for_session(thread_id="middle", session_id="middle-session")
+    )
+    write_jsonl(
+        newest, rows_for_session(thread_id="newest", session_id="newest-session")
+    )
+    older.touch()
+    middle.touch()
+    newest.touch()
+    os.utime(older, (1000, 1000))
+    os.utime(middle, (2000, 2000))
+    os.utime(newest, (3000, 3000))
+    db = tmp_path / "observe.sqlite"
+
+    result = ingest(str(sessions), str(db), newest_files=2)
+
+    assert result.newest_files_limit == 2
+    assert result.files_matched == 3
+    assert result.files_seen == 2
+    assert result.files_imported == 2
+    assert result.files_skipped_by_limit == 1
+    with open_db(db) as conn:
+        session_ids = {
+            row[0] for row in conn.execute("SELECT session_id FROM conversations")
+        }
+    assert session_ids == {"middle-session", "newest-session"}
 
 
 def test_utf8_bom_prefixed_jsonl_is_accepted(tmp_path: Path) -> None:

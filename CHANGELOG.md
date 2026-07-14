@@ -6,6 +6,7 @@ The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
 
+- Added `codex-observe ingest --newest-files <n>` and matching `scan-and-serve` support so large real-history directories can be sampled quickly with aggregate matched/processed/deferred counts.
 - Added a structured next-run checklist to run reports and the dashboard Overview, with visual QA and release audit evidence.
 - Aligned real-log checkpoint documentation and release audit wording so future work is framed as reviewed-redacted fixture promotion, not a blocked parser loop.
 - Bounded session listing output by default, added truncation metadata, and optimized aggregate summary queries for large real histories.

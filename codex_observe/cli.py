@@ -157,6 +157,18 @@ EXPECTED_VISUAL_EMPTY_STATE_COMMAND_SNIPPETS = {
 }
 SESSIONS_SCHEMA_VERSION = "codex-observe.sessions.v1"
 DEFAULT_SESSIONS_LIMIT = 50
+
+
+def positive_int(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be a positive integer") from exc
+    if parsed < 1:
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    return parsed
+
+
 DOCTOR_SCHEMA_VERSION = "codex-observe.doctor.v1"
 AUDIT_SCHEMA_VERSION = "codex-observe.audit.v1"
 REPORT_FAILURE_SCHEMA_VERSION = "codex-observe.report-failure.v1"
@@ -1984,9 +1996,13 @@ def release_audit_report(
         ingest_payload.get("schema_version") == INGEST_SCHEMA_VERSION
         and ingest_payload.get("status") == "ok"
         and ingest_payload.get("privacy", {}).get("raw_content_included") is False
+        and ingest_payload.get("counts", {}).get("files_matched")
+        == result.files_imported
         and ingest_payload.get("counts", {}).get("files_seen") == result.files_imported
         and ingest_payload.get("counts", {}).get("files_imported")
         == result.files_imported
+        and ingest_payload.get("counts", {}).get("files_skipped_by_limit") == 0
+        and ingest_payload.get("scan_limit") == {"mode": "all", "newest_files": None}
         and ingest_payload.get("counts", {}).get("threads") == result.threads
         and ingest_payload.get("counts", {}).get("events") == result.events
         and ingest_payload.get("skipped") == ingest_skipped_counts(ingest_result)
@@ -2004,9 +2020,9 @@ def release_audit_report(
     add(
         "synthetic ingest JSON",
         ingest_json_ok,
-        "schema, counts, skipped categories, text next commands, next commands, text review path, and review path verified"
+        "schema, counts, scan limit, skipped categories, text next commands, next commands, text review path, and review path verified"
         if ingest_json_ok
-        else "synthetic ingest JSON schema_version, counts, skipped categories, text next commands, next_commands, text review path, or review_path missing",
+        else "synthetic ingest JSON schema_version, counts, scan limit, skipped categories, text next commands, next_commands, text review path, or review_path missing",
     )
 
     doctor_status, doctor = doctor_report(actual_db_path)
@@ -3304,9 +3320,18 @@ def ingest_summary(result) -> str:
     malformed_detail = (
         f", {malformed_lines} malformed lines skipped" if malformed_lines else ""
     )
+    limit = getattr(result, "newest_files_limit", None)
+    matched = int(getattr(result, "files_matched", 0) or 0)
+    skipped_by_limit = int(getattr(result, "files_skipped_by_limit", 0) or 0)
+    limit_detail = ""
+    if limit is not None:
+        limit_detail = (
+            f", newest-file limit {int(limit)} selected from {matched} matched"
+            f" ({skipped_by_limit} deferred)"
+        )
     return (
         f"Imported {result.files_imported} of {result.files_seen} JSONL files "
-        f"({skipped_text} skipped{malformed_detail}), "
+        f"({skipped_text} skipped{malformed_detail}{limit_detail}), "
         f"{result.threads} threads, {result.events} events into"
     )
 
@@ -3400,10 +3425,20 @@ def ingest_success_payload(
         "database": db_path,
         "serve": serve,
         "counts": {
+            "files_matched": int(getattr(result, "files_matched", 0) or 0),
             "files_seen": int(getattr(result, "files_seen", 0) or 0),
             "files_imported": int(getattr(result, "files_imported", 0) or 0),
+            "files_skipped_by_limit": int(
+                getattr(result, "files_skipped_by_limit", 0) or 0
+            ),
             "threads": int(getattr(result, "threads", 0) or 0),
             "events": int(getattr(result, "events", 0) or 0),
+        },
+        "scan_limit": {
+            "mode": "newest_files"
+            if getattr(result, "newest_files_limit", None) is not None
+            else "all",
+            "newest_files": getattr(result, "newest_files_limit", None),
         },
         "skipped": ingest_skipped_counts(result),
         "next": "run the commands in next_commands to verify health, choose a run, and open the dashboard.",
@@ -4264,6 +4299,12 @@ def main(argv: list[str] | None = None) -> int:
     p_ingest.add_argument(
         "--json", action="store_true", help="Emit aggregate-only ingest status as JSON"
     )
+    p_ingest.add_argument(
+        "--newest-files",
+        type=positive_int,
+        default=None,
+        help="Only ingest the newest N JSONL files from the input path",
+    )
 
     p_serve = sub.add_parser(
         "serve",
@@ -4294,6 +4335,12 @@ def main(argv: list[str] | None = None) -> int:
         "--host", default=None, help="Streamlit host, for example 127.0.0.1"
     )
     p_scan.add_argument("--port", default=None, help="Streamlit port, for example 8501")
+    p_scan.add_argument(
+        "--newest-files",
+        type=positive_int,
+        default=None,
+        help="Only ingest the newest N JSONL files from the input path before serving",
+    )
 
     p_demo = sub.add_parser(
         "demo",
@@ -4717,7 +4764,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd in {"ingest", "scan-and-serve"}:
         Path(args.db).expanduser().parent.mkdir(parents=True, exist_ok=True)
-        result = ingest(args.sessions_path, args.db)
+        result = ingest(args.sessions_path, args.db, newest_files=args.newest_files)
         if args.cmd == "ingest" and args.json:
             print(
                 json.dumps(

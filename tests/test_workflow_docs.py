@@ -320,6 +320,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
     assert "diagnostic priority" in readme
     assert "valid but empty" in readme
     assert "next ingest or demo command" in readme
+    assert "--newest-files 25 --json" in readme
     for required_readme_gate in [
         "Ruff lint",
         "Ruff format checks",
@@ -368,6 +369,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
     assert "docs/CURRENT.md" in release
     assert "dashboard empty-state next actions" in release
     assert "private real-log checkpoint" in release
+    assert "--newest-files <n>" in release
     assert "docs/LIMITATIONS.md" in release
     assert "release branch is pushed to `origin`" in release
     assert "tracking snapshot" in release
@@ -450,6 +452,7 @@ def test_limitations_doc_covers_current_boundaries_and_next_work_sources() -> No
         "approval-gated",
         "human-approved private input path",
         "first real-log feedback checkpoint",
+        "--newest-files",
         "reviewed-redacted fixtures",
         "docs/REAL_LOG_FEEDBACK.md",
         "reviewer evidence bundle",

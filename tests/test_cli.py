@@ -52,6 +52,10 @@ def test_scan_and_serve_uses_same_streamlit_host_port_ordering(tmp_path: Path) -
         patch("codex_observe.cli.ingest") as ingest,
         patch("codex_observe.cli.subprocess.call", return_value=0) as call,
     ):
+        ingest.return_value.files_matched = 0
+        ingest.return_value.files_skipped_by_limit = 0
+        ingest.return_value.newest_files_limit = None
+        ingest.return_value.files_seen = 0
         ingest.return_value.files_imported = 0
         ingest.return_value.duplicate_files = 0
         ingest.return_value.threads = 0
@@ -70,7 +74,7 @@ def test_scan_and_serve_uses_same_streamlit_host_port_ordering(tmp_path: Path) -
         )
 
     assert result == 0
-    ingest.assert_called_once_with(str(sessions), str(db))
+    ingest.assert_called_once_with(str(sessions), str(db), newest_files=None)
     call.assert_called_once_with(
         [
             sys.executable,
@@ -87,6 +91,38 @@ def test_scan_and_serve_uses_same_streamlit_host_port_ordering(tmp_path: Path) -
             str(db),
         ]
     )
+
+
+def test_scan_and_serve_forwards_newest_files_limit(tmp_path: Path) -> None:
+    sessions = tmp_path / "sessions"
+    sessions.mkdir()
+    db = tmp_path / "observe.sqlite"
+
+    with (
+        patch("codex_observe.cli.ingest") as ingest,
+        patch("codex_observe.cli.subprocess.call", return_value=0),
+    ):
+        ingest.return_value.files_matched = 10
+        ingest.return_value.files_skipped_by_limit = 7
+        ingest.return_value.newest_files_limit = 3
+        ingest.return_value.files_seen = 3
+        ingest.return_value.files_imported = 3
+        ingest.return_value.duplicate_files = 0
+        ingest.return_value.threads = 3
+        ingest.return_value.events = 9
+        result = cli.main(
+            [
+                "scan-and-serve",
+                str(sessions),
+                "--newest-files",
+                "3",
+                "--db",
+                str(db),
+            ]
+        )
+
+    assert result == 0
+    ingest.assert_called_once_with(str(sessions), str(db), newest_files=3)
 
 
 def test_serve_passes_host_without_port_before_app_separator(tmp_path: Path) -> None:
@@ -702,7 +738,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     )
     assert (
         checks["synthetic ingest JSON"]["detail"]
-        == "schema, counts, skipped categories, text next commands, next commands, text review path, and review path verified"
+        == "schema, counts, scan limit, skipped categories, text next commands, next commands, text review path, and review path verified"
     )
     assert report.exists()
     assert report.with_suffix(".json").exists()
@@ -942,6 +978,9 @@ def test_demo_payload_and_text_include_review_path() -> None:
 
 def test_ingest_payload_and_text_include_review_path() -> None:
     result = SimpleNamespace(
+        files_matched=2,
+        files_skipped_by_limit=0,
+        newest_files_limit=None,
         files_seen=2,
         files_imported=2,
         threads=3,
@@ -959,6 +998,9 @@ def test_ingest_payload_and_text_include_review_path() -> None:
 
     assert payload["schema_version"] == cli.INGEST_SCHEMA_VERSION
     assert payload["status"] == "ok"
+    assert payload["counts"]["files_matched"] == 2
+    assert payload["counts"]["files_skipped_by_limit"] == 0
+    assert payload["scan_limit"] == {"mode": "all", "newest_files": None}
     assert [step["label"] for step in payload["review_path"]] == [
         "Verify database health",
         "Choose a reportable run",
@@ -983,6 +1025,9 @@ def test_ingest_payload_and_text_include_review_path() -> None:
     assert text.index("Next commands:") < text.index("Next:")
 
     empty_result = SimpleNamespace(
+        files_matched=0,
+        files_skipped_by_limit=0,
+        newest_files_limit=None,
         files_seen=0,
         files_imported=0,
         threads=0,
@@ -1002,6 +1047,33 @@ def test_ingest_payload_and_text_include_review_path() -> None:
         "Try synthetic data",
         "Verify database health",
     ]
+
+
+def test_ingest_payload_and_text_include_bounded_scan_summary() -> None:
+    result = SimpleNamespace(
+        files_matched=12,
+        files_skipped_by_limit=7,
+        newest_files_limit=5,
+        files_seen=5,
+        files_imported=5,
+        threads=5,
+        events=20,
+        duplicate_files=0,
+        empty_files=0,
+        malformed_files=0,
+        missing_meta_files=0,
+        unreadable_files=0,
+        malformed_lines=0,
+    )
+
+    payload = cli.ingest_success_payload("sessions", "demo.sqlite", result)
+    text = "\n".join(cli.ingest_success_lines("demo.sqlite", result))
+
+    assert payload["counts"]["files_matched"] == 12
+    assert payload["counts"]["files_seen"] == 5
+    assert payload["counts"]["files_skipped_by_limit"] == 7
+    assert payload["scan_limit"] == {"mode": "newest_files", "newest_files": 5}
+    assert "newest-file limit 5 selected from 12 matched (7 deferred)" in text
 
 
 def test_doctor_report_includes_review_path_for_healthy_and_missing_databases(
