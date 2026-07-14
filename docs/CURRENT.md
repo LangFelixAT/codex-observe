@@ -35,7 +35,7 @@ codex-observe evidence-bundle --out .artifacts/public-evidence
 codex-observe audit --json
 ```
 
-The ingest contract gate verifies terminal `Review path` and `Next commands` guidance plus `codex-observe.ingest.v1` counts, skipped categories, newest-file scan-limit metadata, structured `next_commands`, and structured `review_path` evidence.
+The ingest contract gate verifies terminal `Review path`, `Next commands`, and private-sharing review guidance plus `codex-observe.ingest.v1` counts, skipped categories, newest-file scan-limit metadata, privacy metadata with `review_required_before_sharing`, structured `next_commands`, and structured `review_path` evidence.
 
 The visual QA manifest records desktop and narrow screenshots, exercised tabs, structured quick-read evidence, Agent detail selector exercise, missing/empty database onboarding states, sidebar risk labels, sidebar snapshot-count evidence, metric card evidence, comparison review-path and usage-snapshot metric delta evidence, operator-briefing evidence, risk-distribution evidence, next-review path evidence, next-run-checklist evidence, safe-feedback-handoff evidence, report-and-comparison-download-control evidence, success-target evidence, screenshot metadata, and layout review; the final audit verifies the saved manifest schema/contract, referenced screenshots, missing/empty database onboarding states, layout review, sidebar risk labels, sidebar snapshot-count evidence, high-risk metric evidence, structured quick-read evidence, operator-briefing evidence, risk-distribution evidence, next-review path evidence, next-run-checklist evidence, safe-feedback-handoff evidence, comparison review-path and usage-snapshot metric delta evidence, report-and-comparison-download-control evidence, success-target evidence, and generated public evidence bundle artifacts, including the terminal handoff checklist.
 
@@ -49,4 +49,3 @@ The completed `.github/backlog/009-public-evidence-bundle.md` draft was implemen
 The real-log parser feedback loop has now been exercised against the human-approved private input path, specifically the local Codex sessions path (`%USERPROFILE%\.codex\sessions` on Windows). Use that real path for private parser, report, and dashboard validation when actual local coverage is needed, and keep synthetic demo data for public evidence bundles, CI, screenshots intended for sharing, and issue reproduction.
 
 Raw logs, local real-history databases, aggregate reports from private logs, and redacted fixture candidates must remain under ignored `.artifacts/` paths; do not commit raw logs, private aggregate databases, private aggregate metrics, private reports, or unreviewed redacted output.
-

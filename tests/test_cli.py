@@ -1036,6 +1036,9 @@ def test_ingest_payload_and_text_include_review_path() -> None:
 
     assert payload["schema_version"] == cli.INGEST_SCHEMA_VERSION
     assert payload["status"] == "ok"
+    assert payload["privacy"]["review_required_before_sharing"] is True
+    assert "aggregate metrics" in payload["privacy"]["share_warning"]
+    assert "redacted fixture candidates" in payload["privacy"]["share_warning"]
     assert payload["counts"]["files_matched"] == 2
     assert payload["counts"]["files_skipped_by_limit"] == 0
     assert payload["scan_limit"] == {"mode": "all", "newest_files": None}
@@ -1051,6 +1054,8 @@ def test_ingest_payload_and_text_include_review_path() -> None:
     assert payload["review_path"][1]["command"] == (
         "codex-observe sessions --db demo.sqlite --json"
     )
+    assert "Privacy: ingest output is aggregate-only" in text
+    assert "aggregate metrics before sharing" in text
     assert "Review path:" in text
     assert (
         "Verify database health: codex-observe doctor --db demo.sqlite --json" in text

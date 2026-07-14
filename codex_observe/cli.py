@@ -3478,6 +3478,11 @@ def ingest_success_payload(
             "mode": "aggregate-only",
             "private_log_required": True,
             "raw_content_included": False,
+            "review_required_before_sharing": True,
+            "share_warning": (
+                "Review private aggregate databases, aggregate metrics, reports, "
+                "screenshots, copied rows, and redacted fixture candidates before sharing."
+            ),
         },
         "source": sessions_path,
         "database": db_path,
@@ -3511,6 +3516,10 @@ def ingest_success_lines(db_path: str, result, serve: bool = False) -> list[str]
     review_path = ingest_review_path(db_path, status)
     lines = [
         f"{ingest_summary(result)} {db_path}",
+        (
+            "Privacy: ingest output is aggregate-only, but review private databases, "
+            "reports, screenshots, copied rows, and aggregate metrics before sharing."
+        ),
         "Review path:",
     ]
     for step in review_path:
