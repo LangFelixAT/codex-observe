@@ -677,7 +677,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     assert checks["tracking snapshot"]["ok"] is True
     assert (
         checks["public tour JSON"]["detail"]
-        == "schema, privacy, database, evidence bundle, recommended-action evidence, terminal handoff evidence, terminal validation evidence, dashboard quick-read and comparison review-path evidence, top-level review path, per-step success checks, and next commands verified"
+        == "schema, privacy, database, evidence bundle, recommended-action evidence, terminal handoff evidence, terminal validation evidence, dashboard quick-read and comparison review-path evidence, top-level review path, text next commands, per-step success checks, and next commands verified"
     )
     assert (
         checks["issue templates"]["detail"]
@@ -1041,6 +1041,13 @@ def test_public_tour_payload_is_private_log_free_and_points_to_visual_verificati
     assert "codex-observe doctor --db demo.sqlite --json" in payload["next_commands"]
     assert "codex-observe sessions --db demo.sqlite" in payload["next_commands"]
     assert "codex-observe sessions --db demo.sqlite --json" in payload["next_commands"]
+    text_lines = cli.public_tour_lines("demo.sqlite")
+    assert "Next commands:" in text_lines
+    for command in payload["next_commands"]:
+        assert f"- {command}" in text_lines
+    assert text_lines.index("Next commands:") > text_lines.index(
+        "9. File privacy-safe public-tour feedback:"
+    )
     assert any("key findings" in item for item in evidence)
     assert any("review_summary" in item for item in evidence)
     assert any("codex-observe.evidence-bundle.v1" in item for item in evidence)

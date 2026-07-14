@@ -2314,6 +2314,7 @@ def release_audit_report(
     )
 
     tour_payload = public_tour_payload(actual_db_path)
+    tour_lines_text = "\n".join(public_tour_lines(actual_db_path))
     tour_commands = tour_payload.get("next_commands")
     tour_steps = tour_payload.get("steps", [])
     tour_review_path = tour_payload.get("review_path", [])
@@ -2364,6 +2365,8 @@ def release_audit_report(
         and tour_payload.get("database") == actual_db_path
         and tour_payload.get("privacy", {}).get("private_log_required") is False
         and isinstance(tour_commands, list)
+        and "Next commands:" in tour_lines_text
+        and all(command in tour_lines_text for command in tour_commands)
         and f"codex-observe demo --db {actual_db_path}" in tour_commands
         and f"codex-observe doctor --db {actual_db_path}" in tour_commands
         and f"codex-observe doctor --db {actual_db_path} --json" in tour_commands
@@ -2396,9 +2399,9 @@ def release_audit_report(
     add(
         "public tour JSON",
         tour_ok,
-        "schema, privacy, database, evidence bundle, recommended-action evidence, terminal handoff evidence, terminal validation evidence, dashboard quick-read and comparison review-path evidence, top-level review path, per-step success checks, and next commands verified"
+        "schema, privacy, database, evidence bundle, recommended-action evidence, terminal handoff evidence, terminal validation evidence, dashboard quick-read and comparison review-path evidence, top-level review path, text next commands, per-step success checks, and next commands verified"
         if tour_ok
-        else "tour JSON schema_version, privacy, database, evidence bundle key findings, recommended-action evidence, terminal handoff evidence, terminal validation evidence, dashboard quick-read evidence, comparison review-path evidence, comparison metric delta evidence, report/comparison-download evidence, feedback evidence, top-level review_path, per-step success checks, or next_commands missing",
+        else "tour JSON schema_version, privacy, database, evidence bundle key findings, recommended-action evidence, terminal handoff evidence, terminal validation evidence, dashboard quick-read evidence, comparison review-path evidence, comparison metric delta evidence, report/comparison-download evidence, feedback evidence, top-level review_path, text next commands, per-step success checks, or next_commands missing",
     )
 
     ignore_failures = private_artifact_ignore_failures(root)
@@ -2923,13 +2926,23 @@ def public_tour_lines(db_path: str = DEFAULT_DEMO_DB) -> list[str]:
         lines.append(f"- {item['step']}. {item['label']}: {item['command']}")
         lines.append(f"  Success check: {item['success_check']}")
     lines.append("")
-    for index, step in enumerate(public_tour_steps(db_path), start=1):
+    steps = public_tour_steps(db_path)
+    for index, step in enumerate(steps, start=1):
         lines.append(f"{index}. {step['title']}:")
         for evidence in step.get("evidence", []):
             lines.append(f"   Evidence: {evidence}")
         for check in step.get("success_checks", []):
             lines.append(f"   Success check: {check}")
         lines.extend(f"   {command}" for command in step["commands"])
+    next_commands = [
+        command
+        for step in steps
+        for command in step["commands"]
+        if isinstance(command, str)
+    ]
+    if next_commands:
+        lines.extend(["", "Next commands:"])
+        lines.extend(f"- {command}" for command in next_commands)
     return lines
 
 
