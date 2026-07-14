@@ -682,7 +682,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     assert checks["tracking snapshot"]["ok"] is True
     assert (
         checks["public tour JSON"]["detail"]
-        == "schema, privacy, database, evidence bundle, recommended-action evidence, terminal handoff evidence, terminal validation evidence, dashboard quick-read and comparison review-path evidence, top-level review path, feedback handoff, text next commands, per-step success checks, and next commands verified"
+        == "schema, privacy, database, evidence bundle, recommended-action evidence, terminal handoff evidence, terminal validation evidence, dashboard quick-read and comparison review-path evidence, top-level review path, terminal feedback handoff, text next commands, per-step success checks, and next commands verified"
     )
     assert (
         checks["issue templates"]["detail"]
@@ -1064,6 +1064,10 @@ def test_public_tour_payload_is_private_log_free_and_points_to_visual_verificati
         "- Issue template: .github/ISSUE_TEMPLATE/public_tour_feedback.yml"
         in text_lines
     )
+    assert "- Safe feedback sources:" in text_lines
+    assert "  - reviewer evidence bundle" in text_lines
+    assert "- Do not collect:" in text_lines
+    assert "  - private prompts" in text_lines
     assert text_lines.index("Feedback handoff:") < text_lines.index("Next commands:")
     assert "Next commands:" in text_lines
     for command in payload["next_commands"]:

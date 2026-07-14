@@ -2333,8 +2333,12 @@ def release_audit_report(
         and "synthetic or reviewed-redacted evidence"
         in str(tour_feedback_handoff.get("evidence_rule"))
         and "Feedback handoff:" in tour_lines_text
+        and "Safe feedback sources:" in tour_lines_text
+        and "Do not collect:" in tour_lines_text
         and ".github/ISSUE_TEMPLATE/public_tour_feedback.yml" in tour_lines_text
         and "private prompts" in json.dumps(tour_feedback_handoff)
+        and "private prompts" in tour_lines_text
+        and "reviewer evidence bundle" in tour_lines_text
     )
     tour_review_path_ok = (
         isinstance(tour_review_path, list)
@@ -2418,9 +2422,9 @@ def release_audit_report(
     add(
         "public tour JSON",
         tour_ok,
-        "schema, privacy, database, evidence bundle, recommended-action evidence, terminal handoff evidence, terminal validation evidence, dashboard quick-read and comparison review-path evidence, top-level review path, feedback handoff, text next commands, per-step success checks, and next commands verified"
+        "schema, privacy, database, evidence bundle, recommended-action evidence, terminal handoff evidence, terminal validation evidence, dashboard quick-read and comparison review-path evidence, top-level review path, terminal feedback handoff, text next commands, per-step success checks, and next commands verified"
         if tour_ok
-        else "tour JSON schema_version, privacy, database, evidence bundle key findings, recommended-action evidence, terminal handoff evidence, terminal validation evidence, dashboard quick-read evidence, comparison review-path evidence, comparison metric delta evidence, report/comparison-download evidence, feedback evidence, top-level review_path, feedback_handoff, text next commands, per-step success checks, or next_commands missing",
+        else "tour JSON schema_version, privacy, database, evidence bundle key findings, recommended-action evidence, terminal handoff evidence, terminal validation evidence, dashboard quick-read evidence, comparison review-path evidence, comparison metric delta evidence, report/comparison-download evidence, feedback evidence, top-level review_path, terminal feedback_handoff, text next commands, per-step success checks, or next_commands missing",
     )
 
     ignore_failures = private_artifact_ignore_failures(root)
@@ -2984,8 +2988,12 @@ def public_tour_lines(db_path: str = DEFAULT_DEMO_DB) -> list[str]:
             f"- Runbook: {feedback_handoff['runbook']}",
             f"- Issue template: {feedback_handoff['issue_template']}",
             f"- Evidence rule: {feedback_handoff['evidence_rule']}",
+            "- Safe feedback sources:",
         ]
     )
+    lines.extend(f"  - {source}" for source in feedback_handoff["safe_sources"])
+    lines.append("- Do not collect:")
+    lines.extend(f"  - {item}" for item in feedback_handoff["do_not_collect"])
     next_commands = [
         command
         for step in steps
