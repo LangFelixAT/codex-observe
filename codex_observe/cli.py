@@ -187,6 +187,7 @@ TOUR_SCHEMA_VERSION = "codex-observe.tour.v1"
 DEMO_SCHEMA_VERSION = "codex-observe.demo.v1"
 INGEST_SCHEMA_VERSION = "codex-observe.ingest.v1"
 EVIDENCE_BUNDLE_SCHEMA_VERSION = "codex-observe.evidence-bundle.v1"
+PATHS_SCHEMA_VERSION = "codex-observe.paths.v1"
 RELEASE_REQUIRED_FILES = [
     "README.md",
     "LICENSE",
@@ -3559,6 +3560,88 @@ def default_db() -> str:
     return str(Path.home() / ".codex-observe" / "codex_observe.sqlite")
 
 
+def default_sessions_path() -> Path:
+    return Path.home() / ".codex" / "sessions"
+
+
+def _command_arg(path: Path | str) -> str:
+    value = str(path)
+    if any(char.isspace() for char in value):
+        return f'"{value}"'
+    return value
+
+
+def paths_payload(db_path: str | None = None, sessions_path: str | None = None) -> dict:
+    sessions = (
+        Path(sessions_path).expanduser() if sessions_path else default_sessions_path()
+    )
+    db = Path(db_path).expanduser() if db_path else Path(default_db()).expanduser()
+    sessions_arg = _command_arg(sessions)
+    db_arg = _command_arg(db)
+    return {
+        "schema_version": PATHS_SCHEMA_VERSION,
+        "sessions_path": str(sessions),
+        "sessions_path_exists": sessions.exists(),
+        "database": str(db),
+        "database_exists": db.exists(),
+        "privacy": {
+            "raw_content_included": False,
+            "scans_sessions": False,
+            "review_required_before_sharing": True,
+            "share_warning": (
+                "Paths and aggregate artifacts can reveal local workflow clues; "
+                "review before sharing."
+            ),
+        },
+        "next_commands": [
+            f"codex-observe ingest {sessions_arg} --newest-files 25 --db {db_arg} --json",
+            f"codex-observe doctor --db {db_arg}",
+            f"codex-observe sessions --db {db_arg}",
+            f"codex-observe serve --db {db_arg}",
+        ],
+        "review_path": [
+            {
+                "label": "Sample newest private logs",
+                "command": f"codex-observe ingest {sessions_arg} --newest-files 25 --db {db_arg} --json",
+                "success_check": "JSON status is ok and privacy.review_required_before_sharing is true.",
+            },
+            {
+                "label": "Verify aggregate database health",
+                "command": f"codex-observe doctor --db {db_arg}",
+                "success_check": "Doctor status is ok or prints copy-pasteable recovery commands.",
+            },
+            {
+                "label": "Choose the highest-risk run",
+                "command": f"codex-observe sessions --db {db_arg}",
+                "success_check": "Sessions output shows aggregate risk distribution and a recommended report command.",
+            },
+        ],
+    }
+
+
+def paths_lines(
+    db_path: str | None = None, sessions_path: str | None = None
+) -> list[str]:
+    payload = paths_payload(db_path=db_path, sessions_path=sessions_path)
+    lines = [
+        f"Default Codex sessions path: {payload['sessions_path']}",
+        f"Sessions path exists: {str(payload['sessions_path_exists']).lower()}",
+        f"Default Codex Observe database: {payload['database']}",
+        f"Database exists: {str(payload['database_exists']).lower()}",
+        (
+            "Privacy: this command does not scan logs or print filenames, prompts, "
+            "tool output, session IDs, or aggregate metrics."
+        ),
+        "Review path:",
+    ]
+    for step in payload["review_path"]:
+        lines.append(f"- {step['label']}: {step['command']}")
+        lines.append(f"  Success check: {step['success_check']}")
+    lines.append("Next commands:")
+    lines.extend(f"- {command}" for command in payload["next_commands"])
+    return lines
+
+
 def missing_database_hint(db_path: str) -> str:
     return (
         f"Run `codex-observe demo` for synthetic data or "
@@ -4366,6 +4449,28 @@ def main(argv: list[str] | None = None) -> int:
     p_tour.add_argument(
         "--json", action="store_true", help="Emit the tour as schema-versioned JSON"
     )
+
+    p_paths = sub.add_parser(
+        "paths",
+        help="Show local default paths and private validation commands",
+        description="Show the resolved local Codex sessions path, Codex Observe database path, and privacy-safe next commands without scanning logs.",
+    )
+    p_paths.add_argument(
+        "--sessions-path",
+        default=None,
+        help="Override the sessions directory shown in next commands",
+    )
+    p_paths.add_argument(
+        "--db",
+        default=None,
+        help="Override the database path shown in next commands",
+    )
+    p_paths.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit path guidance as schema-versioned JSON",
+    )
+
     p_ingest = sub.add_parser(
         "ingest",
         help="Ingest Codex JSONL files into SQLite",
@@ -4374,7 +4479,7 @@ def main(argv: list[str] | None = None) -> int:
     p_ingest.add_argument(
         "sessions_path",
         nargs="?",
-        default=str(Path.home() / ".codex" / "sessions"),
+        default=str(default_sessions_path()),
         help="Codex sessions directory or JSONL file; defaults to ~/.codex/sessions",
     )
     p_ingest.add_argument("--db", default=default_db(), help="SQLite database path")
@@ -4409,7 +4514,7 @@ def main(argv: list[str] | None = None) -> int:
     p_scan.add_argument(
         "sessions_path",
         nargs="?",
-        default=str(Path.home() / ".codex" / "sessions"),
+        default=str(default_sessions_path()),
         help="Codex sessions directory or JSONL file; defaults to ~/.codex/sessions",
     )
     p_scan.add_argument("--db", default=default_db(), help="SQLite database path")
@@ -4596,6 +4701,22 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(public_tour_payload(args.db), indent=2, sort_keys=True))
         else:
             print("\n".join(public_tour_lines(args.db)))
+        return 0
+    if args.cmd == "paths":
+        if args.json:
+            print(
+                json.dumps(
+                    paths_payload(db_path=args.db, sessions_path=args.sessions_path),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+        else:
+            print(
+                "\n".join(
+                    paths_lines(db_path=args.db, sessions_path=args.sessions_path)
+                )
+            )
         return 0
     if args.cmd == "evidence-bundle":
         status, manifest = public_evidence_bundle(

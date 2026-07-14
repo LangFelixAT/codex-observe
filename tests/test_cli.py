@@ -1737,3 +1737,61 @@ def test_evidence_bundle_cli_json_and_text_outputs_are_actionable(
         in captured.out
     )
     assert "audit_json: audit/audit.json" in captured.out
+
+
+def test_paths_command_prints_privacy_safe_private_validation_handoff(
+    tmp_path: Path, capsys
+) -> None:
+    sessions = tmp_path / ".codex" / "sessions"
+    sessions.mkdir(parents=True)
+    db = tmp_path / ".codex-observe" / "codex_observe.sqlite"
+
+    result = cli.main(["paths", "--sessions-path", str(sessions), "--db", str(db)])
+    captured = capsys.readouterr()
+
+    assert result == 0
+    assert f"Default Codex sessions path: {sessions}" in captured.out
+    assert "Sessions path exists: true" in captured.out
+    assert f"Default Codex Observe database: {db}" in captured.out
+    assert "Database exists: false" in captured.out
+    assert "does not scan logs or print filenames" in captured.out
+    assert "Review path:" in captured.out
+    assert "Sample newest private logs" in captured.out
+    assert (
+        f"codex-observe ingest {sessions} --newest-files 25 --db {db} --json"
+        in captured.out
+    )
+    assert f"codex-observe doctor --db {db}" in captured.out
+    assert f"codex-observe sessions --db {db}" in captured.out
+    assert f"codex-observe serve --db {db}" in captured.out
+
+
+def test_paths_command_json_is_schema_versioned_and_does_not_scan_logs(
+    tmp_path: Path, capsys
+) -> None:
+    sessions = tmp_path / ".codex" / "sessions"
+    sessions.mkdir(parents=True)
+    db = tmp_path / ".codex-observe" / "codex_observe.sqlite"
+
+    result = cli.main(
+        ["paths", "--sessions-path", str(sessions), "--db", str(db), "--json"]
+    )
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+
+    assert result == 0
+    assert payload["schema_version"] == cli.PATHS_SCHEMA_VERSION
+    assert payload["sessions_path"] == str(sessions)
+    assert payload["sessions_path_exists"] is True
+    assert payload["database"] == str(db)
+    assert payload["database_exists"] is False
+    assert payload["privacy"] == {
+        "raw_content_included": False,
+        "review_required_before_sharing": True,
+        "scans_sessions": False,
+        "share_warning": "Paths and aggregate artifacts can reveal local workflow clues; review before sharing.",
+    }
+    assert payload["next_commands"][0] == (
+        f"codex-observe ingest {sessions} --newest-files 25 --db {db} --json"
+    )
+    assert payload["review_path"][0]["label"] == "Sample newest private logs"

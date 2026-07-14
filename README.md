@@ -22,6 +22,14 @@ codex-observe demo --serve --host 127.0.0.1 --port 8501
 ```
 Then open <http://127.0.0.1:8501>.
 
+To confirm the resolved private paths and get a sampled, privacy-safe validation handoff first:
+
+```bash
+codex-observe paths
+```
+
+The command prints the local Codex sessions path, the Codex Observe database path, existence checks, and next commands without scanning logs or printing filenames, prompts, tool output, session IDs, or aggregate metrics.
+
 To scan your own Codex sessions and open the dashboard:
 
 ```bash
@@ -71,6 +79,7 @@ codex-observe scan-and-serve ~/.codex/sessions
 On Windows CMD:
 
 ```bat
+codex-observe paths
 codex-observe scan-and-serve "%USERPROFILE%\.codex\sessions"
 ```
 
@@ -80,6 +89,8 @@ The default database is stored at:
 ~/.codex-observe/codex_observe.sqlite
 ```
 
+
+Use `codex-observe paths` to show the resolved default sessions path and database path, report whether they exist, and print a sampled `--newest-files 25` ingest command plus doctor, sessions, and serve follow-ups without scanning logs or printing filenames, prompts, tool output, session IDs, or aggregate metrics. On Windows this resolves the default sessions directory from `%USERPROFILE%\.codex\sessions`.
 
 After ingestion, the CLI prints an aggregate summary that distinguishes imported files, duplicates, empty files, malformed files, files missing `session_meta`, unreadable files, malformed lines skipped, threads, and events, plus a privacy warning to review private databases, reports, screenshots, copied rows, and aggregate metrics before sharing. Use `codex-observe ingest ~/.codex/sessions` for terminal `Review path` and `Next commands` guidance, or `codex-observe ingest ~/.codex/sessions --json` for a `codex-observe.ingest.v1` aggregate-only payload with counts, skipped categories, privacy metadata including `review_required_before_sharing`, structured `next_commands`, and a structured `review_path`. For large real histories, start with `codex-observe ingest ~/.codex/sessions --newest-files 25 --json`; the JSON reports how many JSONL files matched, how many were processed, and how many were deferred by the newest-file limit without printing raw log content. A partial ingest can still be useful; run `codex-observe doctor --db <db>` next to confirm the resulting database is valid. Doctor recovery hints and terminal `Next commands` are copy-pasteable and preserve the same `--db` path for missing, empty, invalid, or unreadable databases. Doctor JSON also includes structured `next_commands` and a structured `review_path`; a healthy populated database points to `codex-observe sessions --db <db>` for report selection, `codex-observe serve --db <db>` for dashboard inspection, and report export as the next review steps.
 
