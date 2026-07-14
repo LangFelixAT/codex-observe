@@ -25,6 +25,7 @@ from codex_observe.dashboard import (
     data_inventory_html,
     duplication_quick_read_html,
     empty_state_commands_html,
+    feedback_handoff_html,
     risk_marker,
     order_conversations_for_review,
     metric_with_share,
@@ -630,6 +631,36 @@ def test_operator_briefing_html_summarizes_top_action_and_escapes_content() -> N
     assert "Stop &lt;dominant&gt; worker" in rendered
     assert "largest_thread_share_pct: 57.7% -> below &lt;50%" in rendered
     assert "Largest <thread>" not in rendered
+
+
+def test_feedback_handoff_html_surfaces_safe_boundaries_and_escapes() -> None:
+    rendered = feedback_handoff_html(
+        {
+            "runbook": "docs/PUBLIC_TOUR_FEEDBACK.md",
+            "issue_template": ".github/ISSUE_TEMPLATE/public_tour_feedback.yml",
+            "evidence_rule": "Use synthetic or reviewed-redacted aggregate evidence only; avoid <raw> content.",
+            "safe_sources": [
+                "codex-observe report JSON or Markdown",
+                "codex-observe comparison JSON or Markdown",
+            ],
+            "do_not_collect": ["private prompts", "tool output <raw>"],
+        }
+    )
+
+    assert 'class="co-feedback-handoff"' in rendered
+    assert "Safe feedback handoff" in rendered
+    assert "docs/PUBLIC_TOUR_FEEDBACK.md" in rendered
+    assert ".github/ISSUE_TEMPLATE/public_tour_feedback.yml" in rendered
+    assert "synthetic or reviewed-redacted aggregate evidence" in rendered
+    assert "codex-observe report JSON or Markdown" in rendered
+    assert "codex-observe comparison JSON or Markdown" in rendered
+    assert "private prompts" in rendered
+    assert "&lt;raw&gt;" in rendered
+    assert "<raw>" not in rendered
+
+
+def test_feedback_handoff_html_returns_empty_string_without_contract() -> None:
+    assert feedback_handoff_html(None) == ""
 
 
 def test_review_path_html_guides_next_validation_and_escapes_content() -> None:

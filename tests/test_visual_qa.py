@@ -28,6 +28,7 @@ sidebar_risk_label_failures = visual_qa.sidebar_risk_label_failures
 operator_briefing_failures = visual_qa.operator_briefing_failures
 collect_review_paths = visual_qa.collect_review_paths
 review_path_failures = visual_qa.review_path_failures
+feedback_handoff_failures = visual_qa.feedback_handoff_failures
 download_control_failures = visual_qa.download_control_failures
 comparison_preview_failures = visual_qa.comparison_preview_failures
 comparison_review_path_failures = visual_qa.comparison_review_path_failures
@@ -267,6 +268,32 @@ def test_review_path_failures_require_next_review_path_contract() -> None:
     assert "narrow: next review path card not rendered" in failures
 
 
+def test_feedback_handoff_failures_require_safe_feedback_contract() -> None:
+    assert (
+        feedback_handoff_failures(
+            [
+                {
+                    "label": "Safe feedback handoff",
+                    "body": "Safe feedback handoff docs/PUBLIC_TOUR_FEEDBACK.md .github/ISSUE_TEMPLATE/public_tour_feedback.yml synthetic or reviewed-redacted aggregate evidence codex-observe report JSON or Markdown private prompts Do not collect",
+                }
+            ],
+            "desktop",
+        )
+        == []
+    )
+
+    failures = feedback_handoff_failures([], "narrow")
+
+    assert "narrow: safe feedback handoff card not rendered" in failures
+
+    failures = feedback_handoff_failures(
+        [{"body": "Safe feedback handoff docs/PUBLIC_TOUR_FEEDBACK.md"}],
+        "desktop",
+    )
+
+    assert "desktop: safe feedback handoff missing: private prompts" in failures
+
+
 def test_operator_briefing_failures_require_briefing_contract() -> None:
     assert (
         operator_briefing_failures(
@@ -344,6 +371,12 @@ def complete_viewport_results(tmp_path: Path) -> dict[str, dict[str, object]]:
                 {
                     "label": "Next review path",
                     "body": "Next review path Save report JSON Compare workflow change Validate next run File safe feedback PUBLIC_TOUR_FEEDBACK.md",
+                }
+            ],
+            "feedback_handoffs": [
+                {
+                    "label": "Safe feedback handoff",
+                    "body": "Safe feedback handoff docs/PUBLIC_TOUR_FEEDBACK.md .github/ISSUE_TEMPLATE/public_tour_feedback.yml synthetic or reviewed-redacted aggregate evidence codex-observe report JSON or Markdown private prompts Do not collect",
                 }
             ],
             "comparison_previews": [
@@ -487,6 +520,17 @@ def test_visual_manifest_records_review_evidence(tmp_path: Path) -> None:
     assert (
         "Validate next run" in loaded["viewports"]["desktop"]["review_paths"][0]["body"]
     )
+    assert loaded["viewports"]["desktop"]["feedback_handoffs"][0]["label"] == (
+        "Safe feedback handoff"
+    )
+    assert (
+        "docs/PUBLIC_TOUR_FEEDBACK.md"
+        in loaded["viewports"]["desktop"]["feedback_handoffs"][0]["body"]
+    )
+    assert (
+        "Do not collect"
+        in loaded["viewports"]["desktop"]["feedback_handoffs"][0]["body"]
+    )
     assert loaded["viewports"]["desktop"]["comparison_previews"][0]["label"] == (
         "Comparison quick read: regressed"
     )
@@ -538,6 +582,7 @@ def test_visual_manifest_failures_rejects_incomplete_evidence(tmp_path: Path) ->
                 "download_controls": ["Download report MD"],
                 "operator_briefings": [],
                 "review_paths": [],
+                "feedback_handoffs": [],
                 "comparison_previews": [],
                 "comparison_review_paths": [],
                 "comparison_deltas": [],
@@ -565,6 +610,7 @@ def test_visual_manifest_failures_rejects_incomplete_evidence(tmp_path: Path) ->
     assert "manifest desktop success target card not rendered" in failures
     assert "manifest desktop operator briefing card not rendered" in failures
     assert "manifest desktop next review path card not rendered" in failures
+    assert "manifest desktop safe feedback handoff card not rendered" in failures
     assert "manifest desktop comparison preview card not rendered" in failures
     assert "manifest desktop comparison review path not rendered" in failures
     assert "manifest desktop comparison delta cards not rendered" in failures

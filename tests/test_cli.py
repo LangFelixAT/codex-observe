@@ -199,6 +199,12 @@ def write_valid_visual_manifest(root: Path) -> None:
                     "body": "Next review path Save report JSON Compare workflow change Validate next run File safe feedback PUBLIC_TOUR_FEEDBACK.md",
                 }
             ],
+            "feedback_handoffs": [
+                {
+                    "label": "Safe feedback handoff",
+                    "body": "Safe feedback handoff docs/PUBLIC_TOUR_FEEDBACK.md .github/ISSUE_TEMPLATE/public_tour_feedback.yml synthetic or reviewed-redacted aggregate evidence codex-observe report JSON or Markdown private prompts Do not collect",
+                }
+            ],
             "comparison_previews": [
                 {
                     "label": "Comparison quick read: regressed",
@@ -338,6 +344,7 @@ def test_visual_manifest_evidence_failures_validate_saved_sidebar_metric_and_suc
         "Read raw tables"
     )
     payload["viewports"]["desktop"]["download_controls"] = ["Download report MD"]
+    payload["viewports"]["desktop"]["feedback_handoffs"] = []
     payload["viewports"]["desktop"]["comparison_deltas"] = [
         {"label": "Total tokens", "delta": "improved: -49.1k (-85.4%)"}
     ]
@@ -374,6 +381,9 @@ def test_visual_manifest_evidence_failures_validate_saved_sidebar_metric_and_suc
     assert (
         "visual QA manifest desktop missing comparison delta: Largest thread tokens"
         in failures
+    )
+    assert (
+        "visual QA manifest missing desktop safe feedback handoff evidence" in failures
     )
 
 
@@ -412,6 +422,9 @@ def test_visual_manifest_evidence_rejects_stale_minimal_manifest_shape(
     assert "visual QA manifest desktop missing screenshot metadata" in failures
     assert "visual QA manifest desktop missing layout review" in failures
     assert "visual QA manifest missing desktop operator briefing evidence" in failures
+    assert (
+        "visual QA manifest missing desktop safe feedback handoff evidence" in failures
+    )
     assert "visual QA manifest missing desktop comparison preview evidence" in failures
     assert (
         "visual QA manifest missing desktop comparison review path evidence" in failures
@@ -728,7 +741,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
         == "manifest, terminal and reviewer README action plan, key findings, review checklist, feedback handoff, feedback runbook, feedback issue template, reproduce-local commands, validation commands, limitations doc, aggregate reports, and audit artifact verified"
     )
     assert (
-        "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, metric cards, dashboard quick reads, report and comparison downloads, comparison preview, comparison review path, deltas, operator briefing, next review path, and success target verified"
+        "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, metric cards, dashboard quick reads, report and comparison downloads, comparison preview, comparison review path, deltas, operator briefing, next review path, safe feedback handoff, and success target verified"
         in checks["visual QA manifest evidence"]["detail"]
     )
     report_payload = json.loads(report.with_suffix(".json").read_text(encoding="utf-8"))

@@ -336,6 +336,59 @@ def dashboard_css() -> str:
     grid-template-columns: 1fr;
   }
 }
+.co-feedback-handoff {
+  background: color-mix(in srgb, var(--co-accent) 5%, var(--co-panel));
+  border: 1px solid var(--co-border);
+  border-radius: 8px;
+  margin: 0 0 1rem 0;
+  padding: 0.9rem 1rem;
+}
+
+.co-feedback-handoff h3 {
+  font-size: 1rem;
+  letter-spacing: 0;
+  line-height: 1.25;
+  margin: 0 0 0.35rem 0;
+}
+
+.co-feedback-handoff p {
+  color: var(--co-muted);
+  font-size: 0.88rem;
+  margin: 0.2rem 0 0.65rem 0;
+}
+
+.co-feedback-grid {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+
+.co-feedback-item {
+  background: var(--co-surface);
+  border: 1px solid var(--co-border);
+  border-radius: 8px;
+  min-width: 0;
+  padding: 0.65rem 0.75rem;
+}
+
+.co-feedback-item strong {
+  color: var(--co-ink);
+  display: block;
+  font-size: 0.82rem;
+  line-height: 1.22;
+  margin-bottom: 0.2rem;
+}
+
+.co-feedback-item span,
+.co-feedback-item code {
+  color: var(--co-muted);
+  display: block;
+  font-size: 0.8rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
 .co-diagnostics {
   display: grid;
   gap: 0.8rem;
@@ -928,6 +981,54 @@ def review_path_html(success_target: dict[str, object], has_comparison: bool) ->
             "  <p>Turn this run into a validated workflow change without exposing private content.</p>",
             '  <div class="co-review-steps">',
             *[f"    {step}" for step in rendered_steps],
+            "  </div>",
+            "</section>",
+        ]
+    )
+
+
+def feedback_handoff_html(handoff: object) -> str:
+    if not isinstance(handoff, dict):
+        return ""
+    runbook = str(handoff.get("runbook") or "docs/PUBLIC_TOUR_FEEDBACK.md")
+    issue_template = str(
+        handoff.get("issue_template")
+        or ".github/ISSUE_TEMPLATE/public_tour_feedback.yml"
+    )
+    evidence_rule = str(
+        handoff.get("evidence_rule")
+        or "Use synthetic or reviewed-redacted aggregate evidence only."
+    )
+    safe_sources = handoff.get("safe_sources")
+    do_not_collect = handoff.get("do_not_collect")
+    safe_source_text = (
+        "; ".join(str(item) for item in safe_sources if isinstance(item, str) and item)
+        if isinstance(safe_sources, list)
+        else "Report and comparison downloads"
+    )
+    do_not_collect_text = (
+        "; ".join(
+            str(item) for item in do_not_collect if isinstance(item, str) and item
+        )
+        if isinstance(do_not_collect, list)
+        else "Private prompts; tool output; local paths"
+    )
+    return "\n".join(
+        [
+            '<section class="co-feedback-handoff">',
+            "  <h3>Safe feedback handoff</h3>",
+            "  <p>Use these boundaries before sharing dashboard observations or downloaded artifacts.</p>",
+            '  <div class="co-feedback-grid">',
+            '    <div class="co-feedback-item"><strong>Runbook</strong>',
+            f"    <code>{html.escape(runbook)}</code></div>",
+            '    <div class="co-feedback-item"><strong>Issue template</strong>',
+            f"    <code>{html.escape(issue_template)}</code></div>",
+            '    <div class="co-feedback-item"><strong>Evidence rule</strong>',
+            f"    <span>{html.escape(evidence_rule)}</span></div>",
+            '    <div class="co-feedback-item"><strong>Safe sources</strong>',
+            f"    <span>{html.escape(safe_source_text)}</span></div>",
+            '    <div class="co-feedback-item"><strong>Do not collect</strong>',
+            f"    <span>{html.escape(do_not_collect_text)}</span></div>",
             "  </div>",
             "</section>",
         ]
@@ -1926,6 +2027,10 @@ def main() -> None:
         )
         st.markdown(triage_card_html(triage), unsafe_allow_html=True)
         report = build_report(str(db), session_id)
+        st.markdown(
+            feedback_handoff_html(report.get("feedback_handoff")),
+            unsafe_allow_html=True,
+        )
         downloads = report_download_payloads(report)
         export_left, export_right = st.columns(2)
         with export_left:

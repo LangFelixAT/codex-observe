@@ -111,6 +111,16 @@ EXPECTED_REVIEW_PATH = [
     "PUBLIC_TOUR_FEEDBACK.md",
 ]
 
+EXPECTED_FEEDBACK_HANDOFF = [
+    "Safe feedback handoff",
+    "docs/PUBLIC_TOUR_FEEDBACK.md",
+    ".github/ISSUE_TEMPLATE/public_tour_feedback.yml",
+    "synthetic or reviewed-redacted aggregate evidence",
+    "codex-observe report JSON or Markdown",
+    "private prompts",
+    "Do not collect",
+]
+
 EMPTY_STATE_CHECKS = {
     "missing_database": "No database found",
     "empty_database": "No conversations imported yet",
@@ -462,6 +472,30 @@ def operator_briefing_failures(
     return failures
 
 
+def collect_feedback_handoffs(page) -> list[dict[str, str]]:
+    return page.evaluate(
+        r"""
+() => Array.from(document.querySelectorAll('.co-feedback-handoff')).map((card) => ({
+  label: (card.querySelector('h3')?.innerText || '').replace(/\s+/g, ' ').trim(),
+  body: (card.innerText || '').replace(/\s+/g, ' ').trim(),
+})).filter((item) => item.label || item.body)
+        """
+    )
+
+
+def feedback_handoff_failures(
+    handoffs: list[dict[str, str]], viewport_name: str
+) -> list[str]:
+    if not handoffs:
+        return [f"{viewport_name}: safe feedback handoff card not rendered"]
+    body = str(handoffs[0].get("body") or "")
+    return [
+        f"{viewport_name}: safe feedback handoff missing: {expected}"
+        for expected in EXPECTED_FEEDBACK_HANDOFF
+        if expected not in body
+    ]
+
+
 def collect_layout_snapshot(page) -> dict[str, object]:
     return page.evaluate(
         r"""
@@ -552,6 +586,7 @@ def validate_dashboard_page(
     success_targets = collect_success_targets(page)
     operator_briefings = collect_operator_briefings(page)
     review_paths = collect_review_paths(page)
+    feedback_handoffs = collect_feedback_handoffs(page)
     download_controls = collect_download_controls(page)
     comparison_previews = collect_comparison_previews(page)
     comparison_review_paths = collect_comparison_review_paths(page)
@@ -560,6 +595,7 @@ def validate_dashboard_page(
     failures.extend(success_target_failures(success_targets, viewport_name))
     failures.extend(operator_briefing_failures(operator_briefings, viewport_name))
     failures.extend(review_path_failures(review_paths, viewport_name))
+    failures.extend(feedback_handoff_failures(feedback_handoffs, viewport_name))
     failures.extend(download_control_failures(download_controls, viewport_name))
     failures.extend(comparison_preview_failures(comparison_previews, viewport_name))
     failures.extend(
@@ -627,6 +663,7 @@ def validate_dashboard_page(
         "success_targets": success_targets,
         "operator_briefings": operator_briefings,
         "review_paths": review_paths,
+        "feedback_handoffs": feedback_handoffs,
         "download_controls": download_controls,
         "comparison_previews": comparison_previews,
         "comparison_review_paths": comparison_review_paths,
@@ -1059,6 +1096,16 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
             failures.extend(
                 failure.replace(f"{name}: ", f"manifest {name} ")
                 for failure in path_failures
+            )
+
+        feedback_handoffs = raw.get("feedback_handoffs")
+        if not isinstance(feedback_handoffs, list):
+            failures.append(f"manifest {name} missing safe feedback handoff evidence")
+        else:
+            handoff_failures = feedback_handoff_failures(feedback_handoffs, name)
+            failures.extend(
+                failure.replace(f"{name}: ", f"manifest {name} ")
+                for failure in handoff_failures
             )
 
         comparison_previews = raw.get("comparison_previews")

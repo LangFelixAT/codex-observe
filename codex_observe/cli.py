@@ -90,6 +90,16 @@ EXPECTED_VISUAL_REVIEW_PATH = {
     "PUBLIC_TOUR_FEEDBACK.md",
 }
 
+EXPECTED_VISUAL_FEEDBACK_HANDOFF = {
+    "Safe feedback handoff",
+    "docs/PUBLIC_TOUR_FEEDBACK.md",
+    ".github/ISSUE_TEMPLATE/public_tour_feedback.yml",
+    "synthetic or reviewed-redacted aggregate evidence",
+    "codex-observe report JSON or Markdown",
+    "private prompts",
+    "Do not collect",
+}
+
 EXPECTED_VISUAL_TABS = [
     "Overview",
     "Agent detail",
@@ -1692,6 +1702,27 @@ def visual_manifest_evidence_failures(root: Path) -> list[str]:
                     f"visual QA manifest {viewport_name} missing next review path evidence: {', '.join(sorted(missing_review_path))}"
                 )
 
+        feedback_handoffs = viewport.get("feedback_handoffs")
+        if not isinstance(feedback_handoffs, list) or not feedback_handoffs:
+            failures.append(
+                f"visual QA manifest missing {viewport_name} safe feedback handoff evidence"
+            )
+        else:
+            feedback_text = "\n".join(
+                str(item.get("body") or item.get("label") or "")
+                for item in feedback_handoffs
+                if isinstance(item, dict)
+            )
+            missing_feedback_handoff = EXPECTED_VISUAL_FEEDBACK_HANDOFF - {
+                expected
+                for expected in EXPECTED_VISUAL_FEEDBACK_HANDOFF
+                if expected in feedback_text
+            }
+            if missing_feedback_handoff:
+                failures.append(
+                    f"visual QA manifest {viewport_name} missing safe feedback handoff evidence: {', '.join(sorted(missing_feedback_handoff))}"
+                )
+
         comparison_previews = viewport.get("comparison_previews")
         if not isinstance(comparison_previews, list) or not comparison_previews:
             failures.append(
@@ -2596,7 +2627,7 @@ def release_audit_report(
         f"{VISUAL_MANIFEST.as_posix()}; "
         f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['desktop']).as_posix()}; "
         f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['narrow']).as_posix()}; "
-        "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, metric cards, dashboard quick reads, report and comparison downloads, comparison preview, comparison review path, deltas, operator briefing, next review path, and success target verified"
+        "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, metric cards, dashboard quick reads, report and comparison downloads, comparison preview, comparison review path, deltas, operator briefing, next review path, safe feedback handoff, and success target verified"
         if not visual_manifest_failures
         else "; ".join(visual_manifest_failures[:3]),
     )
@@ -2899,7 +2930,7 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
             "title": "Capture and verify UI evidence",
             "evidence": [
                 "visual manifest records desktop and narrow screenshots",
-                "layout review, sidebar risk labels, metric cards, comparison metric delta cards, comparison review path, report and comparison download controls, operator briefing, next review path, dashboard quick reads, and success target are verified",
+                "layout review, sidebar risk labels, metric cards, comparison metric delta cards, comparison review path, report and comparison download controls, operator briefing, next review path, safe feedback handoff, dashboard quick reads, and success target are verified",
                 "tab checks cover Agent detail thread brief, Timeline quick read, Tools quick read, Duplication quick read, and Raw tables data inventory",
             ],
             "success_checks": [
@@ -3612,7 +3643,7 @@ def evidence_bundle_review_checklist(
             {
                 "label": "Inspect dashboard evidence",
                 "artifact": str(artifacts["visual_manifest"]),
-                "look_for": "Desktop/narrow screenshots, operator briefing, quick reads, comparison review path, metric delta cards, and layout review.",
+                "look_for": "Desktop/narrow screenshots, operator briefing, safe feedback handoff, quick reads, comparison review path, metric delta cards, and layout review.",
             }
         )
     return checklist

@@ -6,6 +6,7 @@ The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
 
+- Added a dashboard safe feedback handoff card plus visual QA and release audit evidence for its privacy boundary.
 - Added structured feedback handoff metadata to aggregate report and comparison Markdown/JSON artifacts plus release audit validation.
 - Added structured comparison review paths so comparison outputs guide verdict review, next-run validation, repeat comparison, and safe feedback.
 - Added structured report review paths so exported run reports guide next-run validation and comparison.
@@ -36,7 +37,7 @@ The project follows semantic versioning once release distribution is decided.
 - Added largest-tool-output evidence to structured session recommendation drivers.
 - Added largest-tool-output evidence to session summaries and the recommended-action driver list.
 - Added structured next-run validation commands to the public evidence bundle manifest, README, CLI output, and audit validation.
-- Added dashboard comparison quick-read, review-path, metric delta, and next validation command cards plus Markdown/JSON report and comparison downloads for the selected Overview session and visual/audit evidence that the controls render.
+- Added dashboard comparison quick-read, review-path, metric delta, safe feedback handoff, and next validation command cards plus Markdown/JSON report and comparison downloads for the selected Overview session and visual/audit evidence that the controls render.
 - Added an Agent detail thread brief that surfaces the selected thread's cost share, uncached input, tool count, and first inspection action.
 - Added a Tools quick read that highlights the noisiest captured output and the first command to tighten.
 - Added a Duplication quick read that turns replayed prompt-block estimates into a first cleanup action.
