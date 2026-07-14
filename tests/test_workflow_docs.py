@@ -367,6 +367,9 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         in release
     )
     assert "required_commands" in release
+    assert "private-sharing review metadata" in release
+    assert "text privacy-warning evidence" in release
+    assert "review_required_before_sharing" in release
     assert "structured `next_commands`" in release
     assert "follow-up command templates" in release
     assert "docs/CURRENT.md" in release
@@ -396,6 +399,9 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         "dashboard comparison quick-read, review-path, metric delta, safe feedback handoff, and next validation command cards plus Markdown/JSON report and comparison downloads",
         "codex-observe evidence-bundle --out .artifacts/public-evidence --skip-visual --json",
         "run-comparison.json",
+        "ingest private-sharing review warnings",
+        "release audit validation",
+        "PR checklist guidance",
     ]:
         assert required_changelog_item in changelog
     assert "\\n" not in contributing

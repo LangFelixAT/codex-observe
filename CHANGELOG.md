@@ -6,6 +6,7 @@ The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
 
+- Added ingest private-sharing review warnings to plain output, JSON privacy metadata, release audit validation, and PR checklist guidance.
 - Aligned the PR visual QA checklist with usage-snapshot comparison delta evidence.
 - Kept usage-snapshot comparison deltas visible in dashboard comparison cards and visual QA evidence.
 - Added neutral usage-snapshot deltas to aggregate report comparisons.
@@ -130,5 +131,3 @@ The project follows semantic versioning once release distribution is decided.
 - `codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --format json --out .artifacts/demo/run-comparison.json`
 - `codex-observe evidence-bundle --out .artifacts/public-evidence --skip-visual --json`
 - `python scripts/visual_qa.py`
-
-
