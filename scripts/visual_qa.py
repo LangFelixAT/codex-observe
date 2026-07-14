@@ -73,6 +73,7 @@ EXPECTED_COMPARISON_PREVIEW = {
 }
 EXPECTED_COMPARISON_DELTAS = [
     {"label": "Total tokens", "direction": "regressed"},
+    {"label": "Usage snapshots", "direction": "changed"},
     {"label": "Largest thread tokens", "direction": "regressed"},
 ]
 EXPECTED_COMPARISON_REVIEW_PATH = [

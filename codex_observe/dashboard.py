@@ -1341,7 +1341,22 @@ def comparison_delta_cards_html(comparison: dict[str, object], limit: int = 4) -
         key=lambda metric: abs(int(metric.get("delta") or 0)),
         reverse=True,
     )
-    for metric in ranked[:limit]:
+    selected_metrics = ranked[:limit]
+    snapshot_metric = next(
+        (
+            metric
+            for metric in ranked
+            if str(metric.get("metric") or "") == "usage_snapshots"
+            or str(metric.get("label") or "") == "Usage snapshots"
+        ),
+        None,
+    )
+    if snapshot_metric and snapshot_metric not in selected_metrics:
+        if len(selected_metrics) >= limit and selected_metrics:
+            selected_metrics[-1] = snapshot_metric
+        else:
+            selected_metrics.append(snapshot_metric)
+    for metric in selected_metrics:
         label = html.escape(
             str(metric.get("label") or metric.get("metric") or "Metric")
         )

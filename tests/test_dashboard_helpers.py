@@ -981,6 +981,65 @@ def test_comparison_delta_cards_html_renders_ranked_metric_deltas_and_escapes() 
     assert "Total <tokens>" not in rendered
 
 
+def test_comparison_delta_cards_html_keeps_usage_snapshot_context_with_limit() -> None:
+    rendered = comparison_delta_cards_html(
+        {
+            "metrics": [
+                {
+                    "metric": "total_tokens",
+                    "label": "Total tokens",
+                    "before": 100_000,
+                    "after": 150_000,
+                    "delta": 50_000,
+                    "delta_pct": 50.0,
+                    "direction": "regressed",
+                },
+                {
+                    "metric": "largest_thread_tokens",
+                    "label": "Largest thread tokens",
+                    "before": 80_000,
+                    "after": 120_000,
+                    "delta": 40_000,
+                    "delta_pct": 50.0,
+                    "direction": "regressed",
+                },
+                {
+                    "metric": "uncached_input_tokens",
+                    "label": "Uncached input tokens",
+                    "before": 40_000,
+                    "after": 70_000,
+                    "delta": 30_000,
+                    "delta_pct": 75.0,
+                    "direction": "regressed",
+                },
+                {
+                    "metric": "repeated_prompt_tokens",
+                    "label": "Repeated prompt tokens",
+                    "before": 10_000,
+                    "after": 20_000,
+                    "delta": 10_000,
+                    "delta_pct": 100.0,
+                    "direction": "regressed",
+                },
+                {
+                    "metric": "usage_snapshots",
+                    "label": "Usage snapshots",
+                    "before": 3,
+                    "after": 6,
+                    "delta": 3,
+                    "delta_pct": 100.0,
+                    "direction": "changed",
+                },
+            ]
+        },
+        limit=4,
+    )
+
+    assert rendered.count('class="co-comparison-delta"') == 4
+    assert "Usage snapshots" in rendered
+    assert "changed: 3 (100.0%)" in rendered
+
+
 def test_comparison_delta_cards_html_returns_empty_string_without_metrics() -> None:
     assert comparison_delta_cards_html({}) == ""
 

@@ -275,6 +275,11 @@ def write_valid_visual_manifest(root: Path) -> None:
                     "delta": "regressed: 49.1k (584.6%)",
                 },
                 {
+                    "label": "Usage snapshots",
+                    "before_after": "3 -> 6",
+                    "delta": "changed: 3 (100.0%)",
+                },
+                {
                     "label": "Largest thread tokens",
                     "before_after": "2.9k -> 33.2k",
                     "delta": "regressed: 30.3k (1044.8%)",
@@ -432,6 +437,10 @@ def test_visual_manifest_evidence_failures_validate_saved_sidebar_metric_and_suc
     )
     assert (
         "visual QA manifest desktop comparison delta Total tokens missing direction: regressed"
+        in failures
+    )
+    assert (
+        "visual QA manifest desktop missing comparison delta: Usage snapshots"
         in failures
     )
     assert (

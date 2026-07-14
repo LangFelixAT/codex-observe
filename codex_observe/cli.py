@@ -56,6 +56,7 @@ EXPECTED_VISUAL_COMPARISON_PREVIEW = {
 }
 EXPECTED_VISUAL_COMPARISON_DELTAS = {
     "Total tokens": "regressed",
+    "Usage snapshots": "changed",
     "Largest thread tokens": "regressed",
 }
 EXPECTED_VISUAL_COMPARISON_REVIEW_PATH = {

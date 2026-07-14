@@ -280,6 +280,7 @@ def test_comparison_delta_failures_require_metric_delta_cards() -> None:
         comparison_delta_failures(
             [
                 {"label": "Total tokens", "delta": "regressed: 49.1k (584.6%)"},
+                {"label": "Usage snapshots", "delta": "changed: 3 (100.0%)"},
                 {
                     "label": "Largest thread tokens",
                     "delta": "regressed: 30.3k (1044.8%)",
@@ -298,6 +299,7 @@ def test_comparison_delta_failures_require_metric_delta_cards() -> None:
     assert (
         "narrow: comparison delta Total tokens missing direction: regressed" in failures
     )
+    assert "narrow: comparison delta not found: Usage snapshots" in failures
     assert "narrow: comparison delta not found: Largest thread tokens" in failures
 
 
@@ -489,6 +491,11 @@ def complete_viewport_results(tmp_path: Path) -> dict[str, dict[str, object]]:
                     "label": "Total tokens",
                     "before_after": "8.4k -> 57.5k",
                     "delta": "regressed: 49.1k (584.6%)",
+                },
+                {
+                    "label": "Usage snapshots",
+                    "before_after": "3 -> 6",
+                    "delta": "changed: 3 (100.0%)",
                 },
                 {
                     "label": "Largest thread tokens",
