@@ -369,6 +369,8 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
     assert "required_commands" in release
     assert "private-sharing review metadata" in release
     assert "text privacy-warning evidence" in release
+    assert "terminal privacy warning" in release
+    assert "report/comparison terminal privacy-warning evidence" in release
     assert "review_required_before_sharing" in release
     assert "structured `next_commands`" in release
     assert "follow-up command templates" in release
@@ -400,6 +402,8 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         "codex-observe evidence-bundle --out .artifacts/public-evidence --skip-visual --json",
         "run-comparison.json",
         "ingest private-sharing review warnings",
+        "report and comparison terminal privacy warnings",
+        "private aggregate artifacts are reviewed before sharing",
         "release audit validation",
         "PR checklist guidance",
     ]:

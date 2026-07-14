@@ -1410,6 +1410,14 @@ def test_report_and_comparison_written_lines_include_actionable_drivers(
     )
 
     assert f"Wrote aggregate-only report: {report_path}" in report_lines
+    assert any(
+        "Privacy: review private reports before sharing" in line
+        for line in report_lines
+    )
+    assert any(
+        "aggregate metrics can still reveal workflow clues" in line
+        for line in report_lines
+    )
     assert "Top opportunity: Largest thread; 33.2k tokens" in report_lines
     assert "Next action: Set a stop condition" in report_lines
     assert (
@@ -1420,6 +1428,14 @@ def test_report_and_comparison_written_lines_include_actionable_drivers(
     assert (
         "- codex-observe compare --before-report run-report.json --after-report next-run-report.json --out run-comparison.md"
         in report_lines
+    )
+    assert any(
+        "Privacy: review private comparison reports before sharing" in line
+        for line in comparison_lines
+    )
+    assert any(
+        "aggregate deltas can still reveal workflow clues" in line
+        for line in comparison_lines
     )
     assert "Triage risk: high -> moderate (improved)" in comparison_lines
     assert "Opportunity change: Largest thread improved." in comparison_lines

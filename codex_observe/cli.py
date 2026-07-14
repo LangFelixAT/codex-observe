@@ -2250,6 +2250,9 @@ def release_audit_report(
         report_written_text = "\n".join(report_written_lines(out_path, report))
         report_confirmation_has_success_target = (
             "Success target:" in report_written_text
+            and "Privacy: review private reports before sharing" in report_written_text
+            and "aggregate metrics can still reveal workflow clues"
+            in report_written_text
             and "Next commands:" in report_written_text
             and str(report_payload.get("success_target", {}).get("metric"))
             in report_written_text
@@ -2368,7 +2371,7 @@ def release_audit_report(
         add(
             "aggregate report",
             report_has_cost_profile,
-            f"{out_path}; {json_out_path}; recommended action, usage-snapshot summary, cost profile, opportunity stack, terminal success target, next-run checklist, terminal next commands, triage, review path, feedback handoff, follow-up commands, structured next action, and schema verified",
+            f"{out_path}; {json_out_path}; recommended action, usage-snapshot summary, cost profile, opportunity stack, terminal success target, terminal privacy warning, next-run checklist, terminal next commands, triage, review path, feedback handoff, follow-up commands, structured next action, and schema verified",
         )
         comparison = compare_reports(report, report)
         comparison_out = out_path.with_name("run-comparison.md")
@@ -2383,6 +2386,10 @@ def release_audit_report(
         )
         comparison_confirmation_has_validation_command = (
             "Next validation command:" in comparison_written_text
+            and "Privacy: review private comparison reports before sharing"
+            in comparison_written_text
+            and "aggregate deltas can still reveal workflow clues"
+            in comparison_written_text
             and "Next commands:" in comparison_written_text
             and "codex-observe report --db <db> --session-id <next-session-id>"
             in comparison_written_text
@@ -2477,7 +2484,7 @@ def release_audit_report(
         add(
             "aggregate comparison",
             comparison_has_quick_read,
-            f"{comparison_out}; {comparison_json_out}; quick read, recommended action, triage risk, usage-snapshot deltas, opportunity change, terminal validation command, terminal next commands, structured recommendation, review path, feedback handoff, follow-up commands, and schema verified",
+            f"{comparison_out}; {comparison_json_out}; quick read, recommended action, triage risk, usage-snapshot deltas, opportunity change, terminal validation command, terminal privacy warning, terminal next commands, structured recommendation, review path, feedback handoff, follow-up commands, and schema verified",
         )
     except (FileNotFoundError, ValueError, KeyError) as exc:
         add("aggregate report", False, str(exc))
@@ -3618,6 +3625,7 @@ def comparison_written_lines(path: Path, comparison: dict) -> list[str]:
     recommendation = str(comparison.get("recommendation") or "Inspect the comparison.")
     lines = [
         f"Wrote aggregate-only comparison: {path}",
+        "Privacy: review private comparison reports before sharing; aggregate deltas can still reveal workflow clues.",
         f"Verdict: {comparison.get('verdict', 'unknown')}",
         f"Triage risk: {before} -> {after} ({direction})",
     ]
@@ -3675,6 +3683,7 @@ def report_written_lines(path: Path, report: dict) -> list[str]:
             )
     lines = [
         f"Wrote aggregate-only report: {path}",
+        "Privacy: review private reports before sharing; aggregate metrics can still reveal workflow clues.",
         f"Triage: {risk} risk; {driver}",
     ]
     if opportunity_line:

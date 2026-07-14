@@ -6,6 +6,7 @@ The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
 
+- Added report and comparison terminal privacy warnings so private aggregate artifacts are reviewed before sharing.
 - Added ingest private-sharing review warnings to plain output, JSON privacy metadata, release audit validation, and PR checklist guidance.
 - Aligned the PR visual QA checklist with usage-snapshot comparison delta evidence.
 - Kept usage-snapshot comparison deltas visible in dashboard comparison cards and visual QA evidence.
