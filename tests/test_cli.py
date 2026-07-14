@@ -616,7 +616,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     assert checks["tracking snapshot"]["ok"] is True
     assert (
         checks["public tour JSON"]["detail"]
-        == "schema, privacy, database, evidence bundle, recommended-action evidence, terminal validation evidence, dashboard quick-read evidence, top-level review path, per-step success checks, and next commands verified"
+        == "schema, privacy, database, evidence bundle, recommended-action evidence, terminal validation evidence, dashboard quick-read and comparison review-path evidence, top-level review path, per-step success checks, and next commands verified"
     )
     assert (
         checks["issue templates"]["detail"]

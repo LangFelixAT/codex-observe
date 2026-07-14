@@ -40,7 +40,7 @@ def test_evidence_bundle_check_verifies_manifest_readme_and_skipped_visual(
     )
 
     (bundle / "PUBLIC_TOUR_FEEDBACK.md").write_text(
-        "# Public Tour Feedback Runbook\n", encoding="utf-8"
+        "# Public Tour Feedback\n", encoding="utf-8"
     )
     check = clean_install_smoke.evidence_bundle_check(bundle)
 
@@ -58,7 +58,7 @@ def test_evidence_bundle_check_verifies_manifest_readme_and_skipped_visual(
     assert "## Review Checklist" in check
     assert "PUBLIC_TOUR_FEEDBACK.md" in check
     assert "approval-gated" in check
-    assert "Public Tour Feedback Runbook" in check
+    assert "Public Tour Feedback" in check
 
 
 def test_smoke_commands_verify_console_script_demo_audit_bundle_and_imports(
