@@ -6,6 +6,7 @@ The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
 
+- Aligned the PR visual QA checklist with usage-snapshot comparison delta evidence.
 - Kept usage-snapshot comparison deltas visible in dashboard comparison cards and visual QA evidence.
 - Added neutral usage-snapshot deltas to aggregate report comparisons.
 - Added usage snapshot counts to aggregate report summaries, headlines, and Markdown exports.
