@@ -1101,6 +1101,7 @@ def test_public_evidence_bundle_writes_privacy_safe_manifest_and_artifacts(
     assert "Check workflow-change evidence" in checklist_text
     assert "Verify release gates" in checklist_text
     assert "next validation command" in checklist_text
+    assert "comparison review path" in checklist_text
     assert str(tmp_path) not in checklist_text
     action_plan = loaded["action_plan"]
     action_plan_text = json.dumps(action_plan)
@@ -1171,6 +1172,7 @@ def test_public_evidence_bundle_writes_privacy_safe_manifest_and_artifacts(
     assert "Check workflow-change evidence" in readme
     assert "Verify release gates" in readme
     assert "next validation command" in readme
+    assert "comparison review path" in readme
     assert "## Validate The Next Run" in readme
     assert "Next Report" in readme
     assert "Next Comparison" in readme
@@ -1244,6 +1246,7 @@ def test_evidence_bundle_cli_json_and_text_outputs_are_actionable(
         assert payload["next"].startswith(
             "Start with README.md, LIMITATIONS.md, and PUBLIC_TOUR_FEEDBACK.md"
         )
+        assert "comparison review path" in json.dumps(payload["review_checklist"])
         assert "visual QA screenshots" not in payload["next"]
         assert str(tmp_path) not in captured.out
 

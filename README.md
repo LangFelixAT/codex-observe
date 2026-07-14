@@ -214,7 +214,7 @@ Pull requests run the clean-install smoke gate, Ruff lint, Ruff format checks, t
 
 ## Validate locally
 
-Generate a reviewer-facing synthetic evidence bundle when you need one local directory with terminal output and a reviewer README containing an ordered action plan, key findings, a review checklist, reproduce-local commands, next-run validation commands, `LIMITATIONS.md`, `PUBLIC_TOUR_FEEDBACK.md`, report, comparison, audit, and visual QA artifacts:
+Generate a reviewer-facing synthetic evidence bundle when you need one local directory with terminal output and a reviewer README containing an ordered action plan, key findings, a review checklist with comparison review-path guidance, reproduce-local commands, next-run validation commands, `LIMITATIONS.md`, `PUBLIC_TOUR_FEEDBACK.md`, report, comparison, audit, and visual QA artifacts:
 
 ```bash
 codex-observe evidence-bundle --out .artifacts/public-evidence

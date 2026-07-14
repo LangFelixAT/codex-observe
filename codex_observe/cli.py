@@ -739,6 +739,7 @@ def public_evidence_bundle_artifact_failures(
             "Check workflow-change evidence",
             "Verify release gates",
             "next validation command",
+            "comparison review path",
             "File feedback safely",
         ]:
             if required not in checklist_text:
@@ -807,6 +808,7 @@ def public_evidence_bundle_artifact_failures(
             "Check workflow-change evidence",
             "Verify release gates",
             "next validation command",
+            "comparison review path",
             "## Reproduce Locally",
             "codex-observe demo --db demo/codex_observe_demo.sqlite",
             "codex-observe report --db demo/codex_observe_demo.sqlite --out demo/run-report.md",
@@ -3317,7 +3319,7 @@ def evidence_bundle_review_checklist(
             "artifact": str(
                 artifacts.get("comparison_markdown", "demo/run-comparison.md")
             ),
-            "look_for": "Verdict, triage movement, opportunity change, next step, and next validation command.",
+            "look_for": "Verdict, triage movement, opportunity change, next step, next validation command, and comparison review path.",
         },
         {
             "label": "Verify release gates",
@@ -3339,7 +3341,7 @@ def evidence_bundle_review_checklist(
             {
                 "label": "Inspect dashboard evidence",
                 "artifact": str(artifacts["visual_manifest"]),
-                "look_for": "Desktop/narrow screenshots, operator briefing, quick reads, comparison cards, and layout review.",
+                "look_for": "Desktop/narrow screenshots, operator briefing, quick reads, comparison review path, metric delta cards, and layout review.",
             }
         )
     return checklist
