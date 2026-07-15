@@ -89,7 +89,7 @@ def latest_ingest_scope(db_path: str | Path) -> dict[str, object] | None:
         warning = (
             f"Sampled ingest: newest-file limit {int(row['newest_files'] or 0)} selected "
             f"{counts['files_seen']} of {counts['files_matched']} matched JSONL files "
-            f"({counts['files_skipped_by_limit']} deferred); treat sessions and reports as sampled evidence."
+            f"({counts['files_skipped_by_limit']} deferred); treat sessions, reports, comparisons, and dashboard views as sampled evidence."
         )
     return {
         "imported_at": row["imported_at"],

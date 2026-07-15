@@ -6,6 +6,7 @@ The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
 
+- Broadened sampled-ingest warning text so downstream dashboard views and comparisons are explicitly labeled as sampled evidence.
 - Surfaced sampled-ingest warnings in the dashboard report area and visual manifest evidence so bounded private reports are labeled before download.
 - Surfaced sampled-ingest warnings in the dashboard comparison preview and visual manifest evidence so bounded private comparisons are labeled before download.
 - Carried ingest-scope metadata into comparison JSON, Markdown, terminal confirmations, and release-audit checks so sampled report deltas remain labeled.

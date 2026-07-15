@@ -1168,6 +1168,7 @@ def test_doctor_and_sessions_expose_sampled_ingest_scope(
     assert scope["counts"]["files_seen"] == 2
     assert scope["counts"]["files_skipped_by_limit"] == 1
     assert "Sampled ingest: newest-file limit 2 selected 2 of 3" in scope["warning"]
+    assert "sessions, reports, comparisons, and dashboard views" in scope["warning"]
     assert "Ingest scope: Sampled ingest" in "\n".join(lines)
     assert sessions_payload["ingest_scope"] == scope
 
