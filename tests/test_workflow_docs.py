@@ -143,6 +143,7 @@ def test_current_state_handoff_covers_gates_evidence_and_real_log_checkpoint() -
         "structured `next_commands`",
         "follow-up command templates",
         "next validation command",
+        "success-target preview",
         "terminal privacy warning",
         "privacy-warning",
         "private reports or comparisons",
@@ -293,6 +294,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         "top-level recommended action",
         "follow-up command templates",
         "next validation command",
+        "success-target preview",
         "aggregate triage assessment",
         "aggregate triage assessment",
         "largest-change summary",
@@ -417,6 +419,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         "private aggregate artifacts are reviewed before sharing",
         "release audit validation",
         "PR checklist guidance",
+        "session-listing next-run target previews",
         "codex-observe paths --json",
     ]:
         assert required_changelog_item in changelog

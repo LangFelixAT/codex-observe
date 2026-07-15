@@ -770,7 +770,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     assert report.with_name("run-comparison.json").exists()
     assert (
         checks["session listing"]["detail"]
-        == "2 sessions; triage risk, risk distribution, status, schema, limit metadata, usage snapshots, text recommended action, session table tool-output column, tool-output driver, structured driver summary, recommendation detail, review path, text next commands, and next commands verified"
+        == "2 sessions; triage risk, risk distribution, status, schema, limit metadata, usage snapshots, text recommended action, session table tool-output column, tool-output driver, structured driver summary, success-target preview, recommendation detail, review path, text next commands, and next commands verified"
     )
     assert checks["database doctor"]["detail"] == (
         "ok; schema, text next commands, next commands, and review path verified"
@@ -979,6 +979,17 @@ def test_sessions_json_payload_limits_rows_without_changing_recommendation(
     assert payload["sessions"][0]["session_id"] == "demo-session-cost-review"
     assert payload["recommended_session"]["session_id"] == "demo-session-cost-review"
     assert payload["recommendation_detail"]["target"] == "demo-session-cost-review"
+    assert payload["recommendation_detail"]["success_target_preview"] == {
+        "action": "Filter or summarize fresh context before the next run",
+        "current": "39.5%",
+        "current_value": 39.5,
+        "direction": "lower_is_better",
+        "driver": "Uncached input",
+        "metric": "uncached_input_share_pct",
+        "target": "below 35.0%",
+        "target_value": 35.0,
+        "unit": "percent_of_run",
+    }
 
 
 def test_demo_payload_and_text_include_review_path() -> None:

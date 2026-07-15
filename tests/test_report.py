@@ -406,6 +406,10 @@ def test_session_summaries_are_aggregate_only(tmp_path: Path) -> None:
         "Top drivers: largest thread share: 57.7%; repeated prompt share: 17.4%; uncached input share: 39.5%; largest tool output: 4.0k chars"
         in lines
     )
+    assert "Next-run target: uncached_input_share_pct 39.5% -> below 35.0%" in lines
+    assert (
+        "Habit to try: Filter or summarize fresh context before the next run" in lines
+    )
     assert "Review path:" in lines
     assert "Save report JSON: codex-observe report --db" in lines
     assert (

@@ -28,6 +28,7 @@ from .report import (
     session_report_hint,
     session_risk_distribution,
     session_summaries,
+    session_success_target_preview,
     session_summary_lines,
 )
 
@@ -2170,6 +2171,11 @@ def release_audit_report(
             and isinstance(recommendation_detail.get("drivers"), dict)
             and "largest_tool_output_chars" in recommendation_detail["drivers"]
             and isinstance(recommendation_detail.get("driver_summary"), list)
+            and isinstance(recommendation_detail.get("success_target_preview"), dict)
+            and recommendation_detail["success_target_preview"].get("metric")
+            == "uncached_input_share_pct"
+            and recommendation_detail["success_target_preview"].get("target")
+            == "below 35.0%"
             and any(
                 row.get("driver") == "largest_tool_output_chars"
                 for row in recommendation_detail["driver_summary"]
@@ -2197,6 +2203,8 @@ def release_audit_report(
             "Recommended action:" in session_lines_text
             and "Export report for session:" in session_lines_text
             and "Top drivers:" in session_lines_text
+            and "Next-run target:" in session_lines_text
+            and "Habit to try:" in session_lines_text
             and "Tool out" in session_lines_text
             and "Snapshots" in session_lines_text
             and "largest tool output:" in session_lines_text
@@ -2228,9 +2236,9 @@ def release_audit_report(
         add(
             "session listing",
             session_listing_ok,
-            f"{len(sessions)} sessions; triage risk, risk distribution, status, schema, limit metadata, usage snapshots, text recommended action, session table tool-output column, tool-output driver, structured driver summary, recommendation detail, review path, text next commands, and next commands verified"
+            f"{len(sessions)} sessions; triage risk, risk distribution, status, schema, limit metadata, usage snapshots, text recommended action, session table tool-output column, tool-output driver, structured driver summary, success-target preview, recommendation detail, review path, text next commands, and next commands verified"
             if session_listing_ok
-            else "session listing missing aggregate triage risk, risk_distribution, status, schema_version, limit metadata, usage snapshots, text recommended action, recommended_session, recommendation_detail, review_path, text next commands, session table tool-output column, tool-output driver, structured driver summary, or next_commands",
+            else "session listing missing aggregate triage risk, risk_distribution, status, schema_version, limit metadata, usage snapshots, text recommended action, recommended_session, recommendation_detail, review_path, text next commands, session table tool-output column, tool-output driver, structured driver summary, success-target preview, or next_commands",
         )
     except FileNotFoundError as exc:
         sessions = []
@@ -2944,6 +2952,7 @@ def session_recommendation_detail(recommended: dict[str, object]) -> dict[str, o
             "largest_tool_output_chars": recommended.get("largest_tool_output_chars"),
         },
         "driver_summary": session_driver_summary(recommended),
+        "success_target_preview": session_success_target_preview(recommended),
     }
 
 

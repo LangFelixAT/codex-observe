@@ -248,6 +248,81 @@ def session_risk_distribution_line(distribution: dict[str, int]) -> str:
     )
 
 
+def session_success_target_preview(recommended: dict[str, Any]) -> dict[str, Any]:
+    opportunities = opportunity_df(recommended, limit=1).to_dict("records")
+    driver = str(opportunities[0].get("Driver") or "") if opportunities else ""
+
+    if driver == "Largest thread":
+        current = float(recommended.get("largest_thread_share_pct") or 0)
+        target = _pct_target(current, 50.0, 35.0)
+        return {
+            "metric": "largest_thread_share_pct",
+            "direction": "lower_is_better",
+            "current_value": current,
+            "target_value": target,
+            "unit": "percent_of_run",
+            "current": f"{current:.1f}%",
+            "target": f"below {target:.1f}%",
+            "driver": driver,
+            "action": "Set a stop condition for the dominant thread",
+        }
+    if driver == "Repeated prompt blocks":
+        current = float(recommended.get("repeated_prompt_share_pct") or 0)
+        target = _pct_target(current, 15.0, 8.0)
+        return {
+            "metric": "repeated_prompt_share_pct",
+            "direction": "lower_is_better",
+            "current_value": current,
+            "target_value": target,
+            "unit": "percent_of_run",
+            "current": f"{current:.1f}%",
+            "target": f"below {target:.1f}%",
+            "driver": driver,
+            "action": "Reduce replayed prompt blocks before the next run",
+        }
+    if driver == "Uncached input":
+        current = float(recommended.get("uncached_input_share_pct") or 0)
+        target = _pct_target(current, 35.0, 20.0)
+        return {
+            "metric": "uncached_input_share_pct",
+            "direction": "lower_is_better",
+            "current_value": current,
+            "target_value": target,
+            "unit": "percent_of_run",
+            "current": f"{current:.1f}%",
+            "target": f"below {target:.1f}%",
+            "driver": driver,
+            "action": "Filter or summarize fresh context before the next run",
+        }
+    if driver == "Largest tool output":
+        current = _safe_int(recommended.get("largest_tool_output_chars"))
+        target = 5_000 if current >= 5_000 else 2_000
+        return {
+            "metric": "largest_tool_output_chars",
+            "direction": "lower_is_better",
+            "current_value": current,
+            "target_value": target,
+            "unit": "chars",
+            "current": f"{fmt_short(current)} chars",
+            "target": f"below {fmt_short(target)} chars",
+            "driver": driver,
+            "action": "Narrow commands before large tool output enters context",
+        }
+    total = _safe_int(recommended.get("total_tokens"))
+    target = int(total * 0.9) if total else 0
+    return {
+        "metric": "total_tokens",
+        "direction": "lower_is_better",
+        "current_value": total,
+        "target_value": target,
+        "unit": "tokens",
+        "current": f"{fmt_short(total)} tokens",
+        "target": f"below {fmt_short(target)} tokens",
+        "driver": driver or "Total tokens",
+        "action": "Use total tokens as the next-run guardrail",
+    }
+
+
 def session_recommended_action_lines(recommended: dict[str, Any]) -> list[str]:
     share_drivers = [
         ("largest thread share", recommended.get("largest_thread_share_pct")),
@@ -267,12 +342,15 @@ def session_recommended_action_lines(recommended: dict[str, Any]) -> list[str]:
         driver_parts.append(
             f"largest tool output: {fmt_short(tool_output_chars)} chars"
         )
+    target = session_success_target_preview(recommended)
     return [
         "Recommended action:",
         f"- Export report for session: {recommended['session_id']}",
         "- Why: highest aggregate triage risk; latest run breaks ties",
         f"- Risk: {recommended['triage_risk']}",
         f"- Top drivers: {'; '.join(driver_parts) if driver_parts else 'none recorded'}",
+        f"- Next-run target: {target['metric']} {target['current']} -> {target['target']}",
+        f"- Habit to try: {target['action']}",
     ]
 
 
