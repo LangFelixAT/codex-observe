@@ -16,6 +16,7 @@ For visual QA and screenshot verification only, the visual extra installs Playwr
 ```bash
 python -m pip install -e ".[visual]"
 python -m playwright install chromium
+codex-observe self-check --visual --json
 ```
 
 For contributor verification, install all local dev tools:
@@ -23,10 +24,11 @@ For contributor verification, install all local dev tools:
 ```bash
 python -m pip install -e ".[dev]"
 python -m playwright install chromium
+codex-observe self-check --visual --json
 ```
 
 
-To prove the source checkout works from a fresh virtual environment without touching private Codex logs, run the clean-install smoke gate. The smoke gate verifies `codex-observe self-check --json` as part of the installed console-script contract:
+To prove the source checkout works from a fresh virtual environment without touching private Codex logs, run the clean-install smoke gate. The smoke gate verifies `codex-observe self-check --json` and, for visual/dev extras, `codex-observe self-check --visual --json` as part of the installed console-script contract:
 
 ```bash
 python scripts/clean_install_smoke.py --extra dev
@@ -68,7 +70,7 @@ The local `sample_from_uploaded.sqlite` file is treated as a private local artif
 
 A source-distribution release candidate is ready when:
 
-- `python scripts/clean_install_smoke.py --extra dev` succeeds and verifies `codex-observe self-check --json`, the reviewer evidence bundle README, manifest, limitations doc, and feedback issue template.
+- `python scripts/clean_install_smoke.py --extra dev` succeeds and verifies `codex-observe self-check --json` and, for visual/dev extras, `codex-observe self-check --visual --json`, the reviewer evidence bundle README, manifest, limitations doc, and feedback issue template.
 - `codex-observe evidence-bundle --out .artifacts/public-evidence` creates a synthetic reviewer bundle.
 - `codex-observe audit --json` passes after the public evidence bundle exists.
 - `ruff check` passes.

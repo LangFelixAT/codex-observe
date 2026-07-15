@@ -27,6 +27,7 @@ ruff check
 ruff format --check
 pytest -q
 codex-observe self-check --json
+codex-observe self-check --visual --json
 codex-observe paths --json
 python scripts/clean_install_smoke.py --extra dev
 codex-observe demo --sessions .artifacts/demo/sessions --keep-sessions --json

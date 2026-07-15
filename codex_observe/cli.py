@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import textwrap
 import json
 import re
@@ -3833,7 +3834,18 @@ def supported_python() -> bool:
     return (3, 10) <= sys.version_info[:2] <= (3, 12)
 
 
-def self_check_payload() -> dict[str, object]:
+def optional_dependency_check(name: str, module: str) -> dict[str, object]:
+    found = importlib.util.find_spec(module) is not None
+    return {
+        "name": name,
+        "ok": found,
+        "detail": f"{module} importable"
+        if found
+        else f'{module} missing; install with `python -m pip install -e ".[visual]"`',
+    }
+
+
+def self_check_payload(*, include_visual: bool = False) -> dict[str, object]:
     dashboard_path = Path(__file__).with_name("dashboard.py")
     checks = [
         {
@@ -3854,6 +3866,13 @@ def self_check_payload() -> dict[str, object]:
             else "dashboard.py missing",
         },
     ]
+    if include_visual:
+        checks.extend(
+            [
+                optional_dependency_check("visual_pillow", "PIL"),
+                optional_dependency_check("visual_playwright", "playwright"),
+            ]
+        )
     ok = all(bool(check["ok"]) for check in checks)
     return {
         "schema_version": SELF_CHECK_SCHEMA_VERSION,
@@ -3864,9 +3883,12 @@ def self_check_payload() -> dict[str, object]:
             "scans_sessions": False,
             "review_required_before_sharing": False,
         },
+        "visual_checks_included": include_visual,
         "next_commands": [
             "codex-observe tour",
             "codex-observe demo --serve --host 127.0.0.1 --port 8501",
+            'python -m pip install -e ".[visual]"',
+            "python -m playwright install chromium",
             "codex-observe paths",
             "codex-observe private-validate ~/.codex/sessions --serve --host 127.0.0.1 --port 8501",
         ],
@@ -4928,6 +4950,11 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     p_self.add_argument(
+        "--visual",
+        action="store_true",
+        help="Also verify Pillow and Playwright imports for visual QA",
+    )
+    p_self.add_argument(
         "--json",
         action="store_true",
         help="Emit source-install check status as schema-versioned JSON",
@@ -5229,7 +5256,7 @@ def main(argv: list[str] | None = None) -> int:
             print("\n".join(public_tour_lines(args.db)))
         return 0
     if args.cmd == "self-check":
-        payload = self_check_payload()
+        payload = self_check_payload(include_visual=args.visual)
         if args.json:
             print(json.dumps(payload, indent=2, sort_keys=True))
         else:

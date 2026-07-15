@@ -77,7 +77,7 @@ codex-observe --version
 codex-observe self-check
 ```
 
-`codex-observe self-check --json` emits `codex-observe.self-check.v1` with Python/runtime, package version, dashboard-module, privacy metadata, and next-command evidence for automation.
+`codex-observe self-check --json` emits `codex-observe.self-check.v1` with Python/runtime, package version, dashboard-module, privacy metadata, and next-command evidence for automation. Use `codex-observe self-check --visual --json` after installing `.[visual]` or `.[dev]` to verify Pillow and Playwright imports before running browser visual QA.
 
 ## Run
 
@@ -225,6 +225,7 @@ The script clicks every main dashboard tab, exercises the Agent detail selector,
 ```bash
 python -m pip install -e ".[visual]"
 python -m playwright install chromium
+codex-observe self-check --visual --json
 ```
 
 ## Project workflow

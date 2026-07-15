@@ -117,6 +117,9 @@ def test_smoke_commands_verify_console_script_demo_audit_bundle_and_imports(
     assert bundle_index < audit_index
     assert any("evidence bundle ok" in command for command in flattened)
     assert any("import codex_observe" in command for command in flattened)
+    assert any(
+        " self-check " in command and "--visual" in command for command in flattened
+    )
     assert any("import playwright" in command for command in flattened)
     assert any("from PIL import Image" in command for command in flattened)
     assert all(".codex" not in command for command in flattened)
@@ -134,6 +137,7 @@ def test_smoke_commands_do_not_require_playwright_for_plain_install(
         for command in clean_install_smoke.smoke_commands(paths, "none")
     )
 
+    assert "--visual" not in flattened
     assert "import playwright" not in flattened
     assert "from PIL import Image" not in flattened
     assert " demo " in flattened

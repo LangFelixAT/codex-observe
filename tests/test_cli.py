@@ -38,6 +38,38 @@ def test_self_check_payload_is_privacy_safe() -> None:
     assert any("private-validate" in item for item in payload["next_commands"])
 
 
+def test_self_check_visual_payload_reports_optional_dependencies() -> None:
+    payload = cli.self_check_payload(include_visual=True)
+
+    assert payload["schema_version"] == "codex-observe.self-check.v1"
+    assert payload["visual_checks_included"] is True
+    check_names = {check["name"] for check in payload["checks"]}
+    assert {"visual_pillow", "visual_playwright"}.issubset(check_names)
+    assert any("python -m pip install -e" in item for item in payload["next_commands"])
+    assert any(
+        "python -m playwright install chromium" in item
+        for item in payload["next_commands"]
+    )
+
+
+def test_self_check_visual_payload_fails_when_dependency_missing() -> None:
+    def fake_find_spec(module: str):
+        if module == "PIL":
+            return object()
+        return None
+
+    with patch(
+        "codex_observe.cli.importlib.util.find_spec", side_effect=fake_find_spec
+    ):
+        payload = cli.self_check_payload(include_visual=True)
+
+    assert payload["status"] == "failed"
+    checks = {check["name"]: check for check in payload["checks"]}
+    assert checks["visual_pillow"]["ok"] is True
+    assert checks["visual_playwright"]["ok"] is False
+    assert "playwright missing" in checks["visual_playwright"]["detail"]
+
+
 def test_self_check_cli_text_and_json(capsys) -> None:
     result = cli.main(["self-check"])
 
@@ -53,6 +85,12 @@ def test_self_check_cli_text_and_json(capsys) -> None:
     payload = json.loads(capsys.readouterr().out)
     assert payload["schema_version"] == "codex-observe.self-check.v1"
     assert payload["privacy"]["scans_sessions"] is False
+
+    result = cli.main(["self-check", "--visual", "--json"])
+
+    assert result == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["visual_checks_included"] is True
 
 
 def test_private_validate_writes_ignored_private_artifacts(tmp_path: Path) -> None:

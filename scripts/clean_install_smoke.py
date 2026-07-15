@@ -138,6 +138,7 @@ def smoke_commands(paths: SmokePaths, extra: str) -> list[list[str]]:
     if extra in {"visual", "dev"}:
         commands.extend(
             [
+                [str(paths.codex_observe), "self-check", "--visual", "--json"],
                 [str(paths.python), "-c", "import playwright; print('playwright ok')"],
                 [str(paths.python), "-c", "from PIL import Image; print('pillow ok')"],
             ]
