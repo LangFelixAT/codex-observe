@@ -5,6 +5,7 @@ All notable changes to Codex Observe will be documented here.
 The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
+- Added guided `private-validate --newest-files 25 --json` command as the first `codex-observe paths` next command so path discovery leads to the safer real-session validation loop.
 - Added real-profile visual QA handoff metadata to `codex-observe private-validate` so private validation output points directly at ignored browser evidence generation.
 - Added `python scripts/visual_qa.py --profile real` for ignored private real-session dashboard checks, and capped large raw dashboard tables so private histories do not exceed Streamlit websocket limits.
 

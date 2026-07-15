@@ -989,7 +989,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     )
     assert checks["paths handoff"]["ok"] is True
     assert checks["paths handoff"]["detail"] == (
-        "schema, existence checks, privacy no-scan metadata, sampled ingest command, review path, and text handoff verified"
+        "schema, existence checks, privacy no-scan metadata, guided private validation command, sampled ingest fallback, review path, and text handoff verified"
     )
     assert checks["private validation handoff"]["ok"] is True
     assert checks["private validation handoff"]["detail"] == (
@@ -2223,7 +2223,9 @@ def test_paths_command_prints_privacy_safe_private_validation_handoff(
     assert "Database exists: false" in captured.out
     assert "does not scan logs or print filenames" in captured.out
     assert "Review path:" in captured.out
-    assert "Sample newest private logs" in captured.out
+    assert "Run guided private validation" in captured.out
+    assert "Sample newest private logs manually" in captured.out
+    assert "codex-observe private-validate" in captured.out
     assert (
         f"codex-observe ingest {sessions} --newest-files 25 --db {db} --json"
         in captured.out
@@ -2259,9 +2261,14 @@ def test_paths_command_json_is_schema_versioned_and_does_not_scan_logs(
         "share_warning": "Paths and aggregate artifacts can reveal local workflow clues; review before sharing.",
     }
     assert payload["next_commands"][0] == (
+        f"codex-observe private-validate {sessions} --out .artifacts/private --newest-files 25 --json"
+    )
+    assert payload["next_commands"][1] == (
         f"codex-observe ingest {sessions} --newest-files 25 --db {db} --json"
     )
-    assert payload["review_path"][0]["label"] == "Sample newest private logs"
+    assert payload["review_path"][0]["label"] == "Run guided private validation"
+    assert payload["review_path"][0]["command"] == payload["next_commands"][0]
+    assert payload["review_path"][1]["label"] == "Sample newest private logs manually"
 
 
 def test_paths_command_quotes_shell_sensitive_private_paths(
@@ -2286,7 +2293,11 @@ def test_paths_command_quotes_shell_sensitive_private_paths(
 
     assert result == 0
     assert payload["next_commands"][0] == (
-        f"codex-observe ingest {sessions_arg} --newest-files 25 --db {db_arg} --json"
+        f"codex-observe private-validate {sessions_arg} --out .artifacts/private --newest-files 25 --json"
     )
     assert payload["review_path"][0]["command"] == payload["next_commands"][0]
-    assert payload["next_commands"][1] == f"codex-observe doctor --db {db_arg}"
+    assert payload["next_commands"][1] == (
+        f"codex-observe ingest {sessions_arg} --newest-files 25 --db {db_arg} --json"
+    )
+    assert payload["review_path"][1]["command"] == payload["next_commands"][1]
+    assert payload["next_commands"][2] == f"codex-observe doctor --db {db_arg}"

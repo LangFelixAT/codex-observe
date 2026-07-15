@@ -2705,11 +2705,16 @@ def release_audit_report(
         and paths_payload_check.get("privacy", {}).get("review_required_before_sharing")
         is True
         and isinstance(paths_commands, list)
+        and any(
+            "codex-observe private-validate" in str(command)
+            for command in paths_commands
+        )
         and any("--newest-files 25" in str(command) for command in paths_commands)
+        and any("codex-observe ingest" in str(command) for command in paths_commands)
         and any("codex-observe doctor" in str(command) for command in paths_commands)
         and isinstance(paths_review_path, list)
         and any(
-            "Sample newest private logs" == str(step.get("label"))
+            "Run guided private validation" == str(step.get("label"))
             for step in paths_review_path
             if isinstance(step, dict)
         )
@@ -2719,9 +2724,9 @@ def release_audit_report(
     add(
         "paths handoff",
         paths_ok,
-        "schema, existence checks, privacy no-scan metadata, sampled ingest command, review path, and text handoff verified"
+        "schema, existence checks, privacy no-scan metadata, guided private validation command, sampled ingest fallback, review path, and text handoff verified"
         if paths_ok
-        else "paths schema, existence checks, privacy no-scan metadata, sampled ingest command, review path, or text handoff missing",
+        else "paths schema, existence checks, privacy no-scan metadata, guided private validation command, sampled ingest fallback, review path, or text handoff missing",
     )
 
     private_validate_dir = Path(actual_db_path).with_name("private-validate-audit")
@@ -3919,6 +3924,10 @@ def paths_payload(db_path: str | None = None, sessions_path: str | None = None) 
     db = Path(db_path).expanduser() if db_path else Path(default_db()).expanduser()
     sessions_arg = _command_arg(sessions)
     db_arg = _command_arg(db)
+    private_validate_command = (
+        f"codex-observe private-validate {sessions_arg} --out .artifacts/private "
+        "--newest-files 25 --json"
+    )
     return {
         "schema_version": PATHS_SCHEMA_VERSION,
         "sessions_path": str(sessions),
@@ -3935,6 +3944,7 @@ def paths_payload(db_path: str | None = None, sessions_path: str | None = None) 
             ),
         },
         "next_commands": [
+            private_validate_command,
             f"codex-observe ingest {sessions_arg} --newest-files 25 --db {db_arg} --json",
             f"codex-observe doctor --db {db_arg}",
             f"codex-observe sessions --db {db_arg}",
@@ -3942,7 +3952,12 @@ def paths_payload(db_path: str | None = None, sessions_path: str | None = None) 
         ],
         "review_path": [
             {
-                "label": "Sample newest private logs",
+                "label": "Run guided private validation",
+                "command": private_validate_command,
+                "success_check": "JSON status is ok and visual_qa.command points at ignored private browser evidence.",
+            },
+            {
+                "label": "Sample newest private logs manually",
                 "command": f"codex-observe ingest {sessions_arg} --newest-files 25 --db {db_arg} --json",
                 "success_check": "JSON status is ok and privacy.review_required_before_sharing is true.",
             },

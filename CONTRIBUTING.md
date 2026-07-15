@@ -26,7 +26,7 @@ Use Python 3.10, 3.11, or 3.12. The supported source-install distribution policy
 
 Keep implementation work in small, reviewable checkpoints. After each coherent slice passes its relevant gates, commit it with a message that names the user-visible or workflow outcome, then push the branch so `origin` has the same trace as the local workspace.
 
-Use this cadence for dashboard/UI polish, parser changes, CLI/report behavior, release docs, and evidence tooling. Do not batch unrelated slices into one large commit unless they were already completed together and have passed the full quality gate; in that case, make one checkpoint commit before starting the next slice.
+Use this cadence for dashboard/UI polish, parser changes, CLI/report behavior, release docs, and evidence tooling. `codex-observe paths --json` should keep the guided `private-validate --newest-files 25 --json` command discoverable before lower-level manual follow-ups. Do not batch unrelated slices into one large commit unless they were already completed together and have passed the full quality gate; in that case, make one checkpoint commit before starting the next slice.
 
 Before handing off or starting a new slice, run `git status --short --branch` and confirm the working tree is clean or explain the remaining local changes.
 
