@@ -2688,6 +2688,49 @@ def release_audit_report(
         else "paths schema, existence checks, privacy no-scan metadata, sampled ingest command, review path, or text handoff missing",
     )
 
+    private_validate_dir = Path(actual_db_path).with_name("private-validate-audit")
+    private_validate_status, private_validate = private_validate_payload(
+        sessions_path,
+        output_dir=private_validate_dir,
+        newest_files=25,
+    )
+    private_validate_artifacts = private_validate.get("artifacts", {})
+    private_validate_privacy = private_validate.get("privacy", {})
+    private_validate_ok = (
+        private_validate_status == 0
+        and private_validate.get("schema_version") == PRIVATE_VALIDATE_SCHEMA_VERSION
+        and private_validate.get("status") == "ok"
+        and private_validate.get("sessions_path_exists") is True
+        and private_validate.get("database_exists") is True
+        and private_validate.get("newest_files") == 25
+        and private_validate.get("report_written") is True
+        and private_validate_privacy.get("raw_content_included") is False
+        and private_validate_privacy.get("terminal_output_includes_counts") is False
+        and private_validate_privacy.get("review_required_before_sharing") is True
+        and isinstance(private_validate_artifacts, dict)
+        and str(private_validate_artifacts.get("database", "")).endswith(
+            "real-sessions.sqlite"
+        )
+        and str(private_validate_artifacts.get("report_json", "")).endswith(
+            "real-run-report.json"
+        )
+        and isinstance(private_validate.get("next_commands"), list)
+        and any(
+            "codex-observe serve" in str(command)
+            for command in private_validate.get("next_commands", [])
+        )
+        and "counts" not in private_validate
+        and "sessions" not in private_validate
+        and "recommended_session" not in private_validate
+    )
+    add(
+        "private validation handoff",
+        private_validate_ok,
+        "schema, bounded sample, ignored artifacts, report export, privacy metadata, and dashboard next command verified"
+        if private_validate_ok
+        else "private validation schema, bounded sample, artifacts, report export, privacy metadata, dashboard next command, or privacy-safe top-level payload missing",
+    )
+
     try:
         report_help = subprocess.run(
             [sys.executable, "-m", "codex_observe.cli", "report", "--help"],

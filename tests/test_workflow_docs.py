@@ -160,6 +160,7 @@ def test_current_state_handoff_covers_gates_evidence_and_real_log_checkpoint() -
         "aggregate triage assessment",
         "required_commands",
         "paths handoff evidence",
+        "private-validate` handoff contract",
         "triage",
         "plain `codex-observe audit` prints",
         "python scripts/visual_qa.py",
@@ -392,6 +393,8 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
     assert "docs/CURRENT.md" in release
     assert "dashboard empty-state next actions" in release
     assert "private real-log checkpoint" in release
+    assert "private validation handoff evidence" in release
+    assert "private-validate` handoff contract" in release
     assert "--newest-files <n>" in release
     assert "risk_distribution" in release
     assert "docs/LIMITATIONS.md" in release
@@ -424,6 +427,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         "PR checklist guidance",
         "session-listing next-run target previews",
         "codex-observe paths --json",
+        "private-validate",
     ]:
         assert required_changelog_item in changelog
     assert "\\n" not in contributing

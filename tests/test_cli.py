@@ -896,6 +896,10 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     assert checks["paths handoff"]["detail"] == (
         "schema, existence checks, privacy no-scan metadata, sampled ingest command, review path, and text handoff verified"
     )
+    assert checks["private validation handoff"]["ok"] is True
+    assert checks["private validation handoff"]["detail"] == (
+        "schema, bounded sample, ignored artifacts, report export, privacy metadata, and dashboard next command verified"
+    )
     assert checks["visual QA manifest evidence"]["ok"] is True
     assert checks["CI reviewer evidence bundle"]["ok"] is True
     assert checks["public evidence bundle artifacts"]["ok"] is True
