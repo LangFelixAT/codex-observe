@@ -1083,7 +1083,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     assert report.with_name("run-comparison.json").exists()
     assert (
         checks["session listing"]["detail"]
-        == "2 sessions; triage risk, risk distribution, status, schema, limit metadata, usage snapshots, text recommended action, session table tool-output column, tool-output driver, structured driver summary, success-target preview, recommendation detail, review path, text validation next commands, and structured validation next commands verified"
+        == "2 sessions; triage risk, risk distribution, status, schema, limit and risk-filter metadata, usage snapshots, text recommended action, session table tool-output column, tool-output driver, structured driver summary, success-target preview, recommendation detail, review path, text validation next commands, and structured validation next commands verified"
     )
     assert checks["database doctor"]["detail"] == (
         "ok; schema, text next commands, next commands, and review path verified"
@@ -1271,6 +1271,8 @@ def test_sessions_missing_json_payload_is_actionable_and_schema_versioned() -> N
     }
     assert payload["truncated"] is False
     assert payload["limit"] == cli.DEFAULT_SESSIONS_LIMIT
+    assert payload["risk_filter"] is None
+    assert payload["matching_sessions"] == 0
     assert "codex-observe demo --db missing.sqlite" in payload["next_commands"]
     assert payload["review_path"][0]["label"] == "Create demo data"
     assert payload["review_path"][1]["label"] == "Ingest local logs"
@@ -1339,6 +1341,8 @@ def test_sessions_json_payload_limits_rows_without_changing_recommendation(
     }
     assert payload["truncated"] is True
     assert payload["limit"] == 1
+    assert payload["risk_filter"] is None
+    assert payload["matching_sessions"] == 2
     assert len(payload["sessions"]) == 1
     assert payload["sessions"][0]["session_id"] == "demo-session-cost-review"
     assert payload["recommended_session"]["session_id"] == "demo-session-cost-review"
@@ -1360,6 +1364,71 @@ def test_sessions_json_payload_limits_rows_without_changing_recommendation(
         "target_value": 50.0,
         "unit": "percent_of_run",
     }
+
+
+def test_sessions_json_payload_filters_by_risk_and_keeps_distribution(
+    tmp_path: Path,
+) -> None:
+    db = tmp_path / "demo.sqlite"
+    cli.create_demo_database(str(db), str(tmp_path / "sessions"))
+
+    payload = cli.sessions_json_payload(str(db), risk_filter="low")
+
+    assert payload["schema_version"] == cli.SESSIONS_SCHEMA_VERSION
+    assert payload["status"] == "ok"
+    assert payload["total_sessions"] == 2
+    assert payload["matching_sessions"] == 1
+    assert payload["returned_sessions"] == 1
+    assert payload["truncated"] is False
+    assert payload["risk_filter"] == "low"
+    assert payload["risk_distribution"] == {
+        "high": 1,
+        "medium": 0,
+        "low": 1,
+        "unknown": 0,
+    }
+    assert len(payload["sessions"]) == 1
+    assert payload["sessions"][0]["triage_risk"] == "low"
+    assert payload["recommended_session"]["triage_risk"] == "low"
+    assert (
+        payload["recommendation_detail"]["target"]
+        == payload["sessions"][0]["session_id"]
+    )
+    assert payload["next_commands"][0].endswith("--out run-report.md")
+
+
+def test_sessions_json_payload_reports_empty_filter_matches(tmp_path: Path) -> None:
+    db = tmp_path / "demo.sqlite"
+    cli.create_demo_database(str(db), str(tmp_path / "sessions"))
+
+    payload = cli.sessions_json_payload(str(db), risk_filter="medium")
+
+    assert payload["status"] == "ok"
+    assert payload["total_sessions"] == 2
+    assert payload["matching_sessions"] == 0
+    assert payload["returned_sessions"] == 0
+    assert payload["risk_filter"] == "medium"
+    assert payload["sessions"] == []
+    assert payload["recommended_session"] is None
+    assert payload["recommendation_detail"] is None
+    assert (
+        payload["next"] == "remove --risk or choose one of high, medium, low, unknown."
+    )
+
+
+def test_sessions_cli_filters_text_by_risk(tmp_path: Path, capsys) -> None:
+    db = tmp_path / "demo.sqlite"
+    cli.create_demo_database(str(db), str(tmp_path / "sessions"))
+
+    result = cli.main(["sessions", "--db", str(db), "--risk", "low"])
+    captured = capsys.readouterr()
+
+    assert result == 0
+    assert "Risk distribution: high 1, medium 0, low 1, unknown 0" in captured.out
+    assert "Filter: low risk (1 of 2 sessions)." in captured.out
+    assert " | low | " in captured.out
+    assert " | high | " not in captured.out
+    assert "Next: review the highest-risk matching run" in captured.out
 
 
 def test_demo_payload_and_text_include_review_path() -> None:

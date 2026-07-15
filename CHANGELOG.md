@@ -5,6 +5,7 @@ All notable changes to Codex Observe will be documented here.
 The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
+- Added `codex-observe sessions --risk high|medium|low|unknown` so large histories can be narrowed by aggregate triage band while preserving full risk-distribution context.
 - Hardened `python scripts/visual_qa.py` port handling so default local runs avoid stale Streamlit servers and explicit port conflicts fail clearly.
 - Strengthened `codex-observe audit` coverage for private visual validation by checking the default real-profile handoff status and `private-validate --visual` help discoverability.
 - Added `codex-observe private-validate --visual` so the bounded private validation loop can run real-profile browser QA into ignored private evidence without a second copied command.

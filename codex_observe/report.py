@@ -301,6 +301,19 @@ def session_summaries(db_path: str) -> list[dict[str, Any]]:
     return sort_session_summaries(summaries)
 
 
+def filter_session_summaries_by_risk(
+    summaries: list[dict[str, Any]], risk_filter: str | None = None
+) -> list[dict[str, Any]]:
+    if not risk_filter:
+        return summaries
+    normalized = risk_filter.strip().lower()
+    return [
+        row
+        for row in summaries
+        if str(row.get("triage_risk") or "unknown").lower() == normalized
+    ]
+
+
 def session_report_hint(db_path: str, session_id: str | None = None) -> str:
     session_part = f" --session-id {session_id}" if session_id else ""
     return (
@@ -480,7 +493,9 @@ def session_review_path_lines(db_path: str, session_id: str) -> list[str]:
     ]
 
 
-def session_summary_lines(db_path: str, limit: int | None = 50) -> list[str]:
+def session_summary_lines(
+    db_path: str, limit: int | None = 50, risk_filter: str | None = None
+) -> list[str]:
     summaries = session_summaries(db_path)
     if not summaries:
         db_arg = command_arg(db_path)
@@ -495,12 +510,26 @@ def session_summary_lines(db_path: str, limit: int | None = 50) -> list[str]:
             f"Next: run `{next_commands[0]}` or `{next_commands[1]}`.",
         ]
     distribution = session_risk_distribution(summaries)
-    lines = [
-        session_risk_distribution_line(distribution),
-        "Session ID | Last seen | Risk | Threads | Tools | Snapshots | Tool out | Tokens | Uncached",
-    ]
-    display_limit = len(summaries) if limit is None else max(1, int(limit))
-    displayed = summaries[:display_limit]
+    filtered = filter_session_summaries_by_risk(summaries, risk_filter)
+    lines = [session_risk_distribution_line(distribution)]
+    if risk_filter:
+        normalized = risk_filter.strip().lower()
+        lines.append(
+            f"Filter: {normalized} risk ({len(filtered)} of {len(summaries)} sessions)."
+        )
+    if not filtered:
+        lines.extend(
+            [
+                "No sessions matched the risk filter.",
+                "Next: remove --risk or choose one of high, medium, low, unknown.",
+            ]
+        )
+        return lines
+    lines.append(
+        "Session ID | Last seen | Risk | Threads | Tools | Snapshots | Tool out | Tokens | Uncached"
+    )
+    display_limit = len(filtered) if limit is None else max(1, int(limit))
+    displayed = filtered[:display_limit]
     for row in displayed:
         lines.append(
             " | ".join(
@@ -517,17 +546,23 @@ def session_summary_lines(db_path: str, limit: int | None = 50) -> list[str]:
                 ]
             )
         )
-    if len(displayed) < len(summaries):
-        lines.append(f"Showing {len(displayed)} of {len(summaries)} sessions.")
-    recommended = summaries[0]
+    if len(displayed) < len(filtered):
+        if risk_filter:
+            lines.append(
+                f"Showing {len(displayed)} of {len(filtered)} matching sessions ({len(summaries)} total)."
+            )
+        else:
+            lines.append(f"Showing {len(displayed)} of {len(summaries)} sessions.")
+    recommended = filtered[0]
     recommended_session_id = str(recommended["session_id"])
     lines.extend(session_recommended_action_lines(recommended))
     lines.extend(session_review_path_lines(db_path, recommended_session_id))
     next_commands = session_validation_commands(db_path, recommended_session_id)
     lines.append("Next commands:")
     lines.extend(f"- {command}" for command in next_commands)
+    next_scope = "matching " if risk_filter else ""
     lines.append(
-        "Next: review the highest-risk run "
+        f"Next: review the highest-risk {next_scope}run "
         f"({recommended['session_id']}, {recommended['triage_risk']} risk); "
         f"{session_report_hint(db_path, recommended_session_id)}"
     )

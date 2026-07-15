@@ -21,6 +21,7 @@ from .report import (
     COMPARISON_SCHEMA_VERSION,
     REPORT_SCHEMA_VERSION,
     build_report,
+    filter_session_summaries_by_risk,
     compare_reports,
     comparison_json,
     comparison_markdown,
@@ -2234,9 +2235,29 @@ def release_audit_report(
         sessions_has_status = sessions_payload.get("status") == "ok"
         sessions_has_limit_metadata = (
             sessions_payload.get("total_sessions") == 2
+            and sessions_payload.get("matching_sessions") == 2
             and sessions_payload.get("returned_sessions") == 2
             and sessions_payload.get("truncated") is False
             and sessions_payload.get("limit") == DEFAULT_SESSIONS_LIMIT
+            and sessions_payload.get("risk_filter") is None
+        )
+        sessions_filter_payload = sessions_json_payload(
+            actual_db_path, risk_filter="high"
+        )
+        session_filter_text = "\n".join(
+            session_summary_lines(actual_db_path, risk_filter="high")
+        )
+        sessions_has_risk_filter = (
+            sessions_filter_payload.get("risk_filter") == "high"
+            and sessions_filter_payload.get("total_sessions") == 2
+            and sessions_filter_payload.get("matching_sessions") == 1
+            and sessions_filter_payload.get("returned_sessions") == 1
+            and sessions_filter_payload.get("truncated") is False
+            and sessions_filter_payload.get("recommended_session", {}).get(
+                "triage_risk"
+            )
+            == "high"
+            and "Filter: high risk (1 of 2 sessions)." in session_filter_text
         )
         sessions_has_risk_distribution = (
             sessions_payload.get("risk_distribution", {}).get("high") == 1
@@ -2321,6 +2342,7 @@ def release_audit_report(
             and sessions_has_risk_distribution
             and sessions_has_recommendation
             and sessions_has_limit_metadata
+            and sessions_has_risk_filter
             and sessions_has_next_commands
             and sessions_has_recommendation_detail
             and sessions_has_review_path
@@ -2329,9 +2351,9 @@ def release_audit_report(
         add(
             "session listing",
             session_listing_ok,
-            f"{len(sessions)} sessions; triage risk, risk distribution, status, schema, limit metadata, usage snapshots, text recommended action, session table tool-output column, tool-output driver, structured driver summary, success-target preview, recommendation detail, review path, text validation next commands, and structured validation next commands verified"
+            f"{len(sessions)} sessions; triage risk, risk distribution, status, schema, limit and risk-filter metadata, usage snapshots, text recommended action, session table tool-output column, tool-output driver, structured driver summary, success-target preview, recommendation detail, review path, text validation next commands, and structured validation next commands verified"
             if session_listing_ok
-            else "session listing missing aggregate triage risk, risk_distribution, status, schema_version, limit metadata, usage snapshots, text recommended action, recommended_session, recommendation_detail, review_path, text validation next commands, session table tool-output column, tool-output driver, structured driver summary, success-target preview, validation next_commands, or next_commands",
+            else "session listing missing aggregate triage risk, risk_distribution, status, schema_version, limit and risk-filter metadata, usage snapshots, text recommended action, recommended_session, recommendation_detail, review_path, text validation next commands, session table tool-output column, tool-output driver, structured driver summary, success-target preview, validation next_commands, or next_commands",
         )
     except FileNotFoundError as exc:
         sessions = []
@@ -3131,7 +3153,9 @@ def release_audit_lines(
     return status, lines
 
 
-def sessions_missing_json_payload(db_path: str) -> dict[str, object]:
+def sessions_missing_json_payload(
+    db_path: str, risk_filter: str | None = None
+) -> dict[str, object]:
     db_arg = _command_arg(db_path)
     return {
         "schema_version": SESSIONS_SCHEMA_VERSION,
@@ -3142,6 +3166,8 @@ def sessions_missing_json_payload(db_path: str) -> dict[str, object]:
         "returned_sessions": 0,
         "truncated": False,
         "limit": DEFAULT_SESSIONS_LIMIT,
+        "risk_filter": risk_filter,
+        "matching_sessions": 0,
         "risk_distribution": {"high": 0, "medium": 0, "low": 0, "unknown": 0},
         "recommended_session": None,
         "recommendation_detail": None,
@@ -3249,26 +3275,31 @@ def sessions_review_path(
 
 
 def sessions_json_payload(
-    db_path: str, limit: int | None = DEFAULT_SESSIONS_LIMIT
+    db_path: str,
+    limit: int | None = DEFAULT_SESSIONS_LIMIT,
+    risk_filter: str | None = None,
 ) -> dict[str, object]:
     summaries = session_summaries(db_path)
+    filtered = filter_session_summaries_by_risk(summaries, risk_filter)
     effective_limit = None if limit is None else max(1, int(limit))
-    display_limit = len(summaries) if effective_limit is None else effective_limit
-    displayed = summaries[:display_limit]
+    display_limit = len(filtered) if effective_limit is None else effective_limit
+    displayed = filtered[:display_limit]
     payload: dict[str, object] = {
         "schema_version": SESSIONS_SCHEMA_VERSION,
         "database": db_path,
         "status": "ok" if summaries else "empty",
         "sessions": displayed,
         "total_sessions": len(summaries),
+        "matching_sessions": len(filtered),
         "returned_sessions": len(displayed),
-        "truncated": len(displayed) < len(summaries),
+        "truncated": len(displayed) < len(filtered),
         "limit": effective_limit,
+        "risk_filter": risk_filter,
         "risk_distribution": session_risk_distribution(summaries),
         "ingest_scope": latest_ingest_scope(db_path),
     }
-    if summaries:
-        recommended = summaries[0]
+    if filtered:
+        recommended = filtered[0]
         recommended_session_id = str(recommended["session_id"])
         payload["recommended_session"] = recommended
         payload["recommendation_detail"] = session_recommendation_detail(recommended)
@@ -3281,9 +3312,14 @@ def sessions_json_payload(
         payload["recommended_session"] = None
         payload["recommendation_detail"] = None
         payload["review_path"] = sessions_review_path(db_path)
-        payload["next"] = (
-            f"run `codex-observe ingest ~/.codex/sessions --db {_command_arg(db_path)}` or `codex-observe demo --db {_command_arg(db_path)}`."
-        )
+        if summaries and risk_filter:
+            payload["next"] = (
+                "remove --risk or choose one of high, medium, low, unknown."
+            )
+        else:
+            payload["next"] = (
+                f"run `codex-observe ingest ~/.codex/sessions --db {_command_arg(db_path)}` or `codex-observe demo --db {_command_arg(db_path)}`."
+            )
         payload["next_commands"] = sessions_next_commands(db_path)
     return payload
 
@@ -5336,6 +5372,12 @@ def main(argv: list[str] | None = None) -> int:
         help="Maximum sessions to print or return; default 50",
     )
 
+    p_sessions.add_argument(
+        "--risk",
+        choices=["high", "medium", "low", "unknown"],
+        default=None,
+        help="Filter printed or returned sessions by aggregate triage risk",
+    )
     p_compare = sub.add_parser(
         "compare",
         help="Compare two privacy-safe run reports or two sessions from one database",
@@ -5498,20 +5540,26 @@ def main(argv: list[str] | None = None) -> int:
             if args.json:
                 print(
                     json.dumps(
-                        sessions_json_payload(args.db, limit=args.limit),
+                        sessions_json_payload(
+                            args.db, limit=args.limit, risk_filter=args.risk
+                        ),
                         indent=2,
                         sort_keys=True,
                     )
                 )
             else:
                 lines = ingest_scope_lines(latest_ingest_scope(args.db), args.db)
-                lines.extend(session_summary_lines(args.db, limit=args.limit))
+                lines.extend(
+                    session_summary_lines(
+                        args.db, limit=args.limit, risk_filter=args.risk
+                    )
+                )
                 print("\n".join(lines))
         except FileNotFoundError:
             if args.json:
                 print(
                     json.dumps(
-                        sessions_missing_json_payload(args.db),
+                        sessions_missing_json_payload(args.db, risk_filter=args.risk),
                         indent=2,
                         sort_keys=True,
                     )
