@@ -981,6 +981,12 @@ def test_sessions_json_payload_limits_rows_without_changing_recommendation(
     assert payload["sessions"][0]["session_id"] == "demo-session-cost-review"
     assert payload["recommended_session"]["session_id"] == "demo-session-cost-review"
     assert payload["recommendation_detail"]["target"] == "demo-session-cost-review"
+    assert payload["next_commands"] == [
+        f"codex-observe report --db {db} --session-id demo-session-cost-review --out run-report.md",
+        f"codex-observe report --db {db} --session-id demo-session-cost-review --format json --out run-report.json",
+        f"codex-observe report --db {db} --session-id <next-session-id> --format json --out next-run-report.json",
+        "codex-observe compare --before-report run-report.json --after-report next-run-report.json --out run-comparison.md",
+    ]
     assert payload["recommendation_detail"]["success_target_preview"] == {
         "action": "Set a stop condition for the dominant thread",
         "current": "57.7%",
@@ -1320,14 +1326,15 @@ def test_session_recommendation_detail_includes_structured_tool_output_driver() 
     assert [step["label"] for step in review_path] == [
         "Save report Markdown",
         "Save report JSON",
-        "Compare workflow change",
         "Validate next run",
+        "Compare workflow change",
         "File safe feedback",
     ]
     assert review_path[1]["command"] == (
         "codex-observe report --db demo.sqlite --session-id session-high --format json --out run-report.json"
     )
-    assert "codex-observe compare --before-report" in review_path[2]["command"]
+    assert "next-run-report.json" in review_path[2]["command"]
+    assert "codex-observe compare --before-report" in review_path[3]["command"]
     assert review_path[-1]["command"] == "docs/PUBLIC_TOUR_FEEDBACK.md"
 
     assert detail["driver_summary"] == [

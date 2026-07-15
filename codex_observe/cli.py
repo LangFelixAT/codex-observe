@@ -32,6 +32,7 @@ from .report import (
     session_summaries,
     session_success_target_preview,
     session_summary_lines,
+    session_validation_commands,
 )
 
 
@@ -3017,14 +3018,14 @@ def sessions_review_path(
             "success_check": "JSON includes schema_version, success_target, and next_action_detail.",
         },
         {
-            "label": "Compare workflow change",
-            "command": "codex-observe compare --before-report run-report.json --after-report next-run-report.json --out run-comparison.md",
-            "success_check": "Comparison includes a verdict, triage movement, and next validation command.",
-        },
-        {
             "label": "Validate next run",
             "command": f"codex-observe report --db {db_path} --session-id <next-session-id> --format json --out next-run-report.json",
             "success_check": "The next report can be compared against run-report.json.",
+        },
+        {
+            "label": "Compare workflow change",
+            "command": "codex-observe compare --before-report run-report.json --after-report next-run-report.json --out run-comparison.md",
+            "success_check": "Comparison includes a verdict, triage movement, and next validation command.",
         },
         {
             "label": "File safe feedback",
@@ -3748,10 +3749,7 @@ def sessions_hint(db_path: str) -> str:
 
 def sessions_next_commands(db_path: str, session_id: str | None = None) -> list[str]:
     if session_id:
-        return [
-            f"codex-observe report --db {db_path} --session-id {session_id} --out run-report.md",
-            f"codex-observe report --db {db_path} --session-id {session_id} --format json --out run-report.json",
-        ]
+        return session_validation_commands(db_path, session_id)
     return [
         f"codex-observe ingest ~/.codex/sessions --db {db_path}",
         f"codex-observe demo --db {db_path}",

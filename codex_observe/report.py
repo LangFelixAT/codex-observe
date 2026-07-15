@@ -447,12 +447,21 @@ def session_recommended_action_lines(recommended: dict[str, Any]) -> list[str]:
     ]
 
 
+def session_validation_commands(db_path: str, session_id: str) -> list[str]:
+    return [
+        f"codex-observe report --db {db_path} --session-id {session_id} --out run-report.md",
+        f"codex-observe report --db {db_path} --session-id {session_id} --format json --out run-report.json",
+        f"codex-observe report --db {db_path} --session-id <next-session-id> --format json --out next-run-report.json",
+        "codex-observe compare --before-report run-report.json --after-report next-run-report.json --out run-comparison.md",
+    ]
+
+
 def session_review_path_lines(db_path: str, session_id: str) -> list[str]:
     return [
         "Review path:",
         f"- Save report JSON: codex-observe report --db {db_path} --session-id {session_id} --format json --out run-report.json",
-        "- Compare workflow change: codex-observe compare --before-report run-report.json --after-report next-run-report.json --out run-comparison.md",
         f"- Validate next run: codex-observe report --db {db_path} --session-id <next-session-id> --format json --out next-run-report.json",
+        "- Compare workflow change: codex-observe compare --before-report run-report.json --after-report next-run-report.json --out run-comparison.md",
         "- File safe feedback: docs/PUBLIC_TOUR_FEEDBACK.md",
     ]
 
@@ -499,10 +508,7 @@ def session_summary_lines(db_path: str, limit: int | None = 50) -> list[str]:
     recommended_session_id = str(recommended["session_id"])
     lines.extend(session_recommended_action_lines(recommended))
     lines.extend(session_review_path_lines(db_path, recommended_session_id))
-    next_commands = [
-        f"codex-observe report --db {db_path} --session-id {recommended_session_id} --out run-report.md",
-        f"codex-observe report --db {db_path} --session-id {recommended_session_id} --format json --out run-report.json",
-    ]
+    next_commands = session_validation_commands(db_path, recommended_session_id)
     lines.append("Next commands:")
     lines.extend(f"- {command}" for command in next_commands)
     lines.append(

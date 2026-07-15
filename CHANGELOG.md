@@ -6,6 +6,7 @@ The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
 
+- Extended session recommendation next commands to include next-run report export and comparison commands, making the baseline-to-validation loop copy-pasteable from `codex-observe sessions`.
 - Quoted shell-sensitive paths in `codex-observe paths` handoff commands so private real-session validation remains copy-pasteable from directories with spaces or metacharacters.
 - Added public-tour evidence checks for dashboard report and comparison sampled-ingest warning cards so bounded-scope review evidence is named in the guided tour.
 - Broadened sampled-ingest warning text so downstream dashboard views and comparisons are explicitly labeled as sampled evidence.
