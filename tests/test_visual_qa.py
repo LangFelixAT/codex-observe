@@ -346,6 +346,19 @@ def test_sidebar_risk_filter_failures_require_filter_control() -> None:
     assert "narrow: sidebar Risk filter evidence not found: All risks" in failures
 
 
+def test_collect_sidebar_risk_filter_uses_visible_text_and_aria_labels() -> None:
+    class FakePage:
+        def evaluate(self, script: str) -> list[str]:
+            assert "document.body.innerText" in script
+            assert "querySelectorAll('[aria-label]')" in script
+            return ["Risk filter", "All risks"]
+
+    assert visual_qa.collect_sidebar_risk_filter(FakePage()) == [
+        "Risk filter",
+        "All risks",
+    ]
+
+
 def test_sidebar_session_detail_failures_require_snapshot_context() -> None:
     assert sidebar_session_detail_failures(["6 snapshots"], "desktop") == []
 

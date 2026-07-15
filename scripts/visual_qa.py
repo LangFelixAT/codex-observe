@@ -292,8 +292,17 @@ def collect_sidebar_risk_filter(page) -> list[str]:
     return page.evaluate(
         r"""
 () => {
+  const evidence = new Set();
   const text = document.body.innerText || '';
-  return ['Risk filter', 'All risks'].filter((label) => text.includes(label));
+  for (const label of ['Risk filter', 'All risks']) {
+    if (text.includes(label)) evidence.add(label);
+  }
+  for (const element of document.querySelectorAll('[aria-label]')) {
+    const label = element.getAttribute('aria-label') || '';
+    if (label.includes('Risk filter')) evidence.add('Risk filter');
+    if (label.includes('All risks')) evidence.add('All risks');
+  }
+  return Array.from(evidence);
 }
         """
     )
