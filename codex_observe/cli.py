@@ -4,6 +4,7 @@ import argparse
 import textwrap
 import json
 import re
+import shlex
 import shutil
 import sqlite3
 import subprocess
@@ -3652,9 +3653,12 @@ def default_sessions_path() -> Path:
 
 def _command_arg(path: Path | str) -> str:
     value = str(path)
-    if any(char.isspace() for char in value):
+    safe_punctuation = "._/\\:~+-"
+    if value and all(char.isalnum() or char in safe_punctuation for char in value):
+        return value
+    if sys.platform == "win32":
         return f'"{value}"'
-    return value
+    return shlex.quote(value)
 
 
 def paths_payload(db_path: str | None = None, sessions_path: str | None = None) -> dict:

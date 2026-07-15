@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 
 import sys
 from types import SimpleNamespace
@@ -1910,3 +1911,31 @@ def test_paths_command_json_is_schema_versioned_and_does_not_scan_logs(
         f"codex-observe ingest {sessions} --newest-files 25 --db {db} --json"
     )
     assert payload["review_path"][0]["label"] == "Sample newest private logs"
+
+
+def test_paths_command_quotes_shell_sensitive_private_paths(
+    tmp_path: Path, capsys
+) -> None:
+    sessions = tmp_path / "Codex Sessions & Notes" / "sessions"
+    sessions.mkdir(parents=True)
+    db = tmp_path / "Observe DB (private)" / "codex observe.sqlite"
+
+    result = cli.main(
+        ["paths", "--sessions-path", str(sessions), "--db", str(db), "--json"]
+    )
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+
+    if sys.platform == "win32":
+        sessions_arg = f'"{sessions}"'
+        db_arg = f'"{db}"'
+    else:
+        sessions_arg = shlex.quote(str(sessions))
+        db_arg = shlex.quote(str(db))
+
+    assert result == 0
+    assert payload["next_commands"][0] == (
+        f"codex-observe ingest {sessions_arg} --newest-files 25 --db {db_arg} --json"
+    )
+    assert payload["review_path"][0]["command"] == payload["next_commands"][0]
+    assert payload["next_commands"][1] == f"codex-observe doctor --db {db_arg}"
