@@ -1253,36 +1253,41 @@ def test_doctor_report_includes_review_path_for_healthy_and_missing_databases(
     assert status == 0
     assert lines_status == 0
     assert report["schema_version"] == cli.DOCTOR_SCHEMA_VERSION
+    db_arg = cli._command_arg(db)
+
     assert report["review_path"] == [
         {
             "label": "Choose a reportable run",
-            "command": f"codex-observe sessions --db {db} --json",
+            "command": f"codex-observe sessions --db {db_arg} --json",
             "success_check": "sessions JSON includes status ok and a recommended_session.",
         },
         {
             "label": "Open the dashboard",
-            "command": f"codex-observe serve --db {db}",
+            "command": f"codex-observe serve --db {db_arg}",
             "success_check": "dashboard opens without a missing-database or empty-database state.",
         },
         {
             "label": "Export the recommended report",
-            "command": f"codex-observe report --db {db} --out run-report.md",
+            "command": f"codex-observe report --db {db_arg} --out run-report.md",
             "success_check": "report output includes Recommended Action and Next Run Success Target.",
         },
     ]
     assert "Review path:" in text
-    assert f"Choose a reportable run: codex-observe sessions --db {db} --json" in text
+    assert (
+        f"Choose a reportable run: codex-observe sessions --db {db_arg} --json" in text
+    )
     assert (
         "Success check: sessions JSON includes status ok and a recommended_session."
         in text
     )
     assert "Next commands:" in text
-    assert f"- codex-observe sessions --db {db}" in text
-    assert f"- codex-observe serve --db {db}" in text
+    assert f"- codex-observe sessions --db {db_arg}" in text
+    assert f"- codex-observe serve --db {db_arg}" in text
     assert text.index("Review path:") < text.index("Next commands:")
     assert text.index("Next commands:") < text.index("Next:")
 
     missing = tmp_path / "missing.sqlite"
+    missing_arg = cli._command_arg(missing)
     missing_status, missing_report = cli.doctor_report(str(missing))
     missing_lines_status, missing_lines = cli.doctor_lines(str(missing))
     missing_text = "\n".join(missing_lines)
@@ -1295,11 +1300,34 @@ def test_doctor_report_includes_review_path_for_healthy_and_missing_databases(
         "Ingest local logs",
     ]
     assert missing_report["review_path"][0]["command"] == (
-        f"codex-observe demo --db {missing}"
+        f"codex-observe demo --db {missing_arg}"
     )
     assert "Next commands:" in missing_text
-    assert f"- codex-observe demo --db {missing}" in missing_text
-    assert f"- codex-observe ingest ~/.codex/sessions --db {missing}" in missing_text
+    assert f"- codex-observe demo --db {missing_arg}" in missing_text
+    assert (
+        f"- codex-observe ingest ~/.codex/sessions --db {missing_arg}" in missing_text
+    )
+
+
+def test_doctor_report_quotes_shell_sensitive_database_paths(tmp_path: Path) -> None:
+    db = tmp_path / "Observe DB & Reports" / "codex observe.sqlite"
+    db_arg = cli._command_arg(db)
+
+    status, report = cli.doctor_report(str(db))
+    lines_status, lines = cli.doctor_lines(str(db))
+    text = "\n".join(lines)
+
+    assert status == 2
+    assert lines_status == 2
+    assert report["next_commands"] == [
+        f"codex-observe demo --db {db_arg}",
+        f"codex-observe ingest ~/.codex/sessions --db {db_arg}",
+    ]
+    assert report["review_path"][0]["command"] == report["next_commands"][0]
+    assert report["review_path"][1]["command"] == report["next_commands"][1]
+    assert f"- codex-observe demo --db {db_arg}" in text
+    assert f"- codex-observe ingest ~/.codex/sessions --db {db_arg}" in text
+    assert f"`codex-observe demo --db {db_arg}`" in report["next"]
 
 
 def test_session_recommendation_detail_includes_structured_tool_output_driver() -> None:
