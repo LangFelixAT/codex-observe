@@ -2226,6 +2226,7 @@ def release_audit_report(
             and "largest tool output:" in session_lines_text
             and "Review path:" in session_lines_text
             and "Save report JSON:" in session_lines_text
+            and "Validate next run:" in session_lines_text
             and "Compare workflow change:" in session_lines_text
             and "Next commands:" in session_lines_text
             and all(
@@ -2252,9 +2253,9 @@ def release_audit_report(
         add(
             "session listing",
             session_listing_ok,
-            f"{len(sessions)} sessions; triage risk, risk distribution, status, schema, limit metadata, usage snapshots, text recommended action, session table tool-output column, tool-output driver, structured driver summary, success-target preview, recommendation detail, review path, text next commands, and next commands verified"
+            f"{len(sessions)} sessions; triage risk, risk distribution, status, schema, limit metadata, usage snapshots, text recommended action, session table tool-output column, tool-output driver, structured driver summary, success-target preview, recommendation detail, review path, text validation next commands, and structured validation next commands verified"
             if session_listing_ok
-            else "session listing missing aggregate triage risk, risk_distribution, status, schema_version, limit metadata, usage snapshots, text recommended action, recommended_session, recommendation_detail, review_path, text next commands, session table tool-output column, tool-output driver, structured driver summary, success-target preview, or next_commands",
+            else "session listing missing aggregate triage risk, risk_distribution, status, schema_version, limit metadata, usage snapshots, text recommended action, recommended_session, recommendation_detail, review_path, text validation next commands, session table tool-output column, tool-output driver, structured driver summary, success-target preview, validation next_commands, or next_commands",
         )
     except FileNotFoundError as exc:
         sessions = []

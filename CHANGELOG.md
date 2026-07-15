@@ -6,6 +6,7 @@ The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
 
+- Strengthened release-audit session-listing evidence so it names verified baseline, next-run validation, and comparison next commands.
 - Aligned public-tour sessions wording with the executable baseline, next-run validation, and comparison command sequence.
 - Extended session recommendation next commands to include next-run report export and comparison commands, making the baseline-to-validation loop copy-pasteable from `codex-observe sessions`.
 - Quoted shell-sensitive paths in `codex-observe paths` handoff commands so private real-session validation remains copy-pasteable from directories with spaces or metacharacters.
