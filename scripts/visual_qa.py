@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import json
+import os
 import sqlite3
 import subprocess
 import sys
@@ -1131,6 +1132,25 @@ def streamlit_command(app: Path, host: str, port: int, db: Path) -> list[str]:
     ]
 
 
+def stop_process_tree(process: subprocess.Popen[object], timeout_s: float = 10) -> None:
+    if process.poll() is not None:
+        return
+    if os.name == "nt":
+        subprocess.run(
+            ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+    else:
+        process.terminate()
+    try:
+        process.wait(timeout=timeout_s)
+    except subprocess.TimeoutExpired:  # pragma: no cover - cleanup fallback
+        process.kill()
+        process.wait(timeout=timeout_s)
+
+
 def run_empty_state_check(
     url: str, output_dir: Path, state_name: str
 ) -> tuple[int, dict[str, dict[str, object]]]:
@@ -1745,12 +1765,7 @@ def main() -> int:
                 "viewports": viewport_results,
             }
         finally:
-            process.terminate()
-            try:
-                process.wait(timeout=10)
-            except subprocess.TimeoutExpired:  # pragma: no cover - cleanup fallback
-                process.kill()
-                process.wait(timeout=10)
+            stop_process_tree(process)
 
     url = f"http://{args.host}:{args.port}"
     process = subprocess.Popen(
@@ -1764,12 +1779,7 @@ def main() -> int:
             url, output_dir, str(db), empty_state_results, args.profile
         )
     finally:
-        process.terminate()
-        try:
-            process.wait(timeout=10)
-        except subprocess.TimeoutExpired:  # pragma: no cover - cleanup fallback
-            process.kill()
-            process.wait(timeout=10)
+        stop_process_tree(process)
 
 
 if __name__ == "__main__":

@@ -50,6 +50,86 @@ def test_playwright_install_hint_uses_project_extras() -> None:
     assert "python -m playwright install chromium" in PLAYWRIGHT_INSTALL_HINT
 
 
+def test_stop_process_tree_uses_taskkill_for_windows_children(monkeypatch) -> None:
+    calls = []
+
+    class FakeProcess:
+        pid = 12345
+
+        def __init__(self) -> None:
+            self.wait_timeouts = []
+
+        def poll(self) -> None:
+            return None
+
+        def wait(self, timeout: float) -> None:
+            self.wait_timeouts.append(timeout)
+
+        def terminate(self) -> None:
+            raise AssertionError("Windows cleanup should use taskkill")
+
+        def kill(self) -> None:
+            raise AssertionError(
+                "taskkill cleanup should not call kill after wait succeeds"
+            )
+
+    def fake_run(command, stdout, stderr, check):
+        calls.append(
+            {"command": command, "stdout": stdout, "stderr": stderr, "check": check}
+        )
+
+    monkeypatch.setattr(visual_qa.os, "name", "nt")
+    monkeypatch.setattr(visual_qa.subprocess, "run", fake_run)
+    process = FakeProcess()
+
+    visual_qa.stop_process_tree(process, timeout_s=3)
+
+    assert calls == [
+        {
+            "command": ["taskkill", "/PID", "12345", "/T", "/F"],
+            "stdout": visual_qa.subprocess.DEVNULL,
+            "stderr": visual_qa.subprocess.DEVNULL,
+            "check": False,
+        }
+    ]
+    assert process.wait_timeouts == [3]
+
+
+def test_stop_process_tree_kills_process_when_graceful_stop_times_out(
+    monkeypatch,
+) -> None:
+    class FakeProcess:
+        pid = 67890
+
+        def __init__(self) -> None:
+            self.terminated = False
+            self.killed = False
+            self.wait_calls = 0
+
+        def poll(self) -> None:
+            return None
+
+        def terminate(self) -> None:
+            self.terminated = True
+
+        def wait(self, timeout: float) -> None:
+            self.wait_calls += 1
+            if self.wait_calls == 1:
+                raise visual_qa.subprocess.TimeoutExpired("streamlit", timeout)
+
+        def kill(self) -> None:
+            self.killed = True
+
+    monkeypatch.setattr(visual_qa.os, "name", "posix")
+    process = FakeProcess()
+
+    visual_qa.stop_process_tree(process, timeout_s=2)
+
+    assert process.terminated is True
+    assert process.killed is True
+    assert process.wait_calls == 2
+
+
 def test_visible_text_has_error_detects_streamlit_exception_markers() -> None:
     assert visible_text_has_error("StreamlitAPIException: bad widget")
     assert visible_text_has_error("Traceback\nModuleNotFoundError")
