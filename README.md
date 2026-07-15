@@ -20,7 +20,7 @@ To try it without scanning your own logs, generate a synthetic demo database wit
 ```bash
 codex-observe demo --serve --host 127.0.0.1 --port 8501
 ```
-Then open <http://127.0.0.1:8501>.
+Then open <http://127.0.0.1:8501>. The sidebar keeps the default all-runs review path, and its Risk filter can narrow large histories to one triage band without losing the full Overview context.
 
 To confirm the resolved private paths and get a sampled, privacy-safe validation handoff first:
 

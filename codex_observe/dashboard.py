@@ -1911,11 +1911,44 @@ def order_conversations_for_review(
     return ordered.reset_index(drop=True)
 
 
+def sidebar_risk_filter_options(conversations: pd.DataFrame) -> list[tuple[str, str]]:
+    counts = {"high": 0, "medium": 0, "low": 0, "unknown": 0}
+    if "triage_risk" in conversations.columns:
+        for value in conversations["triage_risk"].fillna("unknown"):
+            risk = str(value or "unknown").strip().lower()
+            if risk == "moderate":
+                risk = "medium"
+            if risk not in counts:
+                risk = "unknown"
+            counts[risk] += 1
+    options = [("All risks", "all")]
+    options.extend(
+        (f"{risk.capitalize()} risk ({counts[risk]})", risk)
+        for risk in ["high", "medium", "low", "unknown"]
+    )
+    return options
+
+
+def filter_conversations_by_risk(
+    conversations: pd.DataFrame, risk_filter: str | None
+) -> pd.DataFrame:
+    if (
+        not risk_filter
+        or risk_filter == "all"
+        or "triage_risk" not in conversations.columns
+    ):
+        return conversations
+    normalized = risk_filter.strip().lower()
+    risk_values = conversations["triage_risk"].fillna("unknown").astype(str).str.lower()
+    risk_values = risk_values.replace({"moderate": "medium"})
+    return conversations[risk_values == normalized].reset_index(drop=True)
+
+
 def risk_marker(risk: str) -> str:
     normalized = risk.strip().lower()
     if normalized == "high":
         return "!!"
-    if normalized == "moderate":
+    if normalized in {"medium", "moderate"}:
         return "!"
     if normalized == "low":
         return "OK"
@@ -2338,13 +2371,38 @@ def main() -> None:
         st.header("Database")
         render_wrapped_path(db)
         st.metric("Conversations", len(conversations))
+        risk_filter_options = sidebar_risk_filter_options(conversations)
+        risk_filter_labels = [label for label, _value in risk_filter_options]
+        selected_risk_label = st.selectbox(
+            "Risk filter", risk_filter_labels, index=0, key="sidebar_risk_filter"
+        )
+        risk_filter = dict(risk_filter_options)[selected_risk_label]
+        filtered_conversations = filter_conversations_by_risk(
+            conversations, risk_filter
+        )
+        if risk_filter != "all":
+            st.caption(
+                f"Showing {len(filtered_conversations)} of {len(conversations)} conversations"
+            )
+        if filtered_conversations.empty:
+            st.info("No conversations match this risk filter.")
+            st.stop()
+        elif st.session_state.get("selected_session_id") not in set(
+            filtered_conversations["session_id"]
+        ):
+            st.session_state["selected_session_id"] = filtered_conversations.iloc[0][
+                "session_id"
+            ]
         st.markdown("### Conversations")
-        if "selected_session_id" not in st.session_state:
-            st.session_state["selected_session_id"] = conversations.iloc[0][
+        if (
+            "selected_session_id" not in st.session_state
+            and not filtered_conversations.empty
+        ):
+            st.session_state["selected_session_id"] = filtered_conversations.iloc[0][
                 "session_id"
             ]
         last_date = None
-        for _, row in conversations.iterrows():
+        for _, row in filtered_conversations.iterrows():
             day = str(row.get("last_seen") or "")[:10]
             if day != last_date:
                 st.markdown(f"#### {day or 'Unknown date'}")

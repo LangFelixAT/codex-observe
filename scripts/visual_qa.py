@@ -116,6 +116,7 @@ EXPECTED_QUICK_READ_EVIDENCE = [
 
 EXPECTED_METRIC_CARDS = ["Threads", "Largest thread", "Uncached input"]
 EXPECTED_SIDEBAR_RISK_LABELS = ["High risk", "Low risk"]
+EXPECTED_SIDEBAR_RISK_FILTER = ["Risk filter", "All risks"]
 EXPECTED_SIDEBAR_SESSION_DETAILS = ["6 snapshots"]
 EXPECTED_DOWNLOAD_CONTROLS = [
     "Download report MD",
@@ -283,6 +284,26 @@ def sidebar_risk_label_failures(
     return [
         f"{viewport_name}: sidebar risk label not found: {label}"
         for label in EXPECTED_SIDEBAR_RISK_LABELS
+        if label not in observed
+    ]
+
+
+def collect_sidebar_risk_filter(page) -> list[str]:
+    return page.evaluate(
+        r"""
+() => {
+  const text = document.body.innerText || '';
+  return ['Risk filter', 'All risks'].filter((label) => text.includes(label));
+}
+        """
+    )
+
+
+def sidebar_risk_filter_failures(labels: list[str], viewport_name: str) -> list[str]:
+    observed = set(labels)
+    return [
+        f"{viewport_name}: sidebar Risk filter evidence not found: {label}"
+        for label in EXPECTED_SIDEBAR_RISK_FILTER
         if label not in observed
     ]
 
@@ -882,6 +903,8 @@ def validate_dashboard_page(
     failures.extend(
         sidebar_risk_label_failures(sidebar_risk_labels, viewport_name, profile)
     )
+    sidebar_risk_filter = collect_sidebar_risk_filter(page)
+    failures.extend(sidebar_risk_filter_failures(sidebar_risk_filter, viewport_name))
     sidebar_session_details = collect_sidebar_session_details(page)
     failures.extend(
         sidebar_session_detail_failures(sidebar_session_details, viewport_name, profile)
@@ -985,11 +1008,11 @@ name => {
                     f"{viewport_name}: Agent detail selector label not visible"
                 )
                 continue
-            comboboxes = page.get_by_role("combobox")
-            if comboboxes.count() < 1:
+            thread_selector = page.get_by_label("Select a thread")
+            if thread_selector.count() < 1:
                 failures.append(f"{viewport_name}: Agent detail combobox not found")
             else:
-                comboboxes.first.click()
+                thread_selector.first.click()
                 page.keyboard.press("ArrowDown")
                 page.keyboard.press("Enter")
                 page.wait_for_timeout(1500 if profile == PROFILE_REAL else 500)
@@ -1020,6 +1043,7 @@ name => {
         "risk_distributions": risk_distributions,
         "metric_cards": metric_cards,
         "sidebar_risk_labels": sidebar_risk_labels,
+        "sidebar_risk_filter": sidebar_risk_filter,
         "sidebar_session_details": sidebar_session_details,
         "success_targets": success_targets,
         "operator_briefings": operator_briefings,
@@ -1447,6 +1471,15 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
                 for failure in risk_failures
             )
 
+        sidebar_risk_filter = raw.get("sidebar_risk_filter")
+        if not isinstance(sidebar_risk_filter, list):
+            failures.append(f"manifest {name} missing sidebar Risk filter evidence")
+        else:
+            filter_failures = sidebar_risk_filter_failures(sidebar_risk_filter, name)
+            failures.extend(
+                failure.replace(f"{name}: ", f"manifest {name} ")
+                for failure in filter_failures
+            )
         sidebar_session_details = raw.get("sidebar_session_details")
         if not isinstance(sidebar_session_details, list):
             failures.append(f"manifest {name} missing sidebar session detail evidence")

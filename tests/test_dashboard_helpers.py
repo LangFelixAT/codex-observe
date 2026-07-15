@@ -28,7 +28,9 @@ from codex_observe.dashboard import (
     duplication_quick_read_html,
     empty_state_commands_html,
     feedback_handoff_html,
+    filter_conversations_by_risk,
     risk_marker,
+    sidebar_risk_filter_options,
     order_conversations_for_review,
     metric_with_share,
     risk_distribution_html,
@@ -93,6 +95,46 @@ def test_order_conversations_for_review_uses_risk_aware_session_summaries() -> N
     assert ordered["triage_risk"].tolist() == ["high", "low"]
     assert ordered["usage_snapshots"].tolist() == [6, 3]
     assert "_review_order" not in ordered.columns
+
+
+def test_sidebar_risk_filter_options_count_risk_bands() -> None:
+    conversations = pd.DataFrame(
+        [
+            {"session_id": "high", "triage_risk": "high"},
+            {"session_id": "medium", "triage_risk": "medium"},
+            {"session_id": "moderate", "triage_risk": "moderate"},
+            {"session_id": "low", "triage_risk": "low"},
+            {"session_id": "mystery", "triage_risk": "unexpected"},
+        ]
+    )
+
+    assert sidebar_risk_filter_options(conversations) == [
+        ("All risks", "all"),
+        ("High risk (1)", "high"),
+        ("Medium risk (2)", "medium"),
+        ("Low risk (1)", "low"),
+        ("Unknown risk (1)", "unknown"),
+    ]
+
+
+def test_filter_conversations_by_risk_preserves_order_and_all_mode() -> None:
+    conversations = pd.DataFrame(
+        [
+            {"session_id": "high", "triage_risk": "high"},
+            {"session_id": "medium", "triage_risk": "medium"},
+            {"session_id": "moderate", "triage_risk": "moderate"},
+            {"session_id": "low", "triage_risk": "low"},
+            {"session_id": "another-high", "triage_risk": "high"},
+        ]
+    )
+
+    assert filter_conversations_by_risk(conversations, "all").equals(conversations)
+    filtered = filter_conversations_by_risk(conversations, "high")
+
+    assert filtered["session_id"].tolist() == ["high", "another-high"]
+    assert filter_conversations_by_risk(conversations, "medium")[
+        "session_id"
+    ].tolist() == ["medium", "moderate"]
 
 
 def test_conversation_button_label_includes_risk_and_selection_marker() -> None:
