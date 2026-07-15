@@ -2362,6 +2362,15 @@ def release_audit_report(
             and "Before next run" in report_markdown_text
             and "After next run" in report_markdown_text
         )
+        report_brief = report_payload.get("next_run_brief")
+        report_has_next_run_brief = (
+            isinstance(report_brief, dict)
+            and report_brief.get("habit")
+            and report_brief.get("target_metric")
+            and "Next Codex run plan" in str(report_brief.get("copy_prompt") or "")
+            and "## Next Run Brief" in report_markdown_text
+            and "Next Codex run plan:" in report_markdown_text
+        )
         report_has_review_path = (
             isinstance(report_review_path, list)
             and len(report_review_path) >= 4
@@ -2416,6 +2425,7 @@ def release_audit_report(
             and report_payload.get("success_target", {}).get("target_value") is not None
             and report_has_review_path
             and report_has_next_run_checklist
+            and report_has_next_run_brief
             and report_has_feedback_handoff
             and report_confirmation_has_success_target
             and any(
@@ -2435,12 +2445,13 @@ def release_audit_report(
             and '"next_command_templates"' in report_json_text
             and '"review_path"' in report_json_text
             and '"next_run_checklist"' in report_json_text
+            and '"next_run_brief"' in report_json_text
             and '"feedback_handoff"' in report_json_text
         )
         add(
             "aggregate report",
             report_has_cost_profile,
-            f"{out_path}; {json_out_path}; recommended action, usage-snapshot summary, cost profile, opportunity stack, terminal success target, terminal privacy warning, next-run checklist, terminal next commands, triage, review path, feedback handoff, follow-up commands, structured next action, ingest scope, and schema verified",
+            f"{out_path}; {json_out_path}; recommended action, usage-snapshot summary, cost profile, opportunity stack, terminal success target, terminal privacy warning, next-run checklist, next-run brief, terminal next commands, triage, review path, feedback handoff, follow-up commands, structured next action, ingest scope, and schema verified",
         )
         comparison = compare_reports(report, report)
         comparison_out = out_path.with_name("run-comparison.md")

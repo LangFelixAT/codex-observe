@@ -623,6 +623,60 @@ def report_next_run_checklist(report: dict[str, Any]) -> list[dict[str, str]]:
     ]
 
 
+def report_next_run_brief(report: dict[str, Any]) -> dict[str, Any]:
+    success_target = report.get("success_target", {}) or {}
+    next_action = report.get("next_action_detail", {}) or {}
+    triage = report.get("triage", {}) or {}
+    headline = report.get("headline", {}) or {}
+    checklist = report.get("next_run_checklist") or report_next_run_checklist(report)
+    habit = str(
+        next_action.get("target")
+        or headline.get("recommendation")
+        or triage.get("next_action")
+        or "Apply the top recommended workflow habit."
+    )
+    metric = str(success_target.get("metric") or "target metric")
+    current = str(success_target.get("current") or "current value")
+    target = str(success_target.get("target") or "target value")
+    driver = str(
+        triage.get("primary_driver")
+        or headline.get("top_diagnostic")
+        or "top aggregate driver"
+    )
+    verification = str(
+        success_target.get("verification")
+        or "Export the next run as report JSON and compare it with this baseline."
+    )
+    guardrail = "Pause, split, or summarize before the same driver dominates the run."
+    if (
+        isinstance(checklist, list)
+        and len(checklist) > 1
+        and isinstance(checklist[1], dict)
+    ):
+        guardrail = str(checklist[1].get("action") or guardrail)
+    prompt = "\n".join(
+        [
+            "Next Codex run plan:",
+            f"- Try: {habit}",
+            f"- Watch: {driver}",
+            f"- Target: move {metric} from {current} toward {target}",
+            f"- Guardrail: {guardrail}",
+            f"- Afterward: {verification}",
+        ]
+    )
+    return {
+        "title": "Next Codex run plan",
+        "habit": habit,
+        "watch": driver,
+        "target_metric": metric,
+        "current": current,
+        "target": target,
+        "guardrail": guardrail,
+        "verification": verification,
+        "copy_prompt": prompt,
+    }
+
+
 def build_report(db_path: str, session_id: str | None = None) -> dict[str, Any]:
     db = Path(db_path).expanduser()
     if not db.exists():
@@ -803,6 +857,7 @@ def build_report(db_path: str, session_id: str | None = None) -> dict[str, Any]:
         str(db), selected_session, report["success_target"]
     )
     report["next_run_checklist"] = report_next_run_checklist(report)
+    report["next_run_brief"] = report_next_run_brief(report)
     report["feedback_handoff"] = aggregate_feedback_handoff()
     return report
 
@@ -1661,6 +1716,24 @@ def comparison_markdown(comparison: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def next_run_brief_markdown_lines(brief: object) -> list[str]:
+    if not isinstance(brief, dict):
+        return []
+    prompt = str(brief.get("copy_prompt") or "").strip()
+    if not prompt:
+        return []
+    return [
+        "## Next Run Brief",
+        "",
+        "Use this aggregate-only brief to plan the next Codex run:",
+        "",
+        "```text",
+        prompt,
+        "```",
+        "",
+    ]
+
+
 def _action_detail_lines(detail: object) -> list[str]:
     if not isinstance(detail, dict):
         return []
@@ -1799,6 +1872,8 @@ def report_markdown(report: dict[str, Any]) -> str:
         )
     if not report["playbook"]:
         lines.extend(["No playbook items available.", ""])
+
+    lines.extend(next_run_brief_markdown_lines(report.get("next_run_brief")))
 
     checklist = report.get("next_run_checklist", [])
     if checklist:

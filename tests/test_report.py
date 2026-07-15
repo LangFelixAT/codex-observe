@@ -115,6 +115,17 @@ def test_build_report_returns_privacy_safe_diagnostics_and_playbook(
         "largest_thread_share_pct" in report["next_run_checklist"][1]["success_check"]
     )
     assert "Export next-run-report.json" in report["next_run_checklist"][2]["action"]
+    assert report["next_run_brief"] == {
+        "title": "Next Codex run plan",
+        "habit": "Set a stop condition for the dominant thread",
+        "watch": "Largest thread drives the run",
+        "target_metric": "largest_thread_share_pct",
+        "current": "57.7%",
+        "target": "below 50.0%",
+        "guardrail": "Pause or split the run when the same aggregate driver starts to dominate.",
+        "verification": "Export the next run as report JSON and compare largest_thread_share_pct before adopting the workflow change.",
+        "copy_prompt": "Next Codex run plan:\n- Try: Set a stop condition for the dominant thread\n- Watch: Largest thread drives the run\n- Target: move largest_thread_share_pct from 57.7% toward below 50.0%\n- Guardrail: Pause or split the run when the same aggregate driver starts to dominate.\n- Afterward: Export the next run as report JSON and compare largest_thread_share_pct before adopting the workflow change.",
+    }
     assert report["next_commands"] == [
         f"codex-observe sessions --db {db} --json",
         f"codex-observe report --db {db} --session-id demo-session-cost-review --format json --out run-report.json",
@@ -175,6 +186,13 @@ def test_report_markdown_and_json_are_shareable_without_private_content(
     assert "Primary driver: Largest thread drives the run" in markdown
     assert "Why: Largest thread used 57.7% of total tokens." in markdown
     assert "## Next Run Success Target" in markdown
+    assert "## Next Run Brief" in markdown
+    assert "Next Codex run plan:" in markdown
+    assert "- Try: Set a stop condition for the dominant thread" in markdown
+    assert (
+        "- Target: move largest_thread_share_pct from 57.7% toward below 50.0%"
+        in markdown
+    )
     assert "## Next Run Checklist" in markdown
     assert "Before next run" in markdown
     assert "During next run" in markdown
@@ -213,6 +231,12 @@ def test_report_markdown_and_json_are_shareable_without_private_content(
     )
     assert payload["next_run_checklist"][0]["phase"] == "Before next run"
     assert payload["next_run_checklist"][2]["phase"] == "After next run"
+    assert (
+        payload["next_run_brief"]["habit"]
+        == "Set a stop condition for the dominant thread"
+    )
+    assert payload["next_run_brief"]["target_metric"] == "largest_thread_share_pct"
+    assert "Next Codex run plan" in payload["next_run_brief"]["copy_prompt"]
     assert payload["review_path"][2]["label"] == "Export the next run"
     assert payload["review_path"][3]["success_check"] == (
         "Export the next run as report JSON and compare largest_thread_share_pct before adopting the workflow change."
