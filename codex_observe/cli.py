@@ -2752,6 +2752,8 @@ def release_audit_report(
         and any("review_summary" in item for item in tour_evidence)
         and any("reviewed-redacted" in item for item in tour_evidence)
         and any("comparison metric delta cards" in item for item in tour_evidence)
+        and any("report sampled-ingest warning" in item for item in tour_evidence)
+        and any("comparison sampled-ingest warning" in item for item in tour_evidence)
         and any(
             "report and comparison download controls" in item for item in tour_evidence
         )
@@ -2766,9 +2768,9 @@ def release_audit_report(
     add(
         "public tour JSON",
         tour_ok,
-        "schema, privacy, database, evidence bundle, recommended-action evidence, terminal handoff evidence, terminal validation evidence, dashboard quick-read and comparison review-path evidence, top-level review path, terminal feedback handoff, text next commands, per-step success checks, and next commands verified"
+        "schema, privacy, database, evidence bundle, recommended-action evidence, terminal handoff evidence, terminal validation evidence, dashboard quick-read, sampled-scope, and comparison review-path evidence, top-level review path, terminal feedback handoff, text next commands, per-step success checks, and next commands verified"
         if tour_ok
-        else "tour JSON schema_version, privacy, database, evidence bundle key findings, recommended-action evidence, terminal handoff evidence, terminal validation evidence, dashboard quick-read evidence, comparison review-path evidence, comparison metric delta evidence, report/comparison-download evidence, feedback evidence, top-level review_path, terminal feedback_handoff, text next commands, per-step success checks, or next_commands missing",
+        else "tour JSON schema_version, privacy, database, evidence bundle key findings, recommended-action evidence, terminal handoff evidence, terminal validation evidence, dashboard quick-read evidence, sampled-scope evidence, comparison review-path evidence, comparison metric delta evidence, report/comparison-download evidence, feedback evidence, top-level review_path, terminal feedback_handoff, text next commands, per-step success checks, or next_commands missing",
     )
 
     ignore_failures = private_artifact_ignore_failures(root)
@@ -3135,6 +3137,7 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
                 "reports include quick-read, triage, top-level Recommended Action, and ranked opportunity stack",
                 "report terminal confirmation includes next action and Success target",
                 "JSON includes schema_version, opportunities, success_target, and next_action_detail",
+                "dashboard report sampled-ingest warning labels bounded private evidence before downloading artifacts",
             ],
             "success_checks": [
                 "Markdown report includes Recommended Action and Next Run Success Target sections",
@@ -3153,6 +3156,7 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
                 "recommendation_detail targets persisted or regressed aggregate drivers",
                 "dashboard comparison review path turns verdicts into validation steps before downloading artifacts",
                 "dashboard comparison metric delta cards show the largest aggregate changes before downloading artifacts",
+                "dashboard comparison sampled-ingest warning labels bounded private evidence before downloading artifacts",
             ],
             "success_checks": [
                 "Markdown comparison includes opportunity-change movement and next validation command",
@@ -3168,7 +3172,7 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
             "title": "Capture and verify UI evidence",
             "evidence": [
                 "visual manifest records desktop and narrow screenshots",
-                "layout review, sidebar risk labels, sidebar session details, metric cards, comparison metric delta cards, comparison review path, report and comparison download controls, operator briefing, next review path, safe feedback handoff, dashboard quick reads, and success target are verified",
+                "layout review, sidebar risk labels, sidebar session details, metric cards, report sampled-ingest warning evidence, comparison metric delta cards, comparison sampled-ingest warning evidence, comparison review path, report and comparison download controls, operator briefing, next review path, safe feedback handoff, dashboard quick reads, and success target are verified",
                 "tab checks cover Agent detail thread brief, Timeline quick read, Tools quick read, Duplication quick read, and Raw tables data inventory",
             ],
             "success_checks": [
