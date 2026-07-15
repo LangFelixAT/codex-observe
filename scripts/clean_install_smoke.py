@@ -123,6 +123,7 @@ def smoke_commands(paths: SmokePaths, extra: str) -> list[list[str]]:
             "--public-evidence-dir",
             str(paths.evidence_bundle),
             "--json",
+            "--skip-visual-evidence",
         ],
         [
             str(paths.python),

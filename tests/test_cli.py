@@ -1019,6 +1019,29 @@ def test_public_evidence_bundle_audit_requires_terminal_handoff(
     assert "evidence bundle terminal output missing Validation commands:" in failures
 
 
+def test_audit_skip_visual_evidence_is_explicit_for_clean_smoke(tmp_path: Path) -> None:
+    db = tmp_path / "audit.sqlite"
+    sessions = tmp_path / "sessions"
+    report = tmp_path / "run-report.md"
+
+    status, audit = cli.release_audit_report(
+        str(db),
+        str(sessions),
+        str(report),
+        check_public_evidence_bundle=False,
+        check_visual_manifest_evidence=False,
+    )
+
+    checks = {check["name"]: check for check in audit["checks"]}
+    assert status == 0
+    assert audit["status"] == "ok"
+    assert checks["visual QA manifest evidence"] == {
+        "name": "visual QA manifest evidence",
+        "ok": True,
+        "detail": "skipped by --skip-visual-evidence; run python scripts/visual_qa.py before release",
+    }
+
+
 def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     db = tmp_path / "demo.sqlite"
     sessions = tmp_path / "sessions"
@@ -1079,7 +1102,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     )
     assert checks["private validation handoff"]["ok"] is True
     assert checks["private validation handoff"]["detail"] == (
-        "schema, bounded sample, ignored artifacts, report export, privacy metadata, and dashboard next command verified"
+        "schema, bounded sample, ignored artifacts, report export, privacy metadata, dashboard next command, and visual QA handoff status verified"
     )
     assert checks["visual QA manifest evidence"]["ok"] is True
     assert checks["CI reviewer evidence bundle"]["ok"] is True
@@ -2156,7 +2179,8 @@ def test_public_evidence_bundle_writes_privacy_safe_manifest_and_artifacts(
         "codex-observe compare --before-report demo/run-report.json --after-report demo/run-report.json --out demo/run-comparison.md"
         in readme
     )
-    assert "codex-observe audit --json" in readme
+    assert "codex-observe audit --skip-visual-evidence --json" in readme
+    assert "codex-observe audit --json" not in readme
     assert "private Codex logs" in readme
     feedback = (out / artifacts["feedback_runbook"]).read_text(encoding="utf-8")
     assert "# Public Tour Feedback" in feedback
@@ -2220,6 +2244,10 @@ def test_evidence_bundle_cli_json_and_text_outputs_are_actionable(
             payload["feedback_handoff"]["issue_template"]
             == ".github/ISSUE_TEMPLATE/public_tour_feedback.yml"
         )
+        assert (
+            "codex-observe audit --skip-visual-evidence --json" in payload["commands"]
+        )
+        assert "codex-observe audit --json" not in payload["commands"]
         assert "next_report" in payload["validation_commands"]
         assert payload["validation_commands"]["next_report"].startswith(
             "codex-observe report --db <db> --session-id <next-session-id>"

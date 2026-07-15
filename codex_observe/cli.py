@@ -991,7 +991,6 @@ def public_evidence_bundle_artifact_failures(
             "codex-observe demo --db demo/codex_observe_demo.sqlite",
             "codex-observe report --db demo/codex_observe_demo.sqlite --out demo/run-report.md",
             "codex-observe compare --before-report demo/run-report.json --after-report demo/run-report.json --out demo/run-comparison.md",
-            "codex-observe audit --json",
             "## Feedback Handoff",
             "docs/PUBLIC_TOUR_FEEDBACK.md",
             ".github/ISSUE_TEMPLATE/public_tour_feedback.yml",
@@ -1007,6 +1006,11 @@ def public_evidence_bundle_artifact_failures(
         ]:
             if required not in readme:
                 failures.append(f"evidence bundle README missing {required}")
+        if (
+            "codex-observe audit --json" not in readme
+            and "codex-observe audit --skip-visual-evidence --json" not in readme
+        ):
+            failures.append("evidence bundle README missing audit reproduction command")
 
     limitations_path = bundle_dir / "LIMITATIONS.md"
     if limitations_path.exists():
@@ -2016,6 +2020,7 @@ def release_audit_report(
     *,
     public_evidence_dir: str | Path | None = None,
     check_public_evidence_bundle: bool = True,
+    check_visual_manifest_evidence: bool = True,
 ) -> tuple[int, dict]:
     root = Path.cwd()
     checks: list[dict[str, object]] = []
@@ -2737,6 +2742,7 @@ def release_audit_report(
     )
     private_validate_artifacts = private_validate.get("artifacts", {})
     private_validate_privacy = private_validate.get("privacy", {})
+    private_validate_visual = private_validate.get("visual_qa", {})
     private_validate_ok = (
         private_validate_status == 0
         and private_validate.get("schema_version") == PRIVATE_VALIDATE_SCHEMA_VERSION
@@ -2760,6 +2766,15 @@ def release_audit_report(
             "codex-observe serve" in str(command)
             for command in private_validate.get("next_commands", [])
         )
+        and isinstance(private_validate_visual, dict)
+        and private_validate_visual.get("profile") == "real"
+        and private_validate_visual.get("status") == "not_run"
+        and private_validate_visual.get("raw_content_included") is False
+        and private_validate_visual.get("review_required_before_sharing") is True
+        and "--profile real" in str(private_validate_visual.get("command") or "")
+        and str(private_validate_visual.get("manifest") or "").endswith(
+            "visual-qa-manifest.json"
+        )
         and "counts" not in private_validate
         and "sessions" not in private_validate
         and "recommended_session" not in private_validate
@@ -2767,9 +2782,9 @@ def release_audit_report(
     add(
         "private validation handoff",
         private_validate_ok,
-        "schema, bounded sample, ignored artifacts, report export, privacy metadata, and dashboard next command verified"
+        "schema, bounded sample, ignored artifacts, report export, privacy metadata, dashboard next command, and visual QA handoff status verified"
         if private_validate_ok
-        else "private validation schema, bounded sample, artifacts, report export, privacy metadata, dashboard next command, or privacy-safe top-level payload missing",
+        else "private validation schema, bounded sample, artifacts, report export, privacy metadata, dashboard next command, visual QA handoff status, or privacy-safe top-level payload missing",
     )
 
     try:
@@ -2787,18 +2802,34 @@ def release_audit_report(
             capture_output=True,
             text=True,
         )
-        help_text = report_help.stdout + compare_help.stdout
-        help_errors = report_help.stderr + compare_help.stderr
+        private_help = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "codex_observe.cli",
+                "private-validate",
+                "--help",
+            ],
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        help_text = report_help.stdout + compare_help.stdout + private_help.stdout
+        help_errors = report_help.stderr + compare_help.stderr + private_help.stderr
         help_ok = (
             report_help.returncode == 0
             and compare_help.returncode == 0
+            and private_help.returncode == 0
             and "ranked opportunity stack" in report_help.stdout
             and "opportunity-change movement" in compare_help.stdout
+            and "--visual" in private_help.stdout
+            and "real-profile browser visual QA" in private_help.stdout
         )
         add(
             "CLI help product concepts",
             help_ok,
-            "report opportunity stack and compare opportunity-change help verified"
+            "report opportunity stack, compare opportunity-change, and private visual QA help verified"
             if help_ok
             else (help_errors.strip() or help_text.strip() or "help output missing"),
         )
@@ -3016,17 +3047,24 @@ def release_audit_report(
         else "; ".join(workflow_doc_failures[:3]),
     )
 
-    visual_manifest_failures = visual_manifest_evidence_failures(root)
-    add(
-        "visual QA manifest evidence",
-        not visual_manifest_failures,
-        f"{VISUAL_MANIFEST.as_posix()}; "
-        f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['desktop']).as_posix()}; "
-        f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['narrow']).as_posix()}; "
-        "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, sidebar session details, risk distribution, metric cards, dashboard quick reads, report and comparison downloads, report scope-warning evidence, comparison preview, comparison scope-warning evidence, comparison review path, deltas, operator briefing, next review path, next-run checklist, next-run brief, safe feedback handoff, and success target verified"
-        if not visual_manifest_failures
-        else "; ".join(visual_manifest_failures[:3]),
-    )
+    if check_visual_manifest_evidence:
+        visual_manifest_failures = visual_manifest_evidence_failures(root)
+        add(
+            "visual QA manifest evidence",
+            not visual_manifest_failures,
+            f"{VISUAL_MANIFEST.as_posix()}; "
+            f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['desktop']).as_posix()}; "
+            f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['narrow']).as_posix()}; "
+            "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, sidebar session details, risk distribution, metric cards, dashboard quick reads, report and comparison downloads, report scope-warning evidence, comparison preview, comparison scope-warning evidence, comparison review path, deltas, operator briefing, next review path, next-run checklist, next-run brief, safe feedback handoff, and success target verified"
+            if not visual_manifest_failures
+            else "; ".join(visual_manifest_failures[:3]),
+        )
+    else:
+        add(
+            "visual QA manifest evidence",
+            True,
+            "skipped by --skip-visual-evidence; run python scripts/visual_qa.py before release",
+        )
     redaction_privacy_failures = redaction_cli_privacy_failures(root)
     add(
         "redaction validation privacy",
@@ -3067,12 +3105,14 @@ def release_audit_lines(
     report_out: str = ".artifacts/demo/run-report.md",
     *,
     public_evidence_dir: str | Path | None = None,
+    check_visual_manifest_evidence: bool = True,
 ) -> tuple[int, list[str]]:
     status, audit = release_audit_report(
         db_path,
         sessions_path,
         report_out,
         public_evidence_dir=public_evidence_dir,
+        check_visual_manifest_evidence=check_visual_manifest_evidence,
     )
     lines = [f"Status: {audit['status']}"]
     for check in audit["checks"]:
@@ -4789,7 +4829,11 @@ def public_evidence_bundle(
         commands.append(
             f"python scripts/visual_qa.py --db {bundle_path_label(db_path, out)} --out {bundle_path_label(visual_dir, out)}"
         )
-    commands.append("codex-observe audit --json")
+    commands.append(
+        "codex-observe audit --json"
+        if run_visual
+        else "codex-observe audit --skip-visual-evidence --json"
+    )
 
     statuses: dict[str, object] = {}
     result = create_demo_database(str(db_path), str(sessions_path), keep_sessions=True)
@@ -4851,6 +4895,7 @@ def public_evidence_bundle(
         str(audit_dir / "sessions"),
         str(audit_dir / "audit-run-report.md"),
         check_public_evidence_bundle=False,
+        check_visual_manifest_evidence=run_visual,
     )
     write_json_artifact(audit_json_path, audit_payload)
     statuses["audit"] = {
@@ -5262,6 +5307,11 @@ def main(argv: list[str] | None = None) -> int:
     p_audit.add_argument(
         "--json", action="store_true", help="Emit aggregate-only JSON for automation"
     )
+    p_audit.add_argument(
+        "--skip-visual-evidence",
+        action="store_true",
+        help="Skip saved visual QA evidence checks; intended for clean-install smoke before browser QA",
+    )
     p_doctor = sub.add_parser(
         "doctor",
         help="Check a Codex Observe database without printing private log content",
@@ -5421,6 +5471,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.sessions,
                 args.report_out,
                 public_evidence_dir=args.public_evidence_dir,
+                check_visual_manifest_evidence=not args.skip_visual_evidence,
             )
             print(json.dumps(audit, indent=2, sort_keys=True))
             return status
@@ -5429,6 +5480,7 @@ def main(argv: list[str] | None = None) -> int:
             args.sessions,
             args.report_out,
             public_evidence_dir=args.public_evidence_dir,
+            check_visual_manifest_evidence=not args.skip_visual_evidence,
         )
         print("\n".join(lines))
         return status

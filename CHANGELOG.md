@@ -5,6 +5,7 @@ All notable changes to Codex Observe will be documented here.
 The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
+- Strengthened `codex-observe audit` coverage for private visual validation by checking the default real-profile handoff status and `private-validate --visual` help discoverability.
 - Added `codex-observe private-validate --visual` so the bounded private validation loop can run real-profile browser QA into ignored private evidence without a second copied command.
 - Hardened visual QA Streamlit cleanup so real-profile dashboard checks terminate the launched process tree instead of leaving child processes behind.
 - Added guided `private-validate --newest-files 25 --json` command as the first `codex-observe paths` next command so path discovery leads to the safer real-session validation loop.
