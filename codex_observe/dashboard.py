@@ -30,9 +30,11 @@ from codex_observe.analysis import (
 )
 from codex_observe.report import (
     build_report,
+    command_arg,
     compare_reports,
     comparison_json,
     comparison_markdown,
+    latest_ingest_scope,
     report_json,
     report_markdown,
     report_next_run_checklist,
@@ -759,6 +761,67 @@ def dashboard_css() -> str:
   overflow-wrap: anywhere;
   padding: 0.55rem 0.65rem;
 }
+.co-sample-coverage {
+  background: var(--co-panel);
+  border: 1px solid color-mix(in srgb, var(--co-warning) 38%, var(--co-border));
+  border-left: 5px solid var(--co-warning);
+  border-radius: 8px;
+  margin: 0.75rem 0 0.95rem 0;
+  padding: 0.85rem 0.95rem;
+}
+
+.co-sample-coverage h3 {
+  font-size: 1rem;
+  letter-spacing: 0;
+  line-height: 1.25;
+  margin: 0 0 0.35rem 0;
+}
+
+.co-sample-coverage p {
+  color: var(--co-muted);
+  font-size: 0.88rem;
+  margin: 0.22rem 0;
+}
+
+.co-sample-coverage-grid {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(125px, 1fr));
+  margin-top: 0.65rem;
+}
+
+.co-sample-coverage-fact {
+  background: var(--co-surface);
+  border: 1px solid var(--co-border);
+  border-radius: 8px;
+  min-width: 0;
+  padding: 0.55rem 0.65rem;
+}
+
+.co-sample-coverage-fact strong {
+  color: var(--co-ink);
+  display: block;
+  font-size: 0.86rem;
+}
+
+.co-sample-coverage-fact span {
+  color: var(--co-muted);
+  display: block;
+  font-size: 0.78rem;
+  margin-top: 0.16rem;
+}
+
+.co-sample-coverage code {
+  background: color-mix(in srgb, var(--co-warning) 12%, var(--co-surface));
+  border: 1px solid color-mix(in srgb, var(--co-warning) 28%, var(--co-border));
+  border-radius: 6px;
+  display: block;
+  font-size: 0.78rem;
+  margin-top: 0.55rem;
+  overflow-wrap: anywhere;
+  padding: 0.45rem 0.55rem;
+  white-space: normal;
+}
 .co-comparison-scope {
   background: color-mix(in srgb, var(--co-warning) 10%, var(--co-surface));
   border: 1px solid color-mix(in srgb, var(--co-warning) 32%, var(--co-border));
@@ -1243,6 +1306,69 @@ def report_ingest_scope_warning_html(report: dict[str, object]) -> str:
         '<div class="co-report-scope">'
         f"<strong>Ingest scope:</strong> {html.escape(warning)}"
         "</div>"
+    )
+
+
+def sampled_ingest_coverage_html(scope: object, db_path: str) -> str:
+    if not isinstance(scope, dict) or scope.get("sampled") is not True:
+        return ""
+    counts = scope.get("counts")
+    scan_limit = scope.get("scan_limit")
+    if not isinstance(counts, dict) or not isinstance(scan_limit, dict):
+        return ""
+    matched = int(counts.get("files_matched") or 0)
+    seen = int(counts.get("files_seen") or 0)
+    deferred = int(counts.get("files_skipped_by_limit") or 0)
+    threads = int(counts.get("threads") or 0)
+    events = int(counts.get("events") or 0)
+    newest_files = int(scan_limit.get("newest_files") or seen or 1)
+    coverage = round(seen / matched * 100, 1) if matched > 0 else 0.0
+    next_limit = min(matched, max(newest_files + 1, newest_files * 2))
+    if matched and next_limit > newest_files:
+        command = (
+            "codex-observe ingest ~/.codex/sessions "
+            f"--newest-files {next_limit} --db {command_arg(db_path)}"
+        )
+        command_label = f"Expand to {fmt_int(next_limit)} newest files"
+    else:
+        command = f"codex-observe ingest ~/.codex/sessions --db {command_arg(db_path)}"
+        command_label = "Run full ingest when you need complete coverage"
+    facts = [
+        (
+            "Coverage",
+            f"{coverage:.1f}%",
+            f"{fmt_int(seen)} of {fmt_int(matched)} matched files",
+        ),
+        ("Deferred", fmt_int(deferred), "files outside this sample"),
+        ("Threads", fmt_short(threads), "imported from sampled files"),
+        ("Events", fmt_short(events), "parsed into this database"),
+    ]
+    fact_html = []
+    for label, value, detail in facts:
+        fact_html.append(
+            '<div class="co-sample-coverage-fact">'
+            f"<strong>{html.escape(label)}: {html.escape(value)}</strong>"
+            f"<span>{html.escape(detail)}</span>"
+            "</div>"
+        )
+    warning = scope.get("warning")
+    warning_text = (
+        str(warning)
+        if isinstance(warning, str)
+        else "This dashboard is based on a bounded ingest sample."
+    )
+    return "\n".join(
+        [
+            '<section class="co-sample-coverage">',
+            "  <h3>Sample coverage</h3>",
+            f"  <p>{html.escape(warning_text)}</p>",
+            '  <div class="co-sample-coverage-grid">',
+            *[f"    {item}" for item in fact_html],
+            "  </div>",
+            f"  <p><strong>{html.escape(command_label)}</strong></p>",
+            f"  <code>{html.escape(command)}</code>",
+            "</section>",
+        ]
     )
 
 
@@ -2064,6 +2190,7 @@ def main() -> None:
 
     summaries = session_summaries(db)
     risk_distribution = session_risk_distribution(summaries)
+    ingest_scope = latest_ingest_scope(db)
     conversations = order_conversations_for_review(conversations, summaries)
 
     with st.sidebar:
@@ -2270,6 +2397,10 @@ def main() -> None:
         )
         st.markdown(
             risk_distribution_html(risk_distribution),
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            sampled_ingest_coverage_html(ingest_scope, db),
             unsafe_allow_html=True,
         )
         comparison_options = [

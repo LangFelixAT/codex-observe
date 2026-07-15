@@ -37,6 +37,7 @@ from codex_observe.dashboard import (
     review_path_html,
     report_download_payloads,
     report_ingest_scope_warning_html,
+    sampled_ingest_coverage_html,
     triage_card_html,
     success_target_html,
     timeline_quick_read_html,
@@ -558,6 +559,8 @@ def test_dashboard_css_contains_polish_hooks_without_viewport_scaled_type() -> N
     assert ".co-comparison-followup" in css
     assert ".co-comparison-scope" in css
     assert ".co-report-scope" in css
+    assert ".co-sample-coverage" in css
+    assert ".co-sample-coverage-grid" in css
     assert ".co-comparison-review-path" in css
     assert ".co-thread-brief" in css
     assert ".co-tool-brief" in css
@@ -642,6 +645,41 @@ def test_report_ingest_scope_warning_html_escapes_and_omits_empty_warning() -> N
     assert "<25>" not in rendered
     assert report_ingest_scope_warning_html({}) == ""
     assert report_ingest_scope_warning_html({"ingest_scope": {"sampled": False}}) == ""
+
+
+def test_sampled_ingest_coverage_html_shows_actionable_sample_expansion() -> None:
+    rendered = sampled_ingest_coverage_html(
+        {
+            "sampled": True,
+            "warning": "Sampled ingest: newest-file limit <25> selected & deferred.",
+            "scan_limit": {"mode": "newest_files", "newest_files": 25},
+            "counts": {
+                "files_matched": 100,
+                "files_seen": 25,
+                "files_skipped_by_limit": 75,
+                "threads": 12,
+                "events": 3456,
+            },
+        },
+        "C:/Observe DB/codex observe.sqlite",
+    )
+
+    assert 'class="co-sample-coverage"' in rendered
+    assert "Sample coverage" in rendered
+    assert "Coverage: 25.0%" in rendered
+    assert "25 of 100 matched files" in rendered
+    assert "Deferred: 75" in rendered
+    assert "Threads: 12" in rendered
+    assert "Events: 3.5k" in rendered
+    assert "Expand to 50 newest files" in rendered
+    assert "--newest-files 50" in rendered
+    assert "&lt;25&gt; selected &amp; deferred" in rendered
+    assert "<25>" not in rendered
+
+
+def test_sampled_ingest_coverage_html_omits_unsampled_scope() -> None:
+    assert sampled_ingest_coverage_html(None, "demo.sqlite") == ""
+    assert sampled_ingest_coverage_html({"sampled": False}, "demo.sqlite") == ""
 
 
 def test_operator_briefing_html_summarizes_top_action_and_escapes_content() -> None:
