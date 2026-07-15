@@ -36,6 +36,7 @@ download_control_failures = visual_qa.download_control_failures
 comparison_preview_failures = visual_qa.comparison_preview_failures
 comparison_review_path_failures = visual_qa.comparison_review_path_failures
 comparison_delta_failures = visual_qa.comparison_delta_failures
+collect_comparison_scope_warnings = visual_qa.collect_comparison_scope_warnings
 visual_empty_state_failures = visual_qa.visual_empty_state_failures
 
 
@@ -247,6 +248,17 @@ def test_comparison_preview_failures_require_quick_read_contract() -> None:
     failures = comparison_preview_failures([], "narrow")
 
     assert "narrow: comparison preview card not rendered" in failures
+
+
+def test_collect_comparison_scope_warnings_reads_warning_cards() -> None:
+    class FakePage:
+        def evaluate(self, script: str) -> list[str]:
+            assert ".co-comparison-scope" in script
+            return ["Ingest scope: Sampled ingest"]
+
+    assert collect_comparison_scope_warnings(FakePage()) == [
+        "Ingest scope: Sampled ingest"
+    ]
 
 
 def test_comparison_review_path_failures_require_ordered_steps() -> None:
@@ -480,6 +492,7 @@ def complete_viewport_results(tmp_path: Path) -> dict[str, dict[str, object]]:
                     "body": "Comparison quick read: regressed Verdict: regressed; largest change: Total tokens +49.1k (regressed). Triage movement: regressed Next step: Inspect new diagnostic first: Repeated prompt blocks. Next validation command codex-observe report --db <db> --session-id <next-session-id> --format json --out next-run-report.json",
                 }
             ],
+            "comparison_scope_warnings": [],
             "comparison_review_paths": [
                 {
                     "label": "Comparison review path",
@@ -645,6 +658,7 @@ def test_visual_manifest_records_review_evidence(tmp_path: Path) -> None:
     assert loaded["viewports"]["desktop"]["comparison_previews"][0]["label"] == (
         "Comparison quick read: regressed"
     )
+    assert loaded["viewports"]["desktop"]["comparison_scope_warnings"] == []
     assert loaded["viewports"]["desktop"]["comparison_review_paths"][0]["label"] == (
         "Comparison review path"
     )
@@ -728,6 +742,7 @@ def test_visual_manifest_failures_rejects_incomplete_evidence(tmp_path: Path) ->
     assert "manifest desktop safe feedback handoff card not rendered" in failures
     assert "manifest desktop comparison preview card not rendered" in failures
     assert "manifest desktop comparison review path not rendered" in failures
+    assert "manifest desktop missing comparison scope warning evidence" in failures
     assert "manifest desktop comparison delta cards not rendered" in failures
     assert (
         "manifest desktop report download control not found: Download report JSON"

@@ -281,6 +281,14 @@ def comparison_preview_failures(
     return failures
 
 
+def collect_comparison_scope_warnings(page) -> list[str]:
+    return page.evaluate(
+        r"""
+() => Array.from(document.querySelectorAll('.co-comparison-scope')).map((card) => (card.innerText || '').replace(/\s+/g, ' ').trim()).filter(Boolean)
+        """
+    )
+
+
 def collect_comparison_review_paths(page) -> list[dict[str, str]]:
     return page.evaluate(
         r"""
@@ -687,6 +695,7 @@ def validate_dashboard_page(
     download_controls = collect_download_controls(page)
     comparison_previews = collect_comparison_previews(page)
     comparison_review_paths = collect_comparison_review_paths(page)
+    comparison_scope_warnings = collect_comparison_scope_warnings(page)
     comparison_deltas = collect_comparison_deltas(page)
     page.evaluate("window.scrollTo(0, 0)")
     failures.extend(success_target_failures(success_targets, viewport_name))
@@ -768,6 +777,7 @@ def validate_dashboard_page(
         "download_controls": download_controls,
         "comparison_previews": comparison_previews,
         "comparison_review_paths": comparison_review_paths,
+        "comparison_scope_warnings": comparison_scope_warnings,
         "comparison_deltas": comparison_deltas,
         "layout_review": layout_snapshot,
     }
@@ -1269,6 +1279,11 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
             failures.extend(
                 failure.replace(f"{name}: ", f"manifest {name} ")
                 for failure in comparison_path_failures
+            )
+        comparison_scope_warnings = raw.get("comparison_scope_warnings")
+        if not isinstance(comparison_scope_warnings, list):
+            failures.append(
+                f"manifest {name} missing comparison scope warning evidence"
             )
         comparison_deltas = raw.get("comparison_deltas")
         if not isinstance(comparison_deltas, list):

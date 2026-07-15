@@ -748,6 +748,17 @@ def dashboard_css() -> str:
   color: var(--co-ink);
 }
 
+.co-comparison-scope {
+  background: color-mix(in srgb, var(--co-warning) 10%, var(--co-surface));
+  border: 1px solid color-mix(in srgb, var(--co-warning) 32%, var(--co-border));
+  border-radius: 8px;
+  color: var(--co-ink);
+  font-size: 0.84rem;
+  line-height: 1.35;
+  margin-top: 0.65rem;
+  overflow-wrap: anywhere;
+  padding: 0.55rem 0.65rem;
+}
 .co-comparison-deltas {
   display: grid;
   gap: 0.55rem;
@@ -1433,6 +1444,20 @@ def comparison_review_path_html(comparison: dict[str, object], limit: int = 5) -
     )
 
 
+def comparison_ingest_scope_warning_html(comparison: dict[str, object]) -> str:
+    scope = comparison.get("ingest_scope")
+    if not isinstance(scope, dict):
+        return ""
+    warning = scope.get("warning")
+    if not isinstance(warning, str) or not warning:
+        return ""
+    return (
+        '<div class="co-comparison-scope">'
+        f"<strong>Ingest scope:</strong> {html.escape(warning)}"
+        "</div>"
+    )
+
+
 def comparison_preview_html(comparison: dict[str, object]) -> str:
     triage = comparison.get("triage_risk", {})
     opportunity = comparison.get("opportunity_change", {})
@@ -1465,6 +1490,7 @@ def comparison_preview_html(comparison: dict[str, object]) -> str:
             f"  <p><strong>Triage movement:</strong> {triage_direction}</p>",
             f"  <p><strong>Opportunity movement:</strong> {opportunity_summary}</p>",
             f"  <p><strong>Next step:</strong> {recommendation}</p>",
+            comparison_ingest_scope_warning_html(comparison),
             comparison_delta_cards_html(comparison),
             comparison_review_path_html(comparison),
             comparison_followup_html(comparison),

@@ -282,7 +282,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         "risk distribution card",
         "Overview triage card",
         "safe feedback handoff",
-        "dashboard comparison quick-read, review-path, metric delta cards including usage snapshots, safe feedback handoff, and next validation command cards plus report and comparison download controls",
+        "dashboard comparison quick-read, sampled-ingest warning when present, review-path, metric delta cards including usage snapshots, safe feedback handoff, and next validation command cards plus report and comparison download controls",
         "codex-observe doctor --db .artifacts/demo/codex_observe_demo.sqlite --json",
         "codex-observe sessions --db .artifacts/demo/codex_observe_demo.sqlite --json",
         "aggregate triage risk",
@@ -308,7 +308,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         "Tools quick read",
         "Duplication quick read",
         "Raw tables data inventory",
-        "comparison quick-read, review-path, metric delta cards including usage snapshots, safe feedback handoff, and next validation command cards plus report and comparison download controls",
+        "comparison quick-read, sampled-ingest warning evidence when present, review-path, metric delta cards including usage snapshots, and next validation command cards plus report and comparison download controls",
         "aggregate triage assessment",
         "required_commands",
         "paths handoff evidence",
@@ -341,7 +341,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         "regression suite",
         "clean-install smoke gate",
         "aggregate release audit",
-        "comparison quick-read, review-path, metric delta cards including usage snapshots, safe feedback handoff, and next validation command cards plus report and comparison download controls",
+        "comparison quick-read, sampled-ingest warning evidence when present, review-path, metric delta cards including usage snapshots, and next validation command cards plus report and comparison download controls",
         "synthetic demo generation",
         "aggregate-only session listing",
         "database doctor",
@@ -375,7 +375,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
     assert "risk distribution" in release
     assert "safe feedback handoff" in release
     assert (
-        "comparison quick-read, review-path, metric delta cards including usage snapshots, safe feedback handoff, and next validation command cards plus report and comparison download controls"
+        "comparison quick-read, sampled-ingest warning evidence when present, review-path, metric delta cards including usage snapshots, safe feedback handoff, and next validation command cards plus report and comparison download controls"
         in release
     )
     assert "required_commands" in release

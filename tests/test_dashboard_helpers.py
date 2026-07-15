@@ -18,6 +18,7 @@ from codex_observe.dashboard import (
     comparison_delta_cards_html,
     comparison_download_payloads,
     comparison_followup_html,
+    comparison_ingest_scope_warning_html,
     comparison_preview_html,
     comparison_review_path_html,
     conversation_button_label,
@@ -554,6 +555,7 @@ def test_dashboard_css_contains_polish_hooks_without_viewport_scaled_type() -> N
     assert ".co-comparison-deltas" in css
     assert ".co-comparison-delta" in css
     assert ".co-comparison-followup" in css
+    assert ".co-comparison-scope" in css
     assert ".co-comparison-review-path" in css
     assert ".co-thread-brief" in css
     assert ".co-tool-brief" in css
@@ -856,6 +858,9 @@ def test_comparison_preview_html_summarizes_and_escapes_quick_read() -> None:
             "triage_risk": {"direction": "improved"},
             "opportunity_change": {"summary": "Top opportunity stayed <largest>."},
             "recommendation": "Keep change & compare again.",
+            "ingest_scope": {
+                "warning": "Sampled ingest: newest-file limit <25> selected & compared.",
+            },
             "next_command_templates": [
                 "codex-observe report --db <db> --session-id <next-session-id> --format json --out next-run-report.json"
             ],
@@ -877,6 +882,11 @@ def test_comparison_preview_html_summarizes_and_escapes_quick_read() -> None:
     assert "Opportunity movement" in rendered
     assert "Top opportunity stayed &lt;largest&gt;." in rendered
     assert "Keep change &amp; compare again." in rendered
+    assert "Ingest scope" in rendered
+    assert (
+        "Sampled ingest: newest-file limit &lt;25&gt; selected &amp; compared."
+        in rendered
+    )
     assert "Next validation command" in rendered
     assert "Comparison review path" in rendered
     assert "Read the verdict" in rendered
@@ -885,6 +895,15 @@ def test_comparison_preview_html_summarizes_and_escapes_quick_read() -> None:
         in rendered
     )
     assert "improved <ok>" not in rendered
+
+
+def test_comparison_ingest_scope_warning_html_returns_empty_string_without_warning() -> (
+    None
+):
+    assert comparison_ingest_scope_warning_html({}) == ""
+    assert (
+        comparison_ingest_scope_warning_html({"ingest_scope": {"sampled": False}}) == ""
+    )
 
 
 def test_comparison_review_path_html_renders_ordered_steps_and_escapes() -> None:
