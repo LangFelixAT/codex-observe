@@ -236,7 +236,7 @@ def collect_sidebar_session_details(page) -> list[str]:
         r"""
 () => {
   const text = document.body.innerText || '';
-  const matches = text.match(/\\b[\\d,.]+[kKmMbB]?\\s+snapshots?\\b/g) || [];
+  const matches = text.match(/\b[\d,.]+[kKmMbB]?\s+snapshots?\b/g) || [];
   return Array.from(new Set(matches));
 }
         """

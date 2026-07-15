@@ -296,6 +296,16 @@ def test_sidebar_session_detail_failures_require_snapshot_context() -> None:
     assert "narrow: sidebar session detail not found: 6 snapshots" in failures
 
 
+def test_collect_sidebar_session_details_uses_javascript_word_boundaries() -> None:
+    class FakePage:
+        def evaluate(self, script: str) -> list[str]:
+            assert r"/\b[\d,.]+[kKmMbB]?\s+snapshots?\b/g" in script
+            assert r"/\\b" not in script
+            return ["6 snapshots"]
+
+    assert visual_qa.collect_sidebar_session_details(FakePage()) == ["6 snapshots"]
+
+
 def test_download_control_failures_require_report_exports() -> None:
     assert (
         download_control_failures(
