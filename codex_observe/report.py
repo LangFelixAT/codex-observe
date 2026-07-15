@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import shlex
 import sqlite3
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +23,16 @@ from .analysis import (
 
 REPORT_SCHEMA_VERSION = "codex-observe.report.v1"
 COMPARISON_SCHEMA_VERSION = "codex-observe.comparison.v1"
+
+
+def command_arg(path: Path | str) -> str:
+    value = str(path)
+    safe_punctuation = "._/\\:~+-"
+    if value and all(char.isalnum() or char in safe_punctuation for char in value):
+        return value
+    if sys.platform == "win32":
+        return f'"{value}"'
+    return shlex.quote(value)
 
 
 def aggregate_feedback_handoff() -> dict[str, object]:
@@ -292,7 +304,7 @@ def session_summaries(db_path: str) -> list[dict[str, Any]]:
 def session_report_hint(db_path: str, session_id: str | None = None) -> str:
     session_part = f" --session-id {session_id}" if session_id else ""
     return (
-        f"run `codex-observe report --db {db_path}{session_part} --out run-report.md` "
+        f"run `codex-observe report --db {command_arg(db_path)}{session_part} --out run-report.md` "
         "to export a shareable aggregate-only report."
     )
 
@@ -448,19 +460,21 @@ def session_recommended_action_lines(recommended: dict[str, Any]) -> list[str]:
 
 
 def session_validation_commands(db_path: str, session_id: str) -> list[str]:
+    db_arg = command_arg(db_path)
     return [
-        f"codex-observe report --db {db_path} --session-id {session_id} --out run-report.md",
-        f"codex-observe report --db {db_path} --session-id {session_id} --format json --out run-report.json",
-        f"codex-observe report --db {db_path} --session-id <next-session-id> --format json --out next-run-report.json",
+        f"codex-observe report --db {db_arg} --session-id {session_id} --out run-report.md",
+        f"codex-observe report --db {db_arg} --session-id {session_id} --format json --out run-report.json",
+        f"codex-observe report --db {db_arg} --session-id <next-session-id> --format json --out next-run-report.json",
         "codex-observe compare --before-report run-report.json --after-report next-run-report.json --out run-comparison.md",
     ]
 
 
 def session_review_path_lines(db_path: str, session_id: str) -> list[str]:
+    db_arg = command_arg(db_path)
     return [
         "Review path:",
-        f"- Save report JSON: codex-observe report --db {db_path} --session-id {session_id} --format json --out run-report.json",
-        f"- Validate next run: codex-observe report --db {db_path} --session-id <next-session-id> --format json --out next-run-report.json",
+        f"- Save report JSON: codex-observe report --db {db_arg} --session-id {session_id} --format json --out run-report.json",
+        f"- Validate next run: codex-observe report --db {db_arg} --session-id <next-session-id> --format json --out next-run-report.json",
         "- Compare workflow change: codex-observe compare --before-report run-report.json --after-report next-run-report.json --out run-comparison.md",
         "- File safe feedback: docs/PUBLIC_TOUR_FEEDBACK.md",
     ]
@@ -469,9 +483,10 @@ def session_review_path_lines(db_path: str, session_id: str) -> list[str]:
 def session_summary_lines(db_path: str, limit: int | None = 50) -> list[str]:
     summaries = session_summaries(db_path)
     if not summaries:
+        db_arg = command_arg(db_path)
         next_commands = [
-            f"codex-observe ingest ~/.codex/sessions --db {db_path}",
-            f"codex-observe demo --db {db_path}",
+            f"codex-observe ingest ~/.codex/sessions --db {db_arg}",
+            f"codex-observe demo --db {db_arg}",
         ]
         return [
             "No conversations found.",
@@ -527,13 +542,14 @@ def default_report_session(db_path: str) -> str:
 
 
 def report_follow_up_commands(db_path: str, session_id: str) -> dict[str, list[str]]:
+    db_arg = command_arg(db_path)
     return {
         "next_commands": [
-            f"codex-observe sessions --db {db_path} --json",
-            f"codex-observe report --db {db_path} --session-id {session_id} --format json --out run-report.json",
+            f"codex-observe sessions --db {db_arg} --json",
+            f"codex-observe report --db {db_arg} --session-id {session_id} --format json --out run-report.json",
         ],
         "next_command_templates": [
-            f"codex-observe report --db {db_path} --session-id <next-session-id> --format json --out next-run-report.json",
+            f"codex-observe report --db {db_arg} --session-id <next-session-id> --format json --out next-run-report.json",
             "codex-observe compare --before-report run-report.json --after-report next-run-report.json --out run-comparison.md",
         ],
     }
@@ -542,6 +558,7 @@ def report_follow_up_commands(db_path: str, session_id: str) -> dict[str, list[s
 def report_review_path(
     db_path: str, session_id: str, success_target: dict[str, Any]
 ) -> list[dict[str, str]]:
+    db_arg = command_arg(db_path)
     metric = str(success_target.get("metric") or "target metric")
     target = str(success_target.get("target") or "the target threshold")
     verification = str(
@@ -551,7 +568,7 @@ def report_review_path(
     return [
         {
             "label": "Save this report JSON",
-            "command": f"codex-observe report --db {db_path} --session-id {session_id} --format json --out run-report.json",
+            "command": f"codex-observe report --db {db_arg} --session-id {session_id} --format json --out run-report.json",
             "success_check": "JSON includes schema_version, success_target, next_action_detail, and review_path.",
         },
         {
@@ -561,7 +578,7 @@ def report_review_path(
         },
         {
             "label": "Export the next run",
-            "command": f"codex-observe report --db {db_path} --session-id <next-session-id> --format json --out next-run-report.json",
+            "command": f"codex-observe report --db {db_arg} --session-id <next-session-id> --format json --out next-run-report.json",
             "success_check": "next-run-report.json uses the same report schema and aggregate-only privacy mode.",
         },
         {

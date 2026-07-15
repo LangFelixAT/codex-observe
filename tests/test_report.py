@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,7 @@ from codex_observe.report import (
     REPORT_SCHEMA_VERSION,
     available_sessions,
     build_report,
+    command_arg,
     compare_reports,
     default_report_session,
     report_follow_up_commands,
@@ -25,7 +27,9 @@ from codex_observe.report import (
     session_success_target_preview,
     sort_session_summaries,
     session_summary_lines,
+    session_validation_commands,
 )
+from codex_observe.schema import SCHEMA_SQL
 
 
 PRIVATE_DEMO_STRINGS = [
@@ -218,6 +222,47 @@ def test_report_markdown_and_json_are_shareable_without_private_content(
     for private in PRIVATE_DEMO_STRINGS:
         assert private not in markdown
         assert private not in json.dumps(payload)
+
+
+def test_report_command_handoffs_quote_shell_sensitive_database_paths(
+    tmp_path: Path,
+) -> None:
+    db = tmp_path / "Observe DB & Reports" / "codex observe.sqlite"
+    db_arg = command_arg(db)
+
+    db.parent.mkdir(parents=True)
+    with sqlite3.connect(db) as conn:
+        conn.executescript(SCHEMA_SQL)
+
+    empty_lines = session_summary_lines(str(db))
+    validation_commands = session_validation_commands(str(db), "session-1")
+    commands = report_follow_up_commands(str(db), "session-1")
+    review_path = report_review_path(
+        str(db),
+        "session-1",
+        {
+            "metric": "largest_thread_share_pct",
+            "target": "below 50.0%",
+            "verification": "Export the next run as report JSON and compare largest_thread_share_pct before adopting the workflow change.",
+        },
+    )
+
+    assert f"- codex-observe ingest ~/.codex/sessions --db {db_arg}" in empty_lines
+    assert f"- codex-observe demo --db {db_arg}" in empty_lines
+    assert validation_commands[:3] == [
+        f"codex-observe report --db {db_arg} --session-id session-1 --out run-report.md",
+        f"codex-observe report --db {db_arg} --session-id session-1 --format json --out run-report.json",
+        f"codex-observe report --db {db_arg} --session-id <next-session-id> --format json --out next-run-report.json",
+    ]
+    assert commands["next_commands"] == [
+        f"codex-observe sessions --db {db_arg} --json",
+        f"codex-observe report --db {db_arg} --session-id session-1 --format json --out run-report.json",
+    ]
+    assert commands["next_command_templates"][0] == (
+        f"codex-observe report --db {db_arg} --session-id <next-session-id> --format json --out next-run-report.json"
+    )
+    assert review_path[0]["command"] == commands["next_commands"][1]
+    assert review_path[2]["command"] == commands["next_command_templates"][0]
 
 
 def test_report_follow_up_commands_are_structured_for_current_and_next_run() -> None:
