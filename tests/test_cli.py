@@ -1175,8 +1175,31 @@ def test_doctor_and_sessions_expose_sampled_ingest_scope(
     plain_sessions = capsys.readouterr().out
     assert "Ingest scope: Sampled ingest" in plain_sessions
     assert "Showing 1 of 2 sessions." in plain_sessions
+
+    report = cli.build_report(str(db))
+    assert report["ingest_scope"] == scope
+    report_markdown = cli.report_markdown(report)
+    report_payload = json.loads(cli.report_json(report))
+    assert "## Ingest Scope" in report_markdown
+    assert "Sampled ingest: newest-file limit 2 selected 2 of 3" in report_markdown
+    assert report_payload["ingest_scope"] == scope
+
+    report_path = tmp_path / "sampled-report.json"
+    assert (
+        cli.main(
+            ["report", "--db", str(db), "--format", "json", "--out", str(report_path)]
+        )
+        == 0
+    )
+    report_output = capsys.readouterr().out
+    assert "Ingest scope: Sampled ingest" in report_output
+    assert (
+        "Sampled ingest: newest-file limit 2 selected 2 of 3"
+        in report_path.read_text(encoding="utf-8")
+    )
     assert str(sessions) not in json.dumps(scope)
     assert str(sessions) not in plain_sessions
+    assert str(sessions) not in report_output
 
 
 def test_doctor_report_includes_review_path_for_healthy_and_missing_databases(

@@ -44,6 +44,75 @@ def aggregate_feedback_handoff() -> dict[str, object]:
     }
 
 
+def latest_ingest_scope(db_path: str | Path) -> dict[str, object] | None:
+    db = Path(db_path).expanduser()
+    if not db.exists():
+        return None
+    try:
+        with sqlite3.connect(db) as conn:
+            conn.row_factory = sqlite3.Row
+            has_table = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='ingest_runs'"
+            ).fetchone()
+            if not has_table:
+                return None
+            row = conn.execute(
+                """
+                SELECT * FROM ingest_runs
+                ORDER BY id DESC
+                LIMIT 1
+                """
+            ).fetchone()
+    except sqlite3.DatabaseError:
+        return None
+    if row is None:
+        return None
+    counts = {
+        "files_matched": int(row["files_matched"] or 0),
+        "files_seen": int(row["files_seen"] or 0),
+        "files_imported": int(row["files_imported"] or 0),
+        "files_skipped_by_limit": int(row["files_skipped_by_limit"] or 0),
+        "threads": int(row["threads"] or 0),
+        "events": int(row["events"] or 0),
+    }
+    skipped = {
+        "duplicate_files": int(row["duplicate_files"] or 0),
+        "empty_files": int(row["empty_files"] or 0),
+        "malformed_files": int(row["malformed_files"] or 0),
+        "malformed_lines": int(row["malformed_lines"] or 0),
+        "missing_meta_files": int(row["missing_meta_files"] or 0),
+        "unreadable_files": int(row["unreadable_files"] or 0),
+    }
+    sampled = str(row["scan_mode"] or "") == "newest_files"
+    warning = None
+    if sampled:
+        warning = (
+            f"Sampled ingest: newest-file limit {int(row['newest_files'] or 0)} selected "
+            f"{counts['files_seen']} of {counts['files_matched']} matched JSONL files "
+            f"({counts['files_skipped_by_limit']} deferred); treat sessions and reports as sampled evidence."
+        )
+    return {
+        "imported_at": row["imported_at"],
+        "scan_limit": {
+            "mode": row["scan_mode"],
+            "newest_files": row["newest_files"],
+        },
+        "counts": counts,
+        "skipped": skipped,
+        "sampled": sampled,
+        "warning": warning,
+    }
+
+
+def ingest_scope_markdown_lines(scope: object) -> list[str]:
+    if not isinstance(scope, dict):
+        return []
+    warning = scope.get("warning")
+    if not isinstance(warning, str) or not warning:
+        return []
+    return ["## Ingest Scope", "", f"- {warning}", ""]
+
+
 def feedback_handoff_markdown_lines(handoff: object) -> list[str]:
     if not isinstance(handoff, dict):
         return []
@@ -664,6 +733,7 @@ def build_report(db_path: str, session_id: str | None = None) -> dict[str, Any]:
                 "tool output",
             ],
         },
+        "ingest_scope": latest_ingest_scope(db),
         "session": {
             "session_id": selected_session,
             "first_seen": conv["first_seen"],
@@ -1552,6 +1622,7 @@ def report_markdown(report: dict[str, Any]) -> str:
         "",
         "Privacy: aggregate-only export. Message text, prompt block previews, event payload JSON, tool arguments, tool commands, and tool output are excluded.",
         "",
+        *ingest_scope_markdown_lines(report.get("ingest_scope")),
         "## Session",
         "",
         f"- Session: `{session['session_id']}`",

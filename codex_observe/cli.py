@@ -23,6 +23,7 @@ from .report import (
     comparison_json,
     comparison_markdown,
     load_report_json,
+    latest_ingest_scope,
     report_json,
     report_markdown,
     session_report_hint,
@@ -265,66 +266,6 @@ def doctor_next_commands(db: Path, status: str) -> list[str]:
     if status == "unreadable":
         return [f"codex-observe demo --db {db}"]
     return []
-
-
-def latest_ingest_scope(db_path: str | Path) -> dict[str, object] | None:
-    db = Path(db_path).expanduser()
-    if not db.exists():
-        return None
-    try:
-        with sqlite3.connect(db) as conn:
-            conn.row_factory = sqlite3.Row
-            has_table = conn.execute(
-                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='ingest_runs'"
-            ).fetchone()
-            if not has_table:
-                return None
-            row = conn.execute(
-                """
-                SELECT * FROM ingest_runs
-                ORDER BY id DESC
-                LIMIT 1
-                """
-            ).fetchone()
-    except sqlite3.DatabaseError:
-        return None
-    if row is None:
-        return None
-    counts = {
-        "files_matched": int(row["files_matched"] or 0),
-        "files_seen": int(row["files_seen"] or 0),
-        "files_imported": int(row["files_imported"] or 0),
-        "files_skipped_by_limit": int(row["files_skipped_by_limit"] or 0),
-        "threads": int(row["threads"] or 0),
-        "events": int(row["events"] or 0),
-    }
-    skipped = {
-        "duplicate_files": int(row["duplicate_files"] or 0),
-        "empty_files": int(row["empty_files"] or 0),
-        "malformed_files": int(row["malformed_files"] or 0),
-        "malformed_lines": int(row["malformed_lines"] or 0),
-        "missing_meta_files": int(row["missing_meta_files"] or 0),
-        "unreadable_files": int(row["unreadable_files"] or 0),
-    }
-    sampled = str(row["scan_mode"] or "") == "newest_files"
-    warning = None
-    if sampled:
-        warning = (
-            f"Sampled ingest: newest-file limit {int(row['newest_files'] or 0)} selected "
-            f"{counts['files_seen']} of {counts['files_matched']} matched JSONL files "
-            f"({counts['files_skipped_by_limit']} deferred); treat sessions and reports as sampled evidence."
-        )
-    return {
-        "imported_at": row["imported_at"],
-        "scan_limit": {
-            "mode": row["scan_mode"],
-            "newest_files": row["newest_files"],
-        },
-        "counts": counts,
-        "skipped": skipped,
-        "sampled": sampled,
-        "warning": warning,
-    }
 
 
 def ingest_scope_lines(scope: object) -> list[str]:
@@ -2412,6 +2353,10 @@ def release_audit_report(
             and "Save this report JSON" in report_markdown_text
             and "Usage snapshots:" in report_markdown_text
             and "usage_snapshots" in report_json_text
+            and report_payload.get("ingest_scope", {}).get("sampled") is False
+            and report_payload.get("ingest_scope", {}).get("scan_limit", {}).get("mode")
+            == "all"
+            and '"ingest_scope"' in report_json_text
             and "## Follow-up Commands" in report_markdown_text
             and "codex-observe sessions --db" in report_markdown_text
             and "codex-observe compare --before-report" in report_markdown_text
@@ -2454,7 +2399,7 @@ def release_audit_report(
         add(
             "aggregate report",
             report_has_cost_profile,
-            f"{out_path}; {json_out_path}; recommended action, usage-snapshot summary, cost profile, opportunity stack, terminal success target, terminal privacy warning, next-run checklist, terminal next commands, triage, review path, feedback handoff, follow-up commands, structured next action, and schema verified",
+            f"{out_path}; {json_out_path}; recommended action, usage-snapshot summary, cost profile, opportunity stack, terminal success target, terminal privacy warning, next-run checklist, terminal next commands, triage, review path, feedback handoff, follow-up commands, structured next action, ingest scope, and schema verified",
         )
         comparison = compare_reports(report, report)
         comparison_out = out_path.with_name("run-comparison.md")
@@ -3892,8 +3837,9 @@ def report_written_lines(path: Path, report: dict) -> list[str]:
     lines = [
         f"Wrote aggregate-only report: {path}",
         "Privacy: review private reports before sharing; aggregate metrics can still reveal workflow clues.",
-        f"Triage: {risk} risk; {driver}",
     ]
+    lines.extend(ingest_scope_lines(report.get("ingest_scope")))
+    lines.append(f"Triage: {risk} risk; {driver}")
     if opportunity_line:
         lines.append(opportunity_line)
     lines.append(f"Next action: {action}")
