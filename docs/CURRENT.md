@@ -34,6 +34,7 @@ codex-observe demo --sessions .artifacts/demo/sessions --keep-sessions --json
 codex-observe ingest .artifacts/demo/sessions --db .artifacts/demo/ingest-contract.sqlite --json
 python scripts/visual_qa.py
 python scripts/visual_qa.py --verify-manifest .artifacts/visual/visual-qa-manifest.json
+python scripts/visual_qa.py --profile real --db .artifacts/private/real-sessions.sqlite --out .artifacts/private/visual-real
 codex-observe evidence-bundle --out .artifacts/public-evidence
 codex-observe audit --json
 ```
@@ -50,6 +51,6 @@ The completed `.github/backlog/009-public-evidence-bundle.md` draft was implemen
 
 ## Private Real-Log Checkpoint
 
-The real-log parser feedback loop has now been exercised against the human-approved private input path, specifically the local Codex sessions path (`%USERPROFILE%\.codex\sessions` on Windows). On 2026-07-15, private validation was refreshed from the resolved Windows profile sessions directory via `codex-observe private-validate`, which writes the path handoff, bounded `--newest-files 25` ingest status, doctor status, session listing, private database, and recommended aggregate report into ignored `.artifacts/private/` artifacts. Use `codex-observe paths` to reprint the current resolved path and sampled private-validation commands, then use `codex-observe private-validate ~/.codex/sessions --serve --host 127.0.0.1 --port 8501` for repeatable private parser, report, and dashboard validation when actual local coverage is needed, and keep synthetic demo data for public evidence bundles, CI, screenshots intended for sharing, and issue reproduction.
+The real-log parser feedback loop has now been exercised against the human-approved private input path, specifically the local Codex sessions path (`%USERPROFILE%\.codex\sessions` on Windows). On 2026-07-15, private validation was refreshed from the resolved Windows profile sessions directory via `codex-observe private-validate`, which writes the path handoff, bounded `--newest-files 25` ingest status, doctor status, session listing, private database, and recommended aggregate report into ignored `.artifacts/private/` artifacts. Use `codex-observe paths` to reprint the current resolved path and sampled private-validation commands, then use `codex-observe private-validate ~/.codex/sessions --serve --host 127.0.0.1 --port 8501` for repeatable private parser, report, and dashboard validation when actual local coverage is needed. Use `python scripts/visual_qa.py --profile real --db .artifacts/private/real-sessions.sqlite --out .artifacts/private/visual-real` for ignored real-data browser evidence, and keep synthetic demo data for public evidence bundles, CI, screenshots intended for sharing, and issue reproduction.
 
 Raw logs, local real-history databases, aggregate reports and comparisons from private logs, private aggregate counts, screenshots, and redacted fixture candidates must remain under ignored `.artifacts/` paths; do not commit raw logs, private aggregate databases, private aggregate metrics, private reports or comparisons, or unreviewed redacted output.

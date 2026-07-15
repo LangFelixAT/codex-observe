@@ -28,6 +28,7 @@ from codex_observe.analysis import (
     useful_text_preview,
     worker_goal,
 )
+
 from codex_observe.report import (
     build_report,
     command_arg,
@@ -46,6 +47,9 @@ from codex_observe.report import (
 )
 
 
+RAW_TABLE_PREVIEW_ROWS = 500
+
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
     p.add_argument(
@@ -59,6 +63,34 @@ def parse_args() -> argparse.Namespace:
 def read_sql(db: str, query: str, params: tuple = ()) -> pd.DataFrame:
     with sqlite3.connect(db) as conn:
         return pd.read_sql_query(query, conn, params=params)
+
+
+def dataframe_preview(
+    df: pd.DataFrame, limit: int = RAW_TABLE_PREVIEW_ROWS
+) -> tuple[pd.DataFrame, str | None]:
+    if limit <= 0 or len(df) <= limit:
+        return df.copy(), None
+    caption = (
+        f"Showing first {fmt_int(limit)} of {fmt_int(len(df))} rows "
+        "to keep large real-history dashboards responsive."
+    )
+    return df.head(limit).copy(), caption
+
+
+def render_capped_dataframe(
+    df: pd.DataFrame,
+    *,
+    columns: list[str] | None = None,
+    limit: int = RAW_TABLE_PREVIEW_ROWS,
+) -> None:
+    display = df
+    if columns is not None:
+        existing = [column for column in columns if column in df.columns]
+        display = df[existing] if existing else df
+    preview, caption = dataframe_preview(display, limit)
+    if caption:
+        st.caption(caption)
+    st.dataframe(preview, width="stretch", hide_index=True)
 
 
 def dashboard_css() -> str:
@@ -2182,19 +2214,16 @@ def render_agent_detail(
             .sort_values("calls", ascending=False)
         )
         st.dataframe(by_tool, width="stretch", hide_index=True)
-        st.dataframe(
-            tt[
-                [
-                    "timestamp",
-                    "tool_name",
-                    "command",
-                    "workdir",
-                    "output_chars",
-                    "success",
-                ]
+        render_capped_dataframe(
+            tt,
+            columns=[
+                "timestamp",
+                "tool_name",
+                "command",
+                "workdir",
+                "output_chars",
+                "success",
             ],
-            width="stretch",
-            hide_index=True,
         )
 
     mm = messages[messages["thread_id"] == tid].copy()
@@ -2855,20 +2884,17 @@ def main() -> None:
             )
 
             st.subheader("Raw tool calls")
-            st.dataframe(
-                tools[
-                    [
-                        "timestamp",
-                        "thread_id",
-                        "tool_name",
-                        "command",
-                        "workdir",
-                        "output_chars",
-                        "success",
-                    ]
+            render_capped_dataframe(
+                tools,
+                columns=[
+                    "timestamp",
+                    "thread_id",
+                    "tool_name",
+                    "command",
+                    "workdir",
+                    "output_chars",
+                    "success",
                 ],
-                width="stretch",
-                hide_index=True,
             )
 
     with tab_dup:
@@ -2914,13 +2940,13 @@ def main() -> None:
             unsafe_allow_html=True,
         )
         st.subheader("Conversations")
-        st.dataframe(conversations, width="stretch", hide_index=True)
+        render_capped_dataframe(conversations)
         st.subheader("Threads")
-        st.dataframe(threads, width="stretch", hide_index=True)
+        render_capped_dataframe(threads)
         st.subheader("Usage snapshots")
-        st.dataframe(usage, width="stretch", hide_index=True)
+        render_capped_dataframe(usage)
         st.subheader("Events")
-        st.dataframe(events, width="stretch", hide_index=True)
+        render_capped_dataframe(events)
 
 
 if __name__ == "__main__":

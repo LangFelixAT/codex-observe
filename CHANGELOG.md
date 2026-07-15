@@ -5,6 +5,7 @@ All notable changes to Codex Observe will be documented here.
 The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
+- Added `python scripts/visual_qa.py --profile real` for ignored private real-session dashboard checks, and capped large raw dashboard tables so private histories do not exceed Streamlit websocket limits.
 
 - Added `codex-observe self-check --visual --json` for no-scan visual dependency verification before browser visual QA.
 - Added `codex-observe self-check` for no-scan source-install verification and wired it into release audit plus clean-install smoke coverage.

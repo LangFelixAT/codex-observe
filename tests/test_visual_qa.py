@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
@@ -862,4 +863,84 @@ def test_verify_visual_manifest_checks_referenced_screenshot_files(
     manifest["viewports"]["desktop"]["screenshot"]["bytes"] = 0
     assert "manifest desktop screenshot is empty" in visual_manifest_file_failures(
         manifest, tmp_path
+    )
+
+
+def test_real_profile_manifest_accepts_private_aggregate_variance(
+    tmp_path: Path,
+) -> None:
+    viewport_results = deepcopy(complete_viewport_results(tmp_path))
+    for raw in viewport_results.values():
+        raw["sidebar_risk_labels"] = ["High risk"]
+        raw["sidebar_session_details"] = ["11 snapshots"]
+        raw["risk_distributions"] = [
+            {
+                "label": "Risk distribution",
+                "body": "Risk distribution 11 imported conversations High risk 2 Medium risk 4",
+            }
+        ]
+        raw["metric_cards"] = [
+            {"label": "Threads", "value": "8"},
+            {"label": "Largest thread", "value": "1.1B tokens (56.1%)"},
+            {"label": "Uncached input", "value": "47.7M tokens (2.4%)"},
+        ]
+        raw["success_targets"] = [
+            {
+                "metric": "largest_thread_share_pct",
+                "current": "56.1%",
+                "target": "below 50.0%",
+            }
+        ]
+        raw["download_controls"] = ["Download report MD", "Download report JSON"]
+        raw["operator_briefings"] = [
+            {
+                "label": "Operator briefing",
+                "heading": "High risk: real private aggregate",
+                "action": "Inspect the largest thread before changing workflow.",
+                "best_habit": "Split the dominant thread",
+                "scale": "1.1B tokens (56.1% of run)",
+                "proof_target": "largest_thread_share_pct: 56.1% -> below 50.0%",
+            }
+        ]
+        raw["next_run_checklists"] = [
+            {
+                "label": "Next run checklist",
+                "body": "Next run checklist Before next run During next run After next run",
+            }
+        ]
+        raw["next_run_briefs"] = [
+            {
+                "label": "Next run brief",
+                "body": "Next run brief Next Codex run plan Copy prompt",
+            }
+        ]
+        raw["comparison_previews"] = []
+        raw["comparison_review_paths"] = []
+        raw["comparison_deltas"] = []
+
+    manifest = build_visual_manifest(
+        url="http://127.0.0.1:8502",
+        profile=visual_qa.PROFILE_REAL,
+        db_path=".artifacts/private/real-sessions.sqlite",
+        output_dir=tmp_path,
+        viewport_results=viewport_results,
+        empty_state_results=complete_empty_state_results(tmp_path),
+    )
+
+    assert manifest["profile"] == visual_qa.PROFILE_REAL
+    assert visual_manifest_failures(manifest) == []
+
+
+def test_visual_manifest_failures_rejects_unknown_profile(tmp_path: Path) -> None:
+    manifest = build_visual_manifest(
+        url="http://127.0.0.1:8502",
+        profile="unknown",
+        db_path=".artifacts/demo/codex_observe_demo.sqlite",
+        output_dir=tmp_path,
+        viewport_results=complete_viewport_results(tmp_path),
+        empty_state_results=complete_empty_state_results(tmp_path),
+    )
+
+    assert "manifest profile is unsupported: unknown" in visual_manifest_failures(
+        manifest
     )

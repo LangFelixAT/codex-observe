@@ -16,6 +16,9 @@ from codex_observe.schema import SCHEMA_SQL
 
 
 VISUAL_MANIFEST_SCHEMA_VERSION = "codex-observe.visual-manifest.v1"
+PROFILE_DEMO = "demo"
+PROFILE_REAL = "real"
+VISUAL_PROFILES = {PROFILE_DEMO, PROFILE_REAL}
 
 VIEWPORTS = {
     "desktop": {"width": 1440, "height": 1000},
@@ -208,14 +211,18 @@ def collect_sidebar_risk_labels(page) -> list[str]:
         r"""
 () => {
   const text = document.body.innerText || '';
-  return ['High risk', 'Low risk'].filter((label) => text.includes(label));
+  return ['High risk', 'Medium risk', 'Low risk', 'Unknown risk'].filter((label) => text.includes(label));
 }
         """
     )
 
 
-def sidebar_risk_label_failures(labels: list[str], viewport_name: str) -> list[str]:
+def sidebar_risk_label_failures(
+    labels: list[str], viewport_name: str, profile: str = PROFILE_DEMO
+) -> list[str]:
     observed = set(labels)
+    if profile == PROFILE_REAL:
+        return [] if observed else [f"{viewport_name}: no sidebar risk label found"]
     return [
         f"{viewport_name}: sidebar risk label not found: {label}"
         for label in EXPECTED_SIDEBAR_RISK_LABELS
@@ -228,16 +235,19 @@ def collect_sidebar_session_details(page) -> list[str]:
         r"""
 () => {
   const text = document.body.innerText || '';
-  return ['6 snapshots'].filter((label) => text.includes(label));
+  const matches = text.match(/\\b[\\d,.]+[kKmMbB]?\\s+snapshots?\\b/g) || [];
+  return Array.from(new Set(matches));
 }
         """
     )
 
 
 def sidebar_session_detail_failures(
-    details: list[str], viewport_name: str
+    details: list[str], viewport_name: str, profile: str = PROFILE_DEMO
 ) -> list[str]:
     observed = set(details)
+    if profile == PROFILE_REAL:
+        return []
     return [
         f"{viewport_name}: sidebar session detail not found: {detail}"
         for detail in EXPECTED_SIDEBAR_SESSION_DETAILS
@@ -256,11 +266,18 @@ def collect_download_controls(page) -> list[str]:
     )
 
 
-def download_control_failures(labels: list[str], viewport_name: str) -> list[str]:
+def download_control_failures(
+    labels: list[str], viewport_name: str, profile: str = PROFILE_DEMO
+) -> list[str]:
     observed = set(labels)
+    expected = (
+        ["Download report MD", "Download report JSON"]
+        if profile == PROFILE_REAL
+        else EXPECTED_DOWNLOAD_CONTROLS
+    )
     return [
         f"{viewport_name}: report download control not found: {label}"
-        for label in EXPECTED_DOWNLOAD_CONTROLS
+        for label in expected
         if label not in observed
     ]
 
@@ -285,11 +302,23 @@ def collect_comparison_previews(page) -> list[dict[str, str]]:
 
 
 def comparison_preview_failures(
-    previews: list[dict[str, str]], viewport_name: str
+    previews: list[dict[str, str]],
+    viewport_name: str,
+    profile: str = PROFILE_DEMO,
 ) -> list[str]:
     if not previews:
-        return [f"{viewport_name}: comparison preview card not rendered"]
+        return (
+            []
+            if profile == PROFILE_REAL
+            else [f"{viewport_name}: comparison preview card not rendered"]
+        )
     body = str(previews[0].get("body") or "")
+    if profile == PROFILE_REAL:
+        return (
+            []
+            if "Comparison quick read" in body
+            else [f"{viewport_name}: comparison preview missing label"]
+        )
     failures = []
     for key, expected in EXPECTED_COMPARISON_PREVIEW.items():
         if expected not in body:
@@ -319,10 +348,16 @@ def collect_comparison_review_paths(page) -> list[dict[str, str]]:
 
 
 def comparison_review_path_failures(
-    paths: list[dict[str, str]], viewport_name: str
+    paths: list[dict[str, str]],
+    viewport_name: str,
+    profile: str = PROFILE_DEMO,
 ) -> list[str]:
     if not paths:
-        return [f"{viewport_name}: comparison review path not rendered"]
+        return (
+            []
+            if profile == PROFILE_REAL
+            else [f"{viewport_name}: comparison review path not rendered"]
+        )
     body = str(paths[0].get("body") or "")
     return [
         f"{viewport_name}: comparison review path missing: {expected}"
@@ -347,10 +382,16 @@ def collect_comparison_deltas(page) -> list[dict[str, str]]:
 
 
 def comparison_delta_failures(
-    deltas: list[dict[str, str]], viewport_name: str
+    deltas: list[dict[str, str]],
+    viewport_name: str,
+    profile: str = PROFILE_DEMO,
 ) -> list[str]:
     if not deltas:
-        return [f"{viewport_name}: comparison delta cards not rendered"]
+        return (
+            []
+            if profile == PROFILE_REAL
+            else [f"{viewport_name}: comparison delta cards not rendered"]
+        )
     failures = []
     observed = {
         str(item.get("label") or ""): str(item.get("delta") or "")
@@ -382,11 +423,23 @@ def collect_risk_distributions(page) -> list[dict[str, str]]:
 
 
 def risk_distribution_failures(
-    distributions: list[dict[str, str]], viewport_name: str
+    distributions: list[dict[str, str]],
+    viewport_name: str,
+    profile: str = PROFILE_DEMO,
 ) -> list[str]:
     if not distributions:
         return [f"{viewport_name}: risk distribution card not rendered"]
     body = str(distributions[0].get("body") or "")
+    if profile == PROFILE_REAL:
+        failures = []
+        for expected in ["Risk distribution", "imported conversations"]:
+            if expected not in body:
+                failures.append(
+                    f"{viewport_name}: risk distribution missing: {expected}"
+                )
+        if not any(label in body for label in ["High risk", "Medium risk", "Low risk"]):
+            failures.append(f"{viewport_name}: risk distribution missing risk labels")
+        return failures
     return [
         f"{viewport_name}: risk distribution missing: {expected}"
         for expected in EXPECTED_RISK_DISTRIBUTION
@@ -434,8 +487,12 @@ def quick_read_evidence_failures(evidence: object, viewport_name: str) -> list[s
 
 
 def metric_card_value_failures(
-    cards: list[dict[str, str]], viewport_name: str
+    cards: list[dict[str, str]],
+    viewport_name: str,
+    profile: str = PROFILE_DEMO,
 ) -> list[str]:
+    if profile == PROFILE_REAL:
+        return []
     by_label = {
         str(card.get("label") or ""): str(card.get("value") or "")
         for card in cards
@@ -478,11 +535,19 @@ def collect_success_targets(page) -> list[dict[str, str]]:
 
 
 def success_target_failures(
-    targets: list[dict[str, str]], viewport_name: str
+    targets: list[dict[str, str]],
+    viewport_name: str,
+    profile: str = PROFILE_DEMO,
 ) -> list[str]:
     if not targets:
         return [f"{viewport_name}: success target card not rendered"]
     observed = targets[0]
+    if profile == PROFILE_REAL:
+        return [
+            f"{viewport_name}: success target {key} missing"
+            for key in ["metric", "current", "target"]
+            if not str(observed.get(key) or "")
+        ]
     failures = []
     for key, expected_value in EXPECTED_SUCCESS_TARGET.items():
         actual_value = str(observed.get(key) or "")
@@ -540,7 +605,9 @@ def review_path_failures(paths: list[dict[str, str]], viewport_name: str) -> lis
 
 
 def operator_briefing_failures(
-    briefings: list[dict[str, str]], viewport_name: str
+    briefings: list[dict[str, str]],
+    viewport_name: str,
+    profile: str = PROFILE_DEMO,
 ) -> list[str]:
     if not briefings:
         return [f"{viewport_name}: operator briefing card not rendered"]
@@ -550,6 +617,11 @@ def operator_briefing_failures(
     expected_label = EXPECTED_OPERATOR_BRIEFING["label"].casefold()
     if label != expected_label:
         failures.append(f"{viewport_name}: operator briefing label missing")
+    if profile == PROFILE_REAL:
+        for key in ["heading", "best_habit", "scale", "proof_target"]:
+            if not str(observed.get(key) or ""):
+                failures.append(f"{viewport_name}: operator briefing {key} missing")
+        return failures
     if EXPECTED_OPERATOR_BRIEFING["risk"] not in str(observed.get("heading") or ""):
         failures.append(
             f"{viewport_name}: operator briefing risk expected {EXPECTED_OPERATOR_BRIEFING['risk']}"
@@ -576,14 +648,21 @@ def collect_next_run_checklists(page) -> list[dict[str, str]]:
 
 
 def next_run_checklist_failures(
-    checklists: list[dict[str, str]], viewport_name: str
+    checklists: list[dict[str, str]],
+    viewport_name: str,
+    profile: str = PROFILE_DEMO,
 ) -> list[str]:
     if not checklists:
         return [f"{viewport_name}: next run checklist card not rendered"]
     body = str(checklists[0].get("body") or "")
+    expected_items = (
+        ["Next run checklist", "Before next run", "During next run", "After next run"]
+        if profile == PROFILE_REAL
+        else EXPECTED_NEXT_RUN_CHECKLIST
+    )
     return [
         f"{viewport_name}: next run checklist missing: {expected}"
-        for expected in EXPECTED_NEXT_RUN_CHECKLIST
+        for expected in expected_items
         if expected not in body
     ]
 
@@ -600,14 +679,19 @@ def collect_next_run_briefs(page) -> list[dict[str, str]]:
 
 
 def next_run_brief_failures(
-    briefs: list[dict[str, str]], viewport_name: str
+    briefs: list[dict[str, str]], viewport_name: str, profile: str = PROFILE_DEMO
 ) -> list[str]:
     if not briefs:
         return [f"{viewport_name}: next run brief card not rendered"]
     body = str(briefs[0].get("body") or "")
+    expected_items = (
+        ["Next run brief", "Next Codex run plan", "Copy prompt"]
+        if profile == PROFILE_REAL
+        else EXPECTED_NEXT_RUN_BRIEF
+    )
     return [
         f"{viewport_name}: next run brief missing: {expected}"
-        for expected in EXPECTED_NEXT_RUN_BRIEF
+        for expected in expected_items
         if expected not in body
     ]
 
@@ -695,40 +779,65 @@ def collect_layout_snapshot(page) -> dict[str, object]:
     )
 
 
+def page_body_text(page, timeout_ms: int = 5000) -> str:
+    try:
+        return page.locator("body").inner_text(timeout=timeout_ms)
+    except Exception:
+        return page.evaluate("() => document.body ? document.body.innerText : ''")
+
+
 def validate_dashboard_page(
-    page, viewport_name: str
+    page, viewport_name: str, profile: str = PROFILE_DEMO
 ) -> tuple[list[str], dict[str, object]]:
     failures: list[str] = []
     exercised_tabs: list[str] = []
     quick_read_evidence: list[dict[str, str]] = []
     agent_selector_exercised = False
-    text = page.locator("body").inner_text(timeout=5000)
+    text = page_body_text(page, 5000)
     if visible_text_has_error(text):
         failures.append(f"{viewport_name}: Streamlit exception text found")
     if "Codex Observe" not in text:
         failures.append(f"{viewport_name}: dashboard title not found")
+    page.get_by_role("tab", name="Overview", exact=True).click()
+    page.wait_for_timeout(1500 if profile == PROFILE_REAL else 500)
+    if profile == PROFILE_REAL:
+        try:
+            page.wait_for_function(
+                "document.querySelectorAll('.co-success-target').length > 0 && "
+                "document.querySelectorAll('.co-next-run-checklist').length > 0 && "
+                "document.querySelectorAll('.co-feedback-handoff').length > 0",
+                timeout=45000,
+            )
+        except Exception:
+            pass
+    wait_script = (
+        "['High risk', 'Medium risk', 'Low risk'].some((label) => document.body.innerText.includes(label))"
+        if profile == PROFILE_REAL
+        else "document.body.innerText.includes('High risk') && document.body.innerText.includes('Low risk')"
+    )
     try:
         page.wait_for_function(
-            "document.body.innerText.includes('High risk') && document.body.innerText.includes('Low risk')",
-            timeout=5000,
+            wait_script, timeout=10000 if profile == PROFILE_REAL else 5000
         )
     except Exception:
         pass
     sidebar_risk_labels = collect_sidebar_risk_labels(page)
-    failures.extend(sidebar_risk_label_failures(sidebar_risk_labels, viewport_name))
+    failures.extend(
+        sidebar_risk_label_failures(sidebar_risk_labels, viewport_name, profile)
+    )
     sidebar_session_details = collect_sidebar_session_details(page)
     failures.extend(
-        sidebar_session_detail_failures(sidebar_session_details, viewport_name)
+        sidebar_session_detail_failures(sidebar_session_details, viewport_name, profile)
     )
     risk_distributions = collect_risk_distributions(page)
-    failures.extend(risk_distribution_failures(risk_distributions, viewport_name))
+    failures.extend(
+        risk_distribution_failures(risk_distributions, viewport_name, profile)
+    )
     metric_cards = collect_metric_cards(page)
     failures.extend(metric_card_failures(metric_cards, viewport_name))
-    failures.extend(metric_card_value_failures(metric_cards, viewport_name))
-    page.get_by_role("tab", name="Overview", exact=True).click()
-    page.wait_for_timeout(500)
+    failures.extend(metric_card_value_failures(metric_cards, viewport_name, profile))
     page.evaluate("window.scrollTo(0, Math.min(document.body.scrollHeight, 900))")
-    page.wait_for_timeout(500)
+    page.wait_for_timeout(1000 if profile == PROFILE_REAL else 500)
     success_targets = collect_success_targets(page)
     operator_briefings = collect_operator_briefings(page)
     review_paths = collect_review_paths(page)
@@ -742,20 +851,31 @@ def validate_dashboard_page(
     comparison_scope_warnings = collect_comparison_scope_warnings(page)
     comparison_deltas = collect_comparison_deltas(page)
     page.evaluate("window.scrollTo(0, 0)")
-    failures.extend(success_target_failures(success_targets, viewport_name))
-    failures.extend(operator_briefing_failures(operator_briefings, viewport_name))
-    failures.extend(review_path_failures(review_paths, viewport_name))
-    failures.extend(next_run_checklist_failures(next_run_checklists, viewport_name))
-    failures.extend(next_run_brief_failures(next_run_briefs, viewport_name))
-    failures.extend(feedback_handoff_failures(feedback_handoffs, viewport_name))
-    failures.extend(download_control_failures(download_controls, viewport_name))
-    failures.extend(comparison_preview_failures(comparison_previews, viewport_name))
+    failures.extend(success_target_failures(success_targets, viewport_name, profile))
     failures.extend(
-        comparison_review_path_failures(comparison_review_paths, viewport_name)
+        operator_briefing_failures(operator_briefings, viewport_name, profile)
     )
-    failures.extend(comparison_delta_failures(comparison_deltas, viewport_name))
+    failures.extend(review_path_failures(review_paths, viewport_name))
+    failures.extend(
+        next_run_checklist_failures(next_run_checklists, viewport_name, profile)
+    )
+    failures.extend(next_run_brief_failures(next_run_briefs, viewport_name, profile))
+    failures.extend(feedback_handoff_failures(feedback_handoffs, viewport_name))
+    failures.extend(
+        download_control_failures(download_controls, viewport_name, profile)
+    )
+    failures.extend(
+        comparison_preview_failures(comparison_previews, viewport_name, profile)
+    )
+    failures.extend(
+        comparison_review_path_failures(comparison_review_paths, viewport_name, profile)
+    )
+    failures.extend(
+        comparison_delta_failures(comparison_deltas, viewport_name, profile)
+    )
+    overview_text = page_body_text(page, 10000)
     for metric_label in ["Largest thread", "Uncached input"]:
-        if metric_label not in text:
+        if metric_label not in overview_text:
             failures.append(
                 f"{viewport_name}: overview metric not found: {metric_label}"
             )
@@ -765,10 +885,32 @@ def validate_dashboard_page(
         if tab.count() != 1:
             failures.append(f"{viewport_name}: tab not found exactly once: {tab_name}")
             continue
-        tab.click()
+        if profile == PROFILE_REAL:
+            page.evaluate(
+                """
+name => {
+  const target = Array.from(document.querySelectorAll('[role="tab"]')).find(
+    (item) => (item.innerText || '').trim() === name
+  );
+  if (target) target.click();
+}
+                """,
+                tab_name,
+            )
+        else:
+            tab.click()
         exercised_tabs.append(tab_name)
-        page.wait_for_timeout(500)
-        body = page.locator("body").inner_text(timeout=5000)
+        page.wait_for_timeout(1000 if profile == PROFILE_REAL else 500)
+        if profile == PROFILE_REAL:
+            try:
+                page.wait_for_function(
+                    "expected => document.body.innerText.includes(expected)",
+                    arg=expected_text,
+                    timeout=30000,
+                )
+            except Exception:
+                pass
+        body = page_body_text(page, 10000 if profile == PROFILE_REAL else 5000)
         if visible_text_has_error(body):
             failures.append(
                 f"{viewport_name}: Streamlit exception after opening {tab_name}"
@@ -793,14 +935,22 @@ def validate_dashboard_page(
                 comboboxes.first.click()
                 page.keyboard.press("ArrowDown")
                 page.keyboard.press("Enter")
-                page.wait_for_timeout(500)
-                selected_body = page.locator("body").inner_text(timeout=5000)
-                if visible_text_has_error(selected_body):
+                page.wait_for_timeout(1500 if profile == PROFILE_REAL else 500)
+                try:
+                    selected_body = page_body_text(
+                        page, 15000 if profile == PROFILE_REAL else 5000
+                    )
+                except Exception:
                     failures.append(
-                        f"{viewport_name}: Streamlit exception after using Agent detail selector"
+                        f"{viewport_name}: Agent detail selector rerender timed out"
                     )
                 else:
-                    agent_selector_exercised = True
+                    if visible_text_has_error(selected_body):
+                        failures.append(
+                            f"{viewport_name}: Streamlit exception after using Agent detail selector"
+                        )
+                    else:
+                        agent_selector_exercised = True
                 page.keyboard.press("Escape")
 
     layout_snapshot = collect_layout_snapshot(page)
@@ -941,7 +1091,7 @@ def validate_empty_state_page(
     page, state_name: str, viewport_name: str
 ) -> tuple[list[str], dict[str, object]]:
     failures: list[str] = []
-    text = page.locator("body").inner_text(timeout=5000)
+    text = page_body_text(page, 5000)
     if visible_text_has_error(text):
         failures.append(f"{state_name} {viewport_name}: Streamlit exception text found")
     if "Codex Observe" not in text:
@@ -1120,6 +1270,7 @@ def visual_empty_state_failures(
 def build_visual_manifest(
     *,
     url: str,
+    profile: str = PROFILE_DEMO,
     db_path: str,
     output_dir: Path,
     viewport_results: dict[str, dict[str, object]],
@@ -1128,6 +1279,7 @@ def build_visual_manifest(
     return {
         "schema_version": VISUAL_MANIFEST_SCHEMA_VERSION,
         "url": url,
+        "profile": profile,
         "database": evidence_path_label(db_path),
         "output_dir": evidence_path_label(output_dir),
         "viewports": viewport_results,
@@ -1148,6 +1300,10 @@ def write_visual_manifest(path: Path, manifest: dict[str, object]) -> None:
 
 def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
     failures: list[str] = []
+    profile = str(manifest.get("profile") or PROFILE_DEMO)
+    if profile not in VISUAL_PROFILES:
+        failures.append(f"manifest profile is unsupported: {profile}")
+        profile = PROFILE_DEMO
     if manifest.get("schema_version") != VISUAL_MANIFEST_SCHEMA_VERSION:
         failures.append("manifest schema_version is missing or unsupported")
 
@@ -1207,7 +1363,9 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
         if not isinstance(sidebar_risk_labels, list):
             failures.append(f"manifest {name} missing sidebar risk label evidence")
         else:
-            risk_failures = sidebar_risk_label_failures(sidebar_risk_labels, name)
+            risk_failures = sidebar_risk_label_failures(
+                sidebar_risk_labels, name, profile
+            )
             failures.extend(
                 failure.replace(f"{name}: ", f"manifest {name} ")
                 for failure in risk_failures
@@ -1218,7 +1376,7 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
             failures.append(f"manifest {name} missing sidebar session detail evidence")
         else:
             detail_failures = sidebar_session_detail_failures(
-                sidebar_session_details, name
+                sidebar_session_details, name, profile
             )
             failures.extend(
                 failure.replace(f"{name}: ", f"manifest {name} ")
@@ -1229,7 +1387,9 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
         if not isinstance(risk_distributions, list):
             failures.append(f"manifest {name} missing risk distribution evidence")
         else:
-            distribution_failures = risk_distribution_failures(risk_distributions, name)
+            distribution_failures = risk_distribution_failures(
+                risk_distributions, name, profile
+            )
             failures.extend(
                 failure.replace(f"{name}: ", f"manifest {name} ")
                 for failure in distribution_failures
@@ -1240,7 +1400,9 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
             failures.append(f"manifest {name} missing metric card evidence")
         else:
             metric_failures = metric_card_failures(metric_cards, name)
-            metric_failures.extend(metric_card_value_failures(metric_cards, name))
+            metric_failures.extend(
+                metric_card_value_failures(metric_cards, name, profile)
+            )
             failures.extend(
                 failure.replace(f"{name}: ", f"manifest {name} ")
                 for failure in metric_failures
@@ -1250,7 +1412,7 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
         if not isinstance(success_targets, list):
             failures.append(f"manifest {name} missing success target evidence")
         else:
-            target_failures = success_target_failures(success_targets, name)
+            target_failures = success_target_failures(success_targets, name, profile)
             failures.extend(
                 failure.replace(f"{name}: ", f"manifest {name} ")
                 for failure in target_failures
@@ -1260,7 +1422,9 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
         if not isinstance(download_controls, list):
             failures.append(f"manifest {name} missing report download control evidence")
         else:
-            control_failures = download_control_failures(download_controls, name)
+            control_failures = download_control_failures(
+                download_controls, name, profile
+            )
             failures.extend(
                 failure.replace(f"{name}: ", f"manifest {name} ")
                 for failure in control_failures
@@ -1270,7 +1434,9 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
         if not isinstance(operator_briefings, list):
             failures.append(f"manifest {name} missing operator briefing evidence")
         else:
-            briefing_failures = operator_briefing_failures(operator_briefings, name)
+            briefing_failures = operator_briefing_failures(
+                operator_briefings, name, profile
+            )
             failures.extend(
                 failure.replace(f"{name}: ", f"manifest {name} ")
                 for failure in briefing_failures
@@ -1290,7 +1456,9 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
         if not isinstance(next_run_checklists, list):
             failures.append(f"manifest {name} missing next run checklist evidence")
         else:
-            checklist_failures = next_run_checklist_failures(next_run_checklists, name)
+            checklist_failures = next_run_checklist_failures(
+                next_run_checklists, name, profile
+            )
             failures.extend(
                 failure.replace(f"{name}: ", f"manifest {name} ")
                 for failure in checklist_failures
@@ -1300,7 +1468,7 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
         if not isinstance(next_run_briefs, list):
             failures.append(f"manifest {name} missing next run brief evidence")
         else:
-            brief_failures = next_run_brief_failures(next_run_briefs, name)
+            brief_failures = next_run_brief_failures(next_run_briefs, name, profile)
             failures.extend(
                 failure.replace(f"{name}: ", f"manifest {name} ")
                 for failure in brief_failures
@@ -1323,7 +1491,9 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
         if not isinstance(comparison_previews, list):
             failures.append(f"manifest {name} missing comparison preview evidence")
         else:
-            preview_failures = comparison_preview_failures(comparison_previews, name)
+            preview_failures = comparison_preview_failures(
+                comparison_previews, name, profile
+            )
             failures.extend(
                 failure.replace(f"{name}: ", f"manifest {name} ")
                 for failure in preview_failures
@@ -1334,7 +1504,7 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
             failures.append(f"manifest {name} missing comparison review path evidence")
         else:
             comparison_path_failures = comparison_review_path_failures(
-                comparison_review_paths, name
+                comparison_review_paths, name, profile
             )
             failures.extend(
                 failure.replace(f"{name}: ", f"manifest {name} ")
@@ -1349,7 +1519,7 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
         if not isinstance(comparison_deltas, list):
             failures.append(f"manifest {name} missing comparison delta evidence")
         else:
-            delta_failures = comparison_delta_failures(comparison_deltas, name)
+            delta_failures = comparison_delta_failures(comparison_deltas, name, profile)
             failures.extend(
                 failure.replace(f"{name}: ", f"manifest {name} ")
                 for failure in delta_failures
@@ -1425,6 +1595,7 @@ def run_visual_check(
     output_dir: Path,
     db_path: str,
     empty_state_results: dict[str, dict[str, object]],
+    profile: str = PROFILE_DEMO,
 ) -> int:
     try:
         from playwright.sync_api import sync_playwright
@@ -1446,7 +1617,7 @@ def run_visual_check(
                 page = browser.new_page(viewport=viewport)
                 page.goto(url, wait_until="networkidle")
                 page.wait_for_timeout(1500)
-                page_failures, evidence = validate_dashboard_page(page, name)
+                page_failures, evidence = validate_dashboard_page(page, name, profile)
                 failures.extend(page_failures)
                 page.get_by_role("tab", name="Overview", exact=True).click()
                 page.wait_for_timeout(500)
@@ -1473,6 +1644,7 @@ def run_visual_check(
     manifest_path = output_dir / "visual-qa-manifest.json"
     manifest = build_visual_manifest(
         url=url,
+        profile=profile,
         db_path=db_path,
         output_dir=output_dir,
         viewport_results=viewport_results,
@@ -1508,6 +1680,12 @@ def main() -> int:
         type=float,
         default=30.0,
         help="Seconds to wait for Streamlit startup.",
+    )
+    parser.add_argument(
+        "--profile",
+        choices=sorted(VISUAL_PROFILES),
+        default=PROFILE_DEMO,
+        help="Expectation profile: strict demo fixture checks or structure-focused real data checks.",
     )
     parser.add_argument(
         "--verify-manifest",
@@ -1582,7 +1760,9 @@ def main() -> int:
     )
     try:
         wait_for_server(url, args.timeout)
-        return run_visual_check(url, output_dir, str(db), empty_state_results)
+        return run_visual_check(
+            url, output_dir, str(db), empty_state_results, args.profile
+        )
     finally:
         process.terminate()
         try:

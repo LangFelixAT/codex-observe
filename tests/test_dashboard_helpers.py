@@ -24,6 +24,7 @@ from codex_observe.dashboard import (
     conversation_button_label,
     dashboard_css,
     data_inventory_html,
+    dataframe_preview,
     duplication_quick_read_html,
     empty_state_commands_html,
     feedback_handoff_html,
@@ -44,6 +45,26 @@ from codex_observe.dashboard import (
     thread_brief_html,
     tool_quick_read_html,
 )
+
+
+def test_dataframe_preview_caps_large_real_history_tables() -> None:
+    frame = pd.DataFrame({"value": range(6)})
+
+    preview, caption = dataframe_preview(frame, limit=3)
+
+    assert preview["value"].tolist() == [0, 1, 2]
+    assert caption == (
+        "Showing first 3 of 6 rows to keep large real-history dashboards responsive."
+    )
+
+
+def test_dataframe_preview_leaves_small_tables_uncapped() -> None:
+    frame = pd.DataFrame({"value": [1, 2]})
+
+    preview, caption = dataframe_preview(frame, limit=3)
+
+    assert preview.equals(frame)
+    assert caption is None
 
 
 def test_order_conversations_for_review_uses_risk_aware_session_summaries() -> None:

@@ -80,7 +80,7 @@ For UI-facing changes, run visual QA:
 python scripts/visual_qa.py
 ```
 
-`codex-observe self-check --visual --json` verifies Pillow and Playwright imports before the browser check. The visual QA script starts Streamlit, clicks Overview, Agent detail, Timeline & jumps, Tools, Duplication, and Raw tables, exercises the Agent detail selector, and writes desktop/narrow screenshots and a validated path-safe visual QA manifest with tab coverage, selector exercise, screenshot metadata, layout review, sidebar risk labels, expected high-risk default metric card evidence, operator-briefing evidence, and success-target evidence to `.artifacts/visual/`. Recheck saved evidence and referenced screenshot files with `python scripts/visual_qa.py --verify-manifest .artifacts/visual/visual-qa-manifest.json`.
+`codex-observe self-check --visual --json` verifies Pillow and Playwright imports before the browser check. The visual QA script starts Streamlit, clicks Overview, Agent detail, Timeline & jumps, Tools, Duplication, and Raw tables, exercises the Agent detail selector, and writes desktop/narrow screenshots and a validated path-safe visual QA manifest with tab coverage, selector exercise, screenshot metadata, layout review, sidebar risk labels, expected high-risk default metric card evidence, operator-briefing evidence, and success-target evidence to `.artifacts/visual/`. Recheck saved evidence and referenced screenshot files with `python scripts/visual_qa.py --verify-manifest .artifacts/visual/visual-qa-manifest.json`. For ignored private validation artifacts, use `python scripts/visual_qa.py --profile real --db .artifacts/private/real-sessions.sqlite --out .artifacts/private/visual-real`; do not commit those screenshots or manifests.
 
 ## Parser changes
 
