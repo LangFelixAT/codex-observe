@@ -255,6 +255,14 @@ def download_control_failures(labels: list[str], viewport_name: str) -> list[str
     ]
 
 
+def collect_report_scope_warnings(page) -> list[str]:
+    return page.evaluate(
+        r"""
+() => Array.from(document.querySelectorAll('.co-report-scope')).map((card) => (card.innerText || '').replace(/\s+/g, ' ').trim()).filter(Boolean)
+        """
+    )
+
+
 def collect_comparison_previews(page) -> list[dict[str, str]]:
     return page.evaluate(
         r"""
@@ -693,6 +701,7 @@ def validate_dashboard_page(
     next_run_checklists = collect_next_run_checklists(page)
     feedback_handoffs = collect_feedback_handoffs(page)
     download_controls = collect_download_controls(page)
+    report_scope_warnings = collect_report_scope_warnings(page)
     comparison_previews = collect_comparison_previews(page)
     comparison_review_paths = collect_comparison_review_paths(page)
     comparison_scope_warnings = collect_comparison_scope_warnings(page)
@@ -775,6 +784,7 @@ def validate_dashboard_page(
         "next_run_checklists": next_run_checklists,
         "feedback_handoffs": feedback_handoffs,
         "download_controls": download_controls,
+        "report_scope_warnings": report_scope_warnings,
         "comparison_previews": comparison_previews,
         "comparison_review_paths": comparison_review_paths,
         "comparison_scope_warnings": comparison_scope_warnings,
@@ -1259,6 +1269,9 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
                 for failure in handoff_failures
             )
 
+        report_scope_warnings = raw.get("report_scope_warnings")
+        if not isinstance(report_scope_warnings, list):
+            failures.append(f"manifest {name} missing report scope warning evidence")
         comparison_previews = raw.get("comparison_previews")
         if not isinstance(comparison_previews, list):
             failures.append(f"manifest {name} missing comparison preview evidence")

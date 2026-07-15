@@ -36,6 +36,7 @@ from codex_observe.dashboard import (
     pct_of_total,
     review_path_html,
     report_download_payloads,
+    report_ingest_scope_warning_html,
     triage_card_html,
     success_target_html,
     timeline_quick_read_html,
@@ -556,6 +557,7 @@ def test_dashboard_css_contains_polish_hooks_without_viewport_scaled_type() -> N
     assert ".co-comparison-delta" in css
     assert ".co-comparison-followup" in css
     assert ".co-comparison-scope" in css
+    assert ".co-report-scope" in css
     assert ".co-comparison-review-path" in css
     assert ".co-thread-brief" in css
     assert ".co-tool-brief" in css
@@ -623,6 +625,23 @@ def test_triage_card_html_escapes_content_and_renders_reasons() -> None:
     assert "Set stop &amp; summarize" in rendered
     assert "Tool output &lt;large&gt;" in rendered
     assert "Largest <thread>" not in rendered
+
+
+def test_report_ingest_scope_warning_html_escapes_and_omits_empty_warning() -> None:
+    rendered = report_ingest_scope_warning_html(
+        {
+            "ingest_scope": {
+                "warning": "Sampled ingest: newest-file limit <25> selected & deferred."
+            }
+        }
+    )
+
+    assert 'class="co-report-scope"' in rendered
+    assert "Ingest scope" in rendered
+    assert "newest-file limit &lt;25&gt; selected &amp; deferred" in rendered
+    assert "<25>" not in rendered
+    assert report_ingest_scope_warning_html({}) == ""
+    assert report_ingest_scope_warning_html({"ingest_scope": {"sampled": False}}) == ""
 
 
 def test_operator_briefing_html_summarizes_top_action_and_escapes_content() -> None:

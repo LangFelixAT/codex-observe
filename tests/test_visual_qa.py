@@ -33,6 +33,7 @@ review_path_failures = visual_qa.review_path_failures
 next_run_checklist_failures = visual_qa.next_run_checklist_failures
 feedback_handoff_failures = visual_qa.feedback_handoff_failures
 download_control_failures = visual_qa.download_control_failures
+collect_report_scope_warnings = visual_qa.collect_report_scope_warnings
 comparison_preview_failures = visual_qa.comparison_preview_failures
 comparison_review_path_failures = visual_qa.comparison_review_path_failures
 comparison_delta_failures = visual_qa.comparison_delta_failures
@@ -230,6 +231,15 @@ def test_download_control_failures_require_report_exports() -> None:
     failures = download_control_failures(["Download report MD"], "narrow")
 
     assert "narrow: report download control not found: Download report JSON" in failures
+
+
+def test_collect_report_scope_warnings_reads_warning_cards() -> None:
+    class FakePage:
+        def evaluate(self, script: str) -> list[str]:
+            assert ".co-report-scope" in script
+            return ["Ingest scope: Sampled ingest"]
+
+    assert collect_report_scope_warnings(FakePage()) == ["Ingest scope: Sampled ingest"]
 
 
 def test_comparison_preview_failures_require_quick_read_contract() -> None:
@@ -452,6 +462,7 @@ def complete_viewport_results(tmp_path: Path) -> dict[str, dict[str, object]]:
                     "target": "below 50.0%",
                 }
             ],
+            "report_scope_warnings": [],
             "download_controls": [
                 "Download report MD",
                 "Download report JSON",
@@ -617,6 +628,7 @@ def test_visual_manifest_records_review_evidence(tmp_path: Path) -> None:
         "current": "57.7%",
         "target": "below 50.0%",
     }
+    assert loaded["viewports"]["desktop"]["report_scope_warnings"] == []
     assert loaded["viewports"]["desktop"]["download_controls"] == [
         "Download report MD",
         "Download report JSON",
@@ -740,6 +752,7 @@ def test_visual_manifest_failures_rejects_incomplete_evidence(tmp_path: Path) ->
     assert "manifest desktop next review path card not rendered" in failures
     assert "manifest desktop next run checklist card not rendered" in failures
     assert "manifest desktop safe feedback handoff card not rendered" in failures
+    assert "manifest desktop missing report scope warning evidence" in failures
     assert "manifest desktop comparison preview card not rendered" in failures
     assert "manifest desktop comparison review path not rendered" in failures
     assert "manifest desktop missing comparison scope warning evidence" in failures

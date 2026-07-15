@@ -748,6 +748,17 @@ def dashboard_css() -> str:
   color: var(--co-ink);
 }
 
+.co-report-scope {
+  background: color-mix(in srgb, var(--co-warning) 10%, var(--co-surface));
+  border: 1px solid color-mix(in srgb, var(--co-warning) 32%, var(--co-border));
+  border-radius: 8px;
+  color: var(--co-ink);
+  font-size: 0.84rem;
+  line-height: 1.35;
+  margin: 0.65rem 0 0.85rem 0;
+  overflow-wrap: anywhere;
+  padding: 0.55rem 0.65rem;
+}
 .co-comparison-scope {
   background: color-mix(in srgb, var(--co-warning) 10%, var(--co-surface));
   border: 1px solid color-mix(in srgb, var(--co-warning) 32%, var(--co-border));
@@ -1218,6 +1229,20 @@ def feedback_handoff_html(handoff: object) -> str:
             "  </div>",
             "</section>",
         ]
+    )
+
+
+def report_ingest_scope_warning_html(report: dict[str, object]) -> str:
+    scope = report.get("ingest_scope")
+    if not isinstance(scope, dict):
+        return ""
+    warning = scope.get("warning")
+    if not isinstance(warning, str) or not warning:
+        return ""
+    return (
+        '<div class="co-report-scope">'
+        f"<strong>Ingest scope:</strong> {html.escape(warning)}"
+        "</div>"
     )
 
 
@@ -2266,6 +2291,10 @@ def main() -> None:
         )
         st.markdown(
             feedback_handoff_html(report.get("feedback_handoff")),
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            report_ingest_scope_warning_html(report),
             unsafe_allow_html=True,
         )
         downloads = report_download_payloads(report)
