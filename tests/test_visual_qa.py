@@ -31,6 +31,7 @@ metric_card_failures = visual_qa.metric_card_failures
 metric_card_value_failures = visual_qa.metric_card_value_failures
 sidebar_risk_label_failures = visual_qa.sidebar_risk_label_failures
 sidebar_risk_filter_failures = visual_qa.sidebar_risk_filter_failures
+sidebar_session_search_failures = visual_qa.sidebar_session_search_failures
 sidebar_session_detail_failures = visual_qa.sidebar_session_detail_failures
 operator_briefing_failures = visual_qa.operator_briefing_failures
 collect_review_paths = visual_qa.collect_review_paths
@@ -356,6 +357,24 @@ def test_collect_sidebar_risk_filter_uses_visible_text_and_aria_labels() -> None
     assert visual_qa.collect_sidebar_risk_filter(FakePage()) == ["Risk filter"]
 
 
+def test_sidebar_session_search_failures_require_find_session_control() -> None:
+    assert sidebar_session_search_failures(["Find session"], "desktop") == []
+
+    failures = sidebar_session_search_failures([], "narrow")
+
+    assert "narrow: sidebar session search evidence not found: Find session" in failures
+
+
+def test_collect_sidebar_session_search_uses_visible_text_and_aria_labels() -> None:
+    class FakePage:
+        def evaluate(self, script: str) -> list[str]:
+            assert "document.body.innerText" in script
+            assert "querySelectorAll('[aria-label]')" in script
+            return ["Find session"]
+
+    assert visual_qa.collect_sidebar_session_search(FakePage()) == ["Find session"]
+
+
 def test_sidebar_session_detail_failures_require_snapshot_context() -> None:
     assert sidebar_session_detail_failures(["6 snapshots"], "desktop") == []
 
@@ -633,6 +652,7 @@ def complete_viewport_results(tmp_path: Path) -> dict[str, dict[str, object]]:
             "agent_detail_selector_exercised": True,
             "sidebar_risk_labels": ["High risk", "Low risk"],
             "sidebar_risk_filter": ["Risk filter"],
+            "sidebar_session_search": ["Find session"],
             "sidebar_session_details": ["6 snapshots"],
             "risk_distributions": [
                 {
@@ -812,6 +832,7 @@ def test_visual_manifest_records_review_evidence(tmp_path: Path) -> None:
         "Low risk",
     ]
     assert loaded["viewports"]["desktop"]["sidebar_risk_filter"] == ["Risk filter"]
+    assert loaded["viewports"]["desktop"]["sidebar_session_search"] == ["Find session"]
     assert loaded["viewports"]["desktop"]["sidebar_session_details"] == ["6 snapshots"]
     assert loaded["viewports"]["desktop"]["risk_distributions"][0]["label"] == (
         "Risk distribution"
@@ -950,6 +971,7 @@ def test_visual_manifest_failures_rejects_incomplete_evidence(tmp_path: Path) ->
     assert "manifest desktop screenshot is empty" in failures
     assert "manifest desktop sidebar risk label not found: Low risk" in failures
     assert "manifest desktop missing sidebar Risk filter evidence" in failures
+    assert "manifest desktop missing sidebar session search evidence" in failures
     assert "manifest desktop risk distribution card not rendered" in failures
     assert "manifest desktop metric card not rendered: Largest thread" in failures
     assert "manifest desktop metric card not rendered: Uncached input" in failures

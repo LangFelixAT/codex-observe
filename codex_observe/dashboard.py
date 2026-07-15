@@ -1944,6 +1944,32 @@ def filter_conversations_by_risk(
     return conversations[risk_values == normalized].reset_index(drop=True)
 
 
+def filter_conversations_by_search(
+    conversations: pd.DataFrame, query: str | None
+) -> pd.DataFrame:
+    terms = [term for term in str(query or "").strip().lower().split() if term]
+    if not terms or conversations.empty:
+        return conversations
+    searchable_columns = [
+        column
+        for column in ["session_id", "preview", "last_seen", "triage_risk"]
+        if column in conversations.columns
+    ]
+    if not searchable_columns:
+        return conversations
+    haystack = (
+        conversations[searchable_columns]
+        .fillna("")
+        .astype(str)
+        .agg(" ".join, axis=1)
+        .str.lower()
+    )
+    mask = pd.Series(True, index=conversations.index)
+    for term in terms:
+        mask &= haystack.str.contains(term, regex=False)
+    return conversations[mask].reset_index(drop=True)
+
+
 def risk_marker(risk: str) -> str:
     normalized = risk.strip().lower()
     if normalized == "high":
@@ -2371,6 +2397,11 @@ def main() -> None:
         st.header("Database")
         render_wrapped_path(db)
         st.metric("Conversations", len(conversations))
+        search_query = st.text_input(
+            "Find session",
+            placeholder="Search label, date, risk, or session fragment",
+            key="sidebar_session_search",
+        )
         risk_filter_options = sidebar_risk_filter_options(conversations)
         risk_filter_labels = [label for label, _value in risk_filter_options]
         selected_risk_label = st.selectbox(
@@ -2380,12 +2411,21 @@ def main() -> None:
         filtered_conversations = filter_conversations_by_risk(
             conversations, risk_filter
         )
+        filtered_conversations = filter_conversations_by_search(
+            filtered_conversations, search_query
+        )
+        active_filters = []
+        if str(search_query or "").strip():
+            active_filters.append("search")
         if risk_filter != "all":
+            active_filters.append("risk")
+        if active_filters:
             st.caption(
-                f"Showing {len(filtered_conversations)} of {len(conversations)} conversations"
+                f"Showing {len(filtered_conversations)} of {len(conversations)} conversations after "
+                f"{', '.join(active_filters)} filter"
             )
         if filtered_conversations.empty:
-            st.info("No conversations match this risk filter.")
+            st.info("No conversations match the current sidebar filters.")
             st.stop()
         elif st.session_state.get("selected_session_id") not in set(
             filtered_conversations["session_id"]

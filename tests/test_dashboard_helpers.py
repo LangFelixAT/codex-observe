@@ -29,6 +29,7 @@ from codex_observe.dashboard import (
     empty_state_commands_html,
     feedback_handoff_html,
     filter_conversations_by_risk,
+    filter_conversations_by_search,
     risk_marker,
     sidebar_risk_filter_options,
     order_conversations_for_review,
@@ -135,6 +136,52 @@ def test_filter_conversations_by_risk_preserves_order_and_all_mode() -> None:
     assert filter_conversations_by_risk(conversations, "medium")[
         "session_id"
     ].tolist() == ["medium", "moderate"]
+
+
+def test_filter_conversations_by_search_matches_sidebar_fields() -> None:
+    conversations = pd.DataFrame(
+        [
+            {
+                "session_id": "run-alpha-high",
+                "preview": "Investigate repeated prompt blocks",
+                "last_seen": "2026-01-02T12:00:00Z",
+                "triage_risk": "high",
+            },
+            {
+                "session_id": "run-beta-low",
+                "preview": "Clean follow-up",
+                "last_seen": "2026-01-03T12:00:00Z",
+                "triage_risk": "low",
+            },
+        ]
+    )
+
+    filtered = filter_conversations_by_search(conversations, "alpha repeated")
+
+    assert filtered["session_id"].tolist() == ["run-alpha-high"]
+
+
+def test_filter_conversations_by_search_uses_literal_multi_term_matching() -> None:
+    conversations = pd.DataFrame(
+        [
+            {"session_id": "run-[abc]", "preview": "2026 narrow check"},
+            {"session_id": "run-other", "preview": "2026 desktop check"},
+        ]
+    )
+
+    filtered = filter_conversations_by_search(conversations, "[abc] narrow")
+
+    assert filtered["session_id"].tolist() == ["run-[abc]"]
+
+
+def test_filter_conversations_by_search_preserves_empty_query_and_no_columns() -> None:
+    conversations = pd.DataFrame([{"session_id": "run-alpha"}])
+    no_searchable_columns = pd.DataFrame([{"value": "run-alpha"}])
+
+    assert filter_conversations_by_search(conversations, "  ").equals(conversations)
+    assert filter_conversations_by_search(no_searchable_columns, "alpha").equals(
+        no_searchable_columns
+    )
 
 
 def test_conversation_button_label_includes_risk_and_selection_marker() -> None:

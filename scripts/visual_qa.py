@@ -117,6 +117,7 @@ EXPECTED_QUICK_READ_EVIDENCE = [
 EXPECTED_METRIC_CARDS = ["Threads", "Largest thread", "Uncached input"]
 EXPECTED_SIDEBAR_RISK_LABELS = ["High risk", "Low risk"]
 EXPECTED_SIDEBAR_RISK_FILTER = ["Risk filter"]
+EXPECTED_SIDEBAR_SESSION_SEARCH = ["Find session"]
 EXPECTED_SIDEBAR_SESSION_DETAILS = ["6 snapshots"]
 EXPECTED_DOWNLOAD_CONTROLS = [
     "Download report MD",
@@ -312,6 +313,34 @@ def sidebar_risk_filter_failures(labels: list[str], viewport_name: str) -> list[
     return [
         f"{viewport_name}: sidebar Risk filter evidence not found: {label}"
         for label in EXPECTED_SIDEBAR_RISK_FILTER
+        if label not in observed
+    ]
+
+
+def collect_sidebar_session_search(page) -> list[str]:
+    return page.evaluate(
+        r"""
+() => {
+  const evidence = new Set();
+  const text = document.body.innerText || '';
+  for (const label of ['Find session']) {
+    if (text.includes(label)) evidence.add(label);
+  }
+  for (const element of document.querySelectorAll('[aria-label]')) {
+    const label = element.getAttribute('aria-label') || '';
+    if (label.includes('Find session')) evidence.add('Find session');
+  }
+  return Array.from(evidence);
+}
+        """
+    )
+
+
+def sidebar_session_search_failures(labels: list[str], viewport_name: str) -> list[str]:
+    observed = set(labels)
+    return [
+        f"{viewport_name}: sidebar session search evidence not found: {label}"
+        for label in EXPECTED_SIDEBAR_SESSION_SEARCH
         if label not in observed
     ]
 
@@ -913,6 +942,10 @@ def validate_dashboard_page(
     )
     sidebar_risk_filter = collect_sidebar_risk_filter(page)
     failures.extend(sidebar_risk_filter_failures(sidebar_risk_filter, viewport_name))
+    sidebar_session_search = collect_sidebar_session_search(page)
+    failures.extend(
+        sidebar_session_search_failures(sidebar_session_search, viewport_name)
+    )
     sidebar_session_details = collect_sidebar_session_details(page)
     failures.extend(
         sidebar_session_detail_failures(sidebar_session_details, viewport_name, profile)
@@ -1052,6 +1085,7 @@ name => {
         "metric_cards": metric_cards,
         "sidebar_risk_labels": sidebar_risk_labels,
         "sidebar_risk_filter": sidebar_risk_filter,
+        "sidebar_session_search": sidebar_session_search,
         "sidebar_session_details": sidebar_session_details,
         "success_targets": success_targets,
         "operator_briefings": operator_briefings,
@@ -1488,6 +1522,18 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
                 failure.replace(f"{name}: ", f"manifest {name} ")
                 for failure in filter_failures
             )
+        sidebar_session_search = raw.get("sidebar_session_search")
+        if not isinstance(sidebar_session_search, list):
+            failures.append(f"manifest {name} missing sidebar session search evidence")
+        else:
+            search_failures = sidebar_session_search_failures(
+                sidebar_session_search, name
+            )
+            failures.extend(
+                failure.replace(f"{name}: ", f"manifest {name} ")
+                for failure in search_failures
+            )
+
         sidebar_session_details = raw.get("sidebar_session_details")
         if not isinstance(sidebar_session_details, list):
             failures.append(f"manifest {name} missing sidebar session detail evidence")
