@@ -957,6 +957,49 @@ def test_sessions_missing_json_payload_is_actionable_and_schema_versioned() -> N
     assert payload["review_path"][1]["label"] == "Ingest local logs"
 
 
+def test_recovery_payloads_quote_shell_sensitive_database_paths(tmp_path: Path) -> None:
+    db = tmp_path / "Observe DB & Reports" / "codex observe.sqlite"
+    db_arg = cli._command_arg(db)
+
+    sessions_payload = cli.sessions_missing_json_payload(str(db))
+    report_missing = cli.report_failure_payload(str(db), "missing", "not found")
+    report_stale = cli.report_failure_payload(str(db), "unknown session", "not found")
+    comparison_sessions = cli.compare_failure_payload(
+        str(db), "missing", "not found", "sessions"
+    )
+    comparison_reports = cli.compare_failure_payload(
+        str(db), "missing", "not found", "reports"
+    )
+
+    assert sessions_payload["database"] == str(db)
+    assert sessions_payload["next_commands"] == [
+        f"codex-observe ingest ~/.codex/sessions --db {db_arg}",
+        f"codex-observe demo --db {db_arg}",
+    ]
+    assert sessions_payload["review_path"][0]["command"] == (
+        f"codex-observe demo --db {db_arg}"
+    )
+    assert f"`codex-observe demo --db {db_arg}`" in sessions_payload["next"]
+
+    assert report_missing["next_commands"] == sessions_payload["next_commands"]
+    assert f"`codex-observe demo --db {db_arg}`" in report_missing["next"]
+    assert report_stale["next_commands"] == [
+        f"codex-observe sessions --db {db_arg}",
+        f"codex-observe sessions --db {db_arg} --json",
+    ]
+    assert f"codex-observe sessions --db {db_arg}" in report_stale["next"]
+
+    assert comparison_sessions["next_commands"] == [
+        f"codex-observe sessions --db {db_arg}",
+        f"codex-observe sessions --db {db_arg} --json",
+    ]
+    assert f"codex-observe sessions --db {db_arg}" in comparison_sessions["next"]
+    assert comparison_reports["next_commands"] == [
+        f"codex-observe report --db {db_arg} --format json --out run-report.json"
+    ]
+    assert comparison_reports["database"] == str(db)
+
+
 def test_sessions_json_payload_limits_rows_without_changing_recommendation(
     tmp_path: Path,
 ) -> None:

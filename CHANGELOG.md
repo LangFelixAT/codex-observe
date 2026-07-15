@@ -6,6 +6,7 @@ The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
 
+- Quoted shell-sensitive database paths in sessions, report, and comparison recovery payload commands.
 - Quoted shell-sensitive database paths in `codex-observe doctor` handoff commands so recovery and review commands remain copy-pasteable.
 - Aligned release documentation with the audit gate that verifies public-tour baseline-to-next-run validation-loop evidence.
 - Strengthened release-audit public-tour evidence so it verifies the baseline, next-run validation, and comparison command sequence.

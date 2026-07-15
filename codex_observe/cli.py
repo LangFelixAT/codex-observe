@@ -2929,6 +2929,7 @@ def release_audit_lines(
 
 
 def sessions_missing_json_payload(db_path: str) -> dict[str, object]:
+    db_arg = _command_arg(db_path)
     return {
         "schema_version": SESSIONS_SCHEMA_VERSION,
         "database": db_path,
@@ -2943,8 +2944,8 @@ def sessions_missing_json_payload(db_path: str) -> dict[str, object]:
         "recommendation_detail": None,
         "review_path": sessions_review_path(db_path),
         "next": (
-            f"run `codex-observe demo --db {db_path}` for synthetic data or "
-            f"`codex-observe ingest ~/.codex/sessions --db {db_path}` for local logs."
+            f"run `codex-observe demo --db {db_arg}` for synthetic data or "
+            f"`codex-observe ingest ~/.codex/sessions --db {db_arg}` for local logs."
         ),
         "next_commands": sessions_next_commands(db_path),
     }
@@ -3001,33 +3002,34 @@ def session_recommendation_detail(recommended: dict[str, object]) -> dict[str, o
 def sessions_review_path(
     db_path: str, session_id: str | None = None
 ) -> list[dict[str, str]]:
+    db_arg = _command_arg(db_path)
     if not session_id:
         return [
             {
                 "label": "Create demo data",
-                "command": f"codex-observe demo --db {db_path}",
+                "command": f"codex-observe demo --db {db_arg}",
                 "success_check": "sessions JSON returns status ok with a recommended_session.",
             },
             {
                 "label": "Ingest local logs",
-                "command": f"codex-observe ingest ~/.codex/sessions --db {db_path}",
+                "command": f"codex-observe ingest ~/.codex/sessions --db {db_arg}",
                 "success_check": "doctor reports a valid populated database.",
             },
         ]
     return [
         {
             "label": "Save report Markdown",
-            "command": f"codex-observe report --db {db_path} --session-id {session_id} --out run-report.md",
+            "command": f"codex-observe report --db {db_arg} --session-id {session_id} --out run-report.md",
             "success_check": "Markdown includes Recommended Action and Next Run Success Target.",
         },
         {
             "label": "Save report JSON",
-            "command": f"codex-observe report --db {db_path} --session-id {session_id} --format json --out run-report.json",
+            "command": f"codex-observe report --db {db_arg} --session-id {session_id} --format json --out run-report.json",
             "success_check": "JSON includes schema_version, success_target, and next_action_detail.",
         },
         {
             "label": "Validate next run",
-            "command": f"codex-observe report --db {db_path} --session-id <next-session-id> --format json --out next-run-report.json",
+            "command": f"codex-observe report --db {db_arg} --session-id <next-session-id> --format json --out next-run-report.json",
             "success_check": "The next report can be compared against run-report.json.",
         },
         {
@@ -3077,7 +3079,7 @@ def sessions_json_payload(
         payload["recommendation_detail"] = None
         payload["review_path"] = sessions_review_path(db_path)
         payload["next"] = (
-            f"run `codex-observe ingest ~/.codex/sessions --db {db_path}` or `codex-observe demo --db {db_path}`."
+            f"run `codex-observe ingest ~/.codex/sessions --db {_command_arg(db_path)}` or `codex-observe demo --db {_command_arg(db_path)}`."
         )
         payload["next_commands"] = sessions_next_commands(db_path)
     return payload
@@ -3742,25 +3744,28 @@ def paths_lines(
 
 
 def missing_database_hint(db_path: str) -> str:
+    db_arg = _command_arg(db_path)
     return (
         f"Run `codex-observe demo` for synthetic data or "
-        f"`codex-observe ingest ~/.codex/sessions --db {db_path}` for local logs."
+        f"`codex-observe ingest ~/.codex/sessions --db {db_arg}` for local logs."
     )
 
 
 def sessions_hint(db_path: str) -> str:
+    db_arg = _command_arg(db_path)
     return (
-        f"Run `codex-observe sessions --db {db_path}` to list aggregate-only session IDs "
+        f"Run `codex-observe sessions --db {db_arg}` to list aggregate-only session IDs "
         "and risk, or add `--json` for `recommended_session`."
     )
 
 
 def sessions_next_commands(db_path: str, session_id: str | None = None) -> list[str]:
+    db_arg = _command_arg(db_path)
     if session_id:
-        return session_validation_commands(db_path, session_id)
+        return session_validation_commands(db_arg, session_id)
     return [
-        f"codex-observe ingest ~/.codex/sessions --db {db_path}",
-        f"codex-observe demo --db {db_path}",
+        f"codex-observe ingest ~/.codex/sessions --db {db_arg}",
+        f"codex-observe demo --db {db_arg}",
     ]
 
 
@@ -3770,16 +3775,17 @@ def compare_failure_payload(
     error: str,
     input_mode: str,
 ) -> dict[str, object]:
+    db_arg = _command_arg(db_path)
     if input_mode == "sessions":
         next_text = sessions_hint(db_path)
         next_commands = [
-            f"codex-observe sessions --db {db_path}",
-            f"codex-observe sessions --db {db_path} --json",
+            f"codex-observe sessions --db {db_arg}",
+            f"codex-observe sessions --db {db_arg} --json",
         ]
     else:
         next_text = report_json_hint(db_path)
         next_commands = [
-            f"codex-observe report --db {db_path} --format json --out run-report.json"
+            f"codex-observe report --db {db_arg} --format json --out run-report.json"
         ]
     return {
         "schema_version": COMPARISON_FAILURE_SCHEMA_VERSION,
@@ -3823,17 +3829,18 @@ def comparison_written_lines(path: Path, comparison: dict) -> list[str]:
 def report_failure_payload(
     db_path: str, status: str, error: str, session_id: str | None = None
 ) -> dict[str, object]:
+    db_arg = _command_arg(db_path)
     if status == "missing":
         next_text = (
-            f"run `codex-observe demo --db {db_path}` for synthetic data or "
-            f"`codex-observe ingest ~/.codex/sessions --db {db_path}` for local logs."
+            f"run `codex-observe demo --db {db_arg}` for synthetic data or "
+            f"`codex-observe ingest ~/.codex/sessions --db {db_arg}` for local logs."
         )
         next_commands = sessions_next_commands(db_path)
     else:
         next_text = sessions_hint(db_path)
         next_commands = [
-            f"codex-observe sessions --db {db_path}",
-            f"codex-observe sessions --db {db_path} --json",
+            f"codex-observe sessions --db {db_arg}",
+            f"codex-observe sessions --db {db_arg} --json",
         ]
     return {
         "schema_version": REPORT_FAILURE_SCHEMA_VERSION,
@@ -3891,8 +3898,9 @@ def report_written_lines(path: Path, report: dict) -> list[str]:
 
 
 def report_json_hint(db_path: str) -> str:
+    db_arg = _command_arg(db_path)
     return (
-        f"Run `codex-observe report --db {db_path} --format json --out run-report.json` "
+        f"Run `codex-observe report --db {db_arg} --format json --out run-report.json` "
         "to create a comparison input."
     )
 
