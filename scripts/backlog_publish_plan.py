@@ -4,6 +4,7 @@ import argparse
 import json
 import re
 import shlex
+import textwrap
 from pathlib import Path
 
 
@@ -77,7 +78,14 @@ def validate_draft(path: Path) -> list[str]:
     if not path.exists():
         return [f"{path}: missing"]
     body = draft_body(path)
-    for required in ["## What to build", "## Acceptance criteria", "## Blocked by"]:
+    for required in [
+        "## What to build",
+        "## Acceptance criteria",
+        "## Tests and evidence",
+        "## Visual QA",
+        "## Privacy review",
+        "## Blocked by",
+    ]:
         if required not in body:
             failures.append(f"{path}: missing {required}")
     for pattern in FORBIDDEN_PATTERNS:
@@ -122,6 +130,125 @@ def publish_commands(root: Path = ROOT) -> list[str]:
     return [str(item["command"]) for item in publish_plan(root)]
 
 
+def slugify_title(title: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", title.strip().lower()).strip("-")
+    return slug or "new-work"
+
+
+def next_draft_path(title: str, root: Path = ROOT) -> Path:
+    draft_dir = root / DRAFT_DIR
+    existing_numbers: list[int] = []
+    if draft_dir.exists():
+        for path in draft_dir.glob("*.md"):
+            match = re.match(r"(\d+)-", path.name)
+            if match:
+                existing_numbers.append(int(match.group(1)))
+    for retired in RETIRED_DRAFTS:
+        match = re.match(r"\.github/backlog/(\d+)-", retired)
+        if match:
+            existing_numbers.append(int(match.group(1)))
+    number = (max(existing_numbers) + 1) if existing_numbers else 1
+    return draft_dir / f"{number:03d}-{slugify_title(title)}.md"
+
+
+def draft_template(
+    title: str,
+    labels: list[str] | None = None,
+    what_to_build: str | None = None,
+    acceptance: list[str] | None = None,
+    tests: list[str] | None = None,
+    visual_qa: str | None = None,
+    privacy_notes: str | None = None,
+    blocked_by: str | None = None,
+) -> str:
+    label_values = labels or ["type: slice"]
+    label_text = ", ".join(f"`{label}`" for label in label_values)
+    acceptance_items = acceptance or [
+        "Define the user-visible behavior and acceptance evidence before implementation.",
+        "Add or update focused tests for the changed behavior.",
+        "Update docs or release evidence when the workflow changes.",
+    ]
+    test_items = tests or [
+        "pytest -q",
+        "ruff check",
+        "ruff format --check",
+    ]
+    visual_text = visual_qa or (
+        "Run `python scripts/visual_qa.py` when the slice changes dashboard UI, "
+        "screenshots, or manifest evidence; otherwise state why visual QA is not applicable."
+    )
+    privacy_text = privacy_notes or (
+        "Use synthetic or reviewed-redacted aggregate evidence only. Do not include "
+        "raw prompts, tool output, local paths, private session IDs, screenshots from "
+        "private logs, or unreviewed redacted fixtures."
+    )
+    blocked_text = blocked_by or "None."
+    body = f"""
+# {title}
+
+Labels: {label_text}
+
+## What to build
+
+{what_to_build or "Describe the demoable vertical slice and the user-visible improvement."}
+
+## Acceptance criteria
+
+{chr(10).join(f"- [ ] {item}" for item in acceptance_items)}
+
+## Tests and evidence
+
+{chr(10).join(f"- [ ] `{item}`" for item in test_items)}
+
+## Visual QA
+
+{visual_text}
+
+## Privacy review
+
+{privacy_text}
+
+## Blocked by
+
+{blocked_text}
+"""
+    return textwrap.dedent(body).strip() + "\n"
+
+
+def create_draft(
+    title: str,
+    root: Path = ROOT,
+    labels: list[str] | None = None,
+    what_to_build: str | None = None,
+    acceptance: list[str] | None = None,
+    tests: list[str] | None = None,
+    visual_qa: str | None = None,
+    privacy_notes: str | None = None,
+    blocked_by: str | None = None,
+) -> Path:
+    path = next_draft_path(title, root)
+    if path.exists():
+        raise FileExistsError(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        draft_template(
+            title=title,
+            labels=labels,
+            what_to_build=what_to_build,
+            acceptance=acceptance,
+            tests=tests,
+            visual_qa=visual_qa,
+            privacy_notes=privacy_notes,
+            blocked_by=blocked_by,
+        ),
+        encoding="utf-8",
+    )
+    failures = validate_draft(path)
+    if failures:
+        raise ValueError("created draft failed validation: " + "; ".join(failures))
+    return path
+
+
 def plan_payload(status: str, failures: list[str] | None = None) -> dict[str, object]:
     payload: dict[str, object] = {
         "schema_version": BACKLOG_PUBLISH_SCHEMA_VERSION,
@@ -144,6 +271,45 @@ def main(argv: list[str] | None = None) -> int:
         description="Validate local backlog issue drafts and print safe publishing commands."
     )
     parser.add_argument(
+        "--new-draft",
+        metavar="TITLE",
+        help="Create a validated local draft under .github/backlog without publishing it.",
+    )
+    parser.add_argument(
+        "--label",
+        action="append",
+        default=[],
+        help="Label for --new-draft; can be passed multiple times.",
+    )
+    parser.add_argument(
+        "--what-to-build",
+        help="Initial What to build text for --new-draft.",
+    )
+    parser.add_argument(
+        "--acceptance",
+        action="append",
+        default=[],
+        help="Acceptance criterion for --new-draft; can be passed multiple times.",
+    )
+    parser.add_argument(
+        "--test",
+        action="append",
+        default=[],
+        help="Validation command for --new-draft; can be passed multiple times.",
+    )
+    parser.add_argument(
+        "--visual-qa",
+        help="Visual QA expectation for --new-draft.",
+    )
+    parser.add_argument(
+        "--privacy-note",
+        help="Privacy review note for --new-draft.",
+    )
+    parser.add_argument(
+        "--blocked-by",
+        help="Blocked-by note for --new-draft; defaults to None.",
+    )
+    parser.add_argument(
         "--commands-only",
         action="store_true",
         help="Only print gh commands when validation passes.",
@@ -154,6 +320,38 @@ def main(argv: list[str] | None = None) -> int:
         help="Print validated publish plan metadata as JSON.",
     )
     args = parser.parse_args(argv)
+
+    if args.new_draft:
+        created = create_draft(
+            args.new_draft,
+            ROOT,
+            labels=args.label or None,
+            what_to_build=args.what_to_build,
+            acceptance=args.acceptance or None,
+            tests=args.test or None,
+            visual_qa=args.visual_qa,
+            privacy_notes=args.privacy_note,
+            blocked_by=args.blocked_by,
+        )
+        relative = relative_posix(created, ROOT)
+        if args.json:
+            print_json_payload(
+                {
+                    "schema_version": BACKLOG_PUBLISH_SCHEMA_VERSION,
+                    "status": "created",
+                    "repo": TARGET_REPOSITORY,
+                    "requires_approval": True,
+                    "draft": relative,
+                    "publishable_drafts": publish_plan(ROOT),
+                }
+            )
+        else:
+            print(f"Created local backlog draft: {relative}")
+            print(
+                "Review it, run `python scripts/backlog_publish_plan.py --json`, "
+                "and publish only after explicit human approval."
+            )
+        return 0
 
     failures: list[str] = []
     for _, relative in discover_drafts(ROOT):

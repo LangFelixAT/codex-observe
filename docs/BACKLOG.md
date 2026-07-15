@@ -16,6 +16,7 @@ Suggested labels used by the templates:
 
 Before publishing fresh drafts:
 
+- [ ] Scaffold new drafts with `python scripts/backlog_publish_plan.py --new-draft "Short demoable title" --label "type: slice" --label "area: dashboard"` so tests, visual QA, privacy review, and blocked-by sections are present from the start.
 - [ ] Run `python scripts/backlog_publish_plan.py` and review the generated `gh issue create` commands.
 - [ ] Run `python scripts/backlog_publish_plan.py --json` when automation or reviewers need `schema_version`-marked machine-readable draft metadata.
 - [ ] Confirm each generated command includes `--repo LangFelixAT/codex-observe` and the expected `--label` values.

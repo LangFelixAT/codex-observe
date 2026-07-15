@@ -16,6 +16,7 @@ Use Python 3.10, 3.11, or 3.12. The supported source-install distribution policy
 
 - Work from a fresh vertical slice in docs or a published GitHub issue; `docs/TRACKING.md` records the current issue snapshot and `docs/BACKLOG.md` is now a completed closeout record.
 - Keep slices demoable on their own.
+- Scaffold fresh local issue drafts with `python scripts/backlog_publish_plan.py --new-draft "Short demoable title" --label "type: slice" --label "area: dashboard"` so tests, visual QA, privacy review, and blocked-by sections are present from the start.
 - Run `python scripts/backlog_publish_plan.py` before publishing fresh local issue drafts; use `python scripts/backlog_publish_plan.py --json` for machine-readable review metadata.
 - Do not publish fresh local issue drafts to GitHub without explicit approval; check `docs/TRACKING.md` before opening or retiring issues.
 - Use `.github/PULL_REQUEST_TEMPLATE.md` for verification and privacy evidence.

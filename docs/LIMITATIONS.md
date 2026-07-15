@@ -20,4 +20,4 @@ The first real-log feedback checkpoint has been exercised against a human-approv
 - Real-user feedback from trying the public tour and reviewer evidence bundle should be privacy-safe and collected with `.github/ISSUE_TEMPLATE/public_tour_feedback.yml` and `docs/PUBLIC_TOUR_FEEDBACK.md`.
 - Human-reviewed redacted fixture gaps from `docs/REAL_LOG_FEEDBACK.md`, including any future gaps found after the first private real-log checkpoint.
 - Explicitly approved distribution work if the project moves beyond source installs.
-- Fresh vertical-slice issue drafts only when the work is actionable, demoable, and not merely a human-input reminder.
+- Fresh vertical-slice issue drafts only when the work is actionable, demoable, and not merely a human-input reminder; scaffold them with `python scripts/backlog_publish_plan.py --new-draft` so tests, visual QA, privacy review, and blocked-by sections are present before validation.

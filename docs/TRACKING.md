@@ -31,8 +31,8 @@ Use GitHub issues for new work only when the work is fresh, demoable, and not me
 
 1. Start from `docs/CURRENT.md`, `docs/NEXT_WAVE.md`, `docs/LIMITATIONS.md`, and `docs/PUBLIC_TOUR_FEEDBACK.md`.
 2. Capture privacy-safe observations with `.github/ISSUE_TEMPLATE/public_tour_feedback.yml` before converting feedback into implementation work.
-3. If a local draft is useful, create it under `.github/backlog/` with acceptance criteria, blocked-by notes, tests, visual QA expectations, and privacy review notes.
-4. Run `python scripts/backlog_publish_plan.py --json` to validate draft metadata.
+3. If a local draft is useful, scaffold it with `python scripts/backlog_publish_plan.py --new-draft "Short demoable title" --label "type: slice" --label "area: dashboard"` so it starts with acceptance criteria, tests, visual QA expectations, privacy review notes, and blocked-by notes.
+4. Run `python scripts/backlog_publish_plan.py --json` to validate draft metadata and preview the approval-gated `gh issue create` command.
 5. Publish with `gh issue create` only after explicit human approval for the external write.
 6. Commit and push the implementation branch after a passing quality gate so the work remains traceable.
 

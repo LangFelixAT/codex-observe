@@ -116,6 +116,7 @@ def test_backlog_records_completed_slices_no_publishable_drafts_and_external_wri
     assert [path.name for path in issue_files] == []
     assert "requires explicit approval" in backlog
     assert "python scripts/backlog_publish_plan.py" in backlog
+    assert "python scripts/backlog_publish_plan.py --new-draft" in backlog
     assert "python scripts/backlog_publish_plan.py --json" in backlog
     assert "draft files were deleted" in backlog
     assert "There are currently no publishable local issue drafts" in backlog
@@ -258,6 +259,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         "codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --out .artifacts/demo/run-comparison.md",
         "codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --format json --out .artifacts/demo/run-comparison.json",
         "python scripts/backlog_publish_plan.py",
+        "python scripts/backlog_publish_plan.py --new-draft",
         "python scripts/backlog_publish_plan.py --json",
         "docs/PUBLIC_TOUR_FEEDBACK.md",
         ".github/ISSUE_TEMPLATE/public_tour_feedback.yml",
@@ -489,6 +491,7 @@ def test_limitations_doc_covers_current_boundaries_and_next_work_sources() -> No
         "explicit human approval",
         "Real-user feedback",
         "Fresh GitHub issues",
+        "python scripts/backlog_publish_plan.py --new-draft",
         "docs/PUBLIC_TOUR_FEEDBACK.md",
         "docs/TRACKING.md",
     ]:
@@ -567,6 +570,7 @@ def test_tracking_snapshot_records_current_issue_state_and_publish_guard() -> No
         "All current GitHub issues are closed",
         "There is no `.github/backlog` directory",
         "no current publishable local issue draft",
+        "python scripts/backlog_publish_plan.py --new-draft",
         "python scripts/backlog_publish_plan.py --json",
         "explicit human approval",
         "Commit and push the implementation branch",
