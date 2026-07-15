@@ -203,6 +203,7 @@ INGEST_SCHEMA_VERSION = "codex-observe.ingest.v1"
 EVIDENCE_BUNDLE_SCHEMA_VERSION = "codex-observe.evidence-bundle.v1"
 PATHS_SCHEMA_VERSION = "codex-observe.paths.v1"
 PRIVATE_VALIDATE_SCHEMA_VERSION = "codex-observe.private-validate.v1"
+SELF_CHECK_SCHEMA_VERSION = "codex-observe.self-check.v1"
 RELEASE_REQUIRED_FILES = [
     "README.md",
     "LICENSE",
@@ -220,6 +221,7 @@ RELEASE_REQUIRED_COMMANDS = [
     "ruff check",
     "ruff format --check",
     "pytest -q",
+    "codex-observe self-check --json",
     "codex-observe paths --json",
     "python scripts/clean_install_smoke.py --extra dev",
     "codex-observe demo --sessions .artifacts/demo/sessions --keep-sessions --json",
@@ -2648,6 +2650,39 @@ def release_audit_report(
     except OSError as exc:
         add("CLI version command", False, str(exc))
 
+    self_check = self_check_payload()
+    self_check_checks = self_check.get("checks", [])
+    self_check_ok = (
+        self_check.get("schema_version") == SELF_CHECK_SCHEMA_VERSION
+        and self_check.get("status") == "ok"
+        and self_check.get("privacy", {}).get("raw_content_included") is False
+        and self_check.get("privacy", {}).get("scans_sessions") is False
+        and isinstance(self_check_checks, list)
+        and {
+            str(check.get("name"))
+            for check in self_check_checks
+            if isinstance(check, dict)
+        }
+        == {"python", "package_version", "dashboard_module"}
+        and isinstance(self_check.get("next_commands"), list)
+        and any(
+            "codex-observe tour" in str(command)
+            for command in self_check.get("next_commands", [])
+        )
+        and any(
+            "private-validate" in str(command)
+            for command in self_check.get("next_commands", [])
+        )
+        and "sessions" not in self_check
+        and "counts" not in self_check
+    )
+    add(
+        "source install self-check",
+        self_check_ok,
+        "schema, supported runtime, package version, dashboard module, privacy metadata, and next commands verified"
+        if self_check_ok
+        else "self-check schema, runtime, package version, dashboard module, privacy metadata, next commands, or privacy-safe payload missing",
+    )
     paths_payload_check = paths_payload(
         db_path=actual_db_path, sessions_path=sessions_path
     )
@@ -3794,6 +3829,67 @@ def _command_arg(path: Path | str) -> str:
     return shlex.quote(value)
 
 
+def supported_python() -> bool:
+    return (3, 10) <= sys.version_info[:2] <= (3, 12)
+
+
+def self_check_payload() -> dict[str, object]:
+    dashboard_path = Path(__file__).with_name("dashboard.py")
+    checks = [
+        {
+            "name": "python",
+            "ok": supported_python(),
+            "detail": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+        },
+        {
+            "name": "package_version",
+            "ok": bool(__version__),
+            "detail": f"codex-observe {__version__}",
+        },
+        {
+            "name": "dashboard_module",
+            "ok": dashboard_path.exists(),
+            "detail": "dashboard.py available"
+            if dashboard_path.exists()
+            else "dashboard.py missing",
+        },
+    ]
+    ok = all(bool(check["ok"]) for check in checks)
+    return {
+        "schema_version": SELF_CHECK_SCHEMA_VERSION,
+        "status": "ok" if ok else "failed",
+        "checks": checks,
+        "privacy": {
+            "raw_content_included": False,
+            "scans_sessions": False,
+            "review_required_before_sharing": False,
+        },
+        "next_commands": [
+            "codex-observe tour",
+            "codex-observe demo --serve --host 127.0.0.1 --port 8501",
+            "codex-observe paths",
+            "codex-observe private-validate ~/.codex/sessions --serve --host 127.0.0.1 --port 8501",
+        ],
+        "next": "run the demo tour first, then use private-validate when you are ready to inspect local Codex history.",
+    }
+
+
+def self_check_lines(payload: dict[str, object]) -> list[str]:
+    lines = [
+        f"Install check: {payload['status']}",
+        "Privacy: this command does not scan sessions or print local paths, prompts, tool output, session IDs, or aggregate metrics.",
+        "Checks:",
+    ]
+    for check in payload.get("checks", []):
+        if not isinstance(check, dict):
+            continue
+        marker = "OK" if check.get("ok") else "FAIL"
+        lines.append(f"- [{marker}] {check.get('name')}: {check.get('detail')}")
+    lines.append("Next commands:")
+    lines.extend(f"- {command}" for command in payload.get("next_commands", []))
+    return lines
+
+
 def paths_payload(db_path: str | None = None, sessions_path: str | None = None) -> dict:
     sessions = (
         Path(sessions_path).expanduser() if sessions_path else default_sessions_path()
@@ -4823,6 +4919,19 @@ def main(argv: list[str] | None = None) -> int:
         "--json", action="store_true", help="Emit the tour as schema-versioned JSON"
     )
 
+    p_self = sub.add_parser(
+        "self-check",
+        help="Verify the local source install without scanning private logs",
+        description=(
+            "Check the installed command, supported Python runtime, dashboard module, "
+            "and next commands without reading Codex session logs."
+        ),
+    )
+    p_self.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit source-install check status as schema-versioned JSON",
+    )
     p_paths = sub.add_parser(
         "paths",
         help="Show local default paths and private validation commands",
@@ -5119,6 +5228,13 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print("\n".join(public_tour_lines(args.db)))
         return 0
+    if args.cmd == "self-check":
+        payload = self_check_payload()
+        if args.json:
+            print(json.dumps(payload, indent=2, sort_keys=True))
+        else:
+            print("\n".join(self_check_lines(payload)))
+        return 0 if payload.get("status") == "ok" else 1
     if args.cmd == "paths":
         if args.json:
             print(

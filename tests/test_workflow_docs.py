@@ -155,6 +155,7 @@ def test_current_state_handoff_covers_gates_evidence_and_real_log_checkpoint() -
         "ruff check",
         "ruff format --check",
         "pytest -q",
+        "codex-observe self-check --json",
         "codex-observe paths --json",
         "codex-observe audit --json",
         "aggregate triage assessment",
@@ -266,6 +267,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         ".github/ISSUE_TEMPLATE/public_tour_feedback.yml",
         "docs/TRACKING.md",
         "codex-observe evidence-bundle --out .artifacts/public-evidence",
+        "codex-observe self-check --json",
         "codex-observe paths --json",
         "codex-observe audit --json",
         "events.payload_json",
@@ -383,6 +385,8 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         in release
     )
     assert "required_commands" in release
+    assert "codex-observe self-check --json" in release
+    assert "codex-observe.self-check.v1" in release
     assert "private-sharing review metadata" in release
     assert "text privacy-warning evidence" in release
     assert "terminal privacy warning" in release
@@ -403,6 +407,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
     assert "git status --short --branch" in release
     for required_distribution_item in [
         "codex-observe evidence-bundle --out .artifacts/public-evidence",
+        "codex-observe self-check --json",
         "codex-observe paths --json",
         "codex-observe audit --json",
         "run-report.json",
@@ -427,6 +432,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         "PR checklist guidance",
         "session-listing next-run target previews",
         "codex-observe paths --json",
+        "codex-observe self-check",
         "private-validate",
     ]:
         assert required_changelog_item in changelog

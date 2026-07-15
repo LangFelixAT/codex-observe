@@ -17,6 +17,44 @@ def dashboard_path() -> str:
     return str(Path(cli.__file__).with_name("dashboard.py"))
 
 
+def test_self_check_payload_is_privacy_safe() -> None:
+    payload = cli.self_check_payload()
+
+    assert payload["schema_version"] == "codex-observe.self-check.v1"
+    assert payload["status"] == "ok"
+    assert payload["privacy"] == {
+        "raw_content_included": False,
+        "scans_sessions": False,
+        "review_required_before_sharing": False,
+    }
+    assert {check["name"] for check in payload["checks"]} == {
+        "python",
+        "package_version",
+        "dashboard_module",
+    }
+    assert "sessions" not in payload
+    assert "counts" not in payload
+    assert any("codex-observe tour" in item for item in payload["next_commands"])
+    assert any("private-validate" in item for item in payload["next_commands"])
+
+
+def test_self_check_cli_text_and_json(capsys) -> None:
+    result = cli.main(["self-check"])
+
+    assert result == 0
+    text_output = capsys.readouterr().out
+    assert "Install check: ok" in text_output
+    assert "Privacy: this command does not scan sessions" in text_output
+    assert "codex-observe demo --serve" in text_output
+
+    result = cli.main(["self-check", "--json"])
+
+    assert result == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["schema_version"] == "codex-observe.self-check.v1"
+    assert payload["privacy"]["scans_sessions"] is False
+
+
 def test_private_validate_writes_ignored_private_artifacts(tmp_path: Path) -> None:
     sessions = tmp_path / "sessions"
     create_demo_database(tmp_path / "source.sqlite", sessions, keep_sessions=True)
@@ -892,6 +930,10 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     assert "success target" in checks["aggregate report"]["detail"]
     assert checks["aggregate comparison"]["ok"] is True
     assert "usage-snapshot deltas" in checks["aggregate comparison"]["detail"]
+    assert checks["source install self-check"]["ok"] is True
+    assert checks["source install self-check"]["detail"] == (
+        "schema, supported runtime, package version, dashboard module, privacy metadata, and next commands verified"
+    )
     assert checks["paths handoff"]["ok"] is True
     assert checks["paths handoff"]["detail"] == (
         "schema, existence checks, privacy no-scan metadata, sampled ingest command, review path, and text handoff verified"

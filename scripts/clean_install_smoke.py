@@ -95,6 +95,7 @@ def smoke_commands(paths: SmokePaths, extra: str) -> list[list[str]]:
         [str(paths.python), "-m", "pip", "install", "--upgrade", "pip"],
         [str(paths.python), "-m", "pip", "install", "-e", install_target(extra)],
         [str(paths.codex_observe), "--version"],
+        [str(paths.codex_observe), "self-check", "--json"],
         [
             str(paths.codex_observe),
             "demo",

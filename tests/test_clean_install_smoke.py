@@ -91,6 +91,10 @@ def test_smoke_commands_verify_console_script_demo_audit_bundle_and_imports(
         "codex-observe" in command and "--version" in command for command in flattened
     )
     assert any(
+        "codex-observe" in command and " self-check " in command and "--json" in command
+        for command in flattened
+    )
+    assert any(
         "codex-observe" in command and " demo " in command for command in flattened
     )
     assert any(

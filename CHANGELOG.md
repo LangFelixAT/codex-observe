@@ -6,6 +6,7 @@ The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
 
+- Added `codex-observe self-check` for no-scan source-install verification and wired it into release audit plus clean-install smoke coverage.
 - Added release-audit coverage for the synthetic `private-validate` handoff so bounded real-session validation stays schema-versioned, privacy-safe, and dashboard-ready.
 - Added `codex-observe private-validate` to run the bounded real-session validation loop into ignored private artifacts with privacy-safe terminal and JSON status, plus `--serve` for opening the validated private dashboard in one command.
 - Added a validated local backlog draft scaffold command so fresh demoable GitHub issue candidates start with tests, visual QA, privacy review, and approval-gate metadata.

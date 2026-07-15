@@ -8,6 +8,7 @@ Codex Observe is currently distributed as a source checkout with an editable loc
 git clone https://github.com/LangFelixAT/codex-observe.git
 cd codex-observe
 python -m pip install -e .
+codex-observe self-check
 ```
 
 For visual QA and screenshot verification only, the visual extra installs Playwright and Pillow:
@@ -25,7 +26,7 @@ python -m playwright install chromium
 ```
 
 
-To prove the source checkout works from a fresh virtual environment without touching private Codex logs, run the clean-install smoke gate:
+To prove the source checkout works from a fresh virtual environment without touching private Codex logs, run the clean-install smoke gate. The smoke gate verifies `codex-observe self-check --json` as part of the installed console-script contract:
 
 ```bash
 python scripts/clean_install_smoke.py --extra dev
@@ -67,12 +68,13 @@ The local `sample_from_uploaded.sqlite` file is treated as a private local artif
 
 A source-distribution release candidate is ready when:
 
-- `python scripts/clean_install_smoke.py --extra dev` succeeds and verifies the reviewer evidence bundle README, manifest, limitations doc, and feedback issue template.
+- `python scripts/clean_install_smoke.py --extra dev` succeeds and verifies `codex-observe self-check --json`, the reviewer evidence bundle README, manifest, limitations doc, and feedback issue template.
 - `codex-observe evidence-bundle --out .artifacts/public-evidence` creates a synthetic reviewer bundle.
 - `codex-observe audit --json` passes after the public evidence bundle exists.
 - `ruff check` passes.
 - `ruff format --check` passes.
 - `pytest -q` passes.
+- `codex-observe self-check --json` verifies source-install health without scanning private logs.
 - `codex-observe paths --json` verifies the local path handoff without scanning private logs.
 - `codex-observe demo` creates the synthetic database.
 - `codex-observe doctor --db .artifacts/demo/codex_observe_demo.sqlite --json` returns `status: ok`.
