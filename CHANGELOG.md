@@ -6,6 +6,7 @@ The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
 
+- Carried ingest-scope metadata into comparison JSON, Markdown, terminal confirmations, and release-audit checks so sampled report deltas remain labeled.
 - Carried persisted ingest-scope metadata into report JSON, Markdown, and terminal confirmations so sampled evidence remains labeled after export.
 - Added persisted ingest-scope metadata so doctor and sessions warn when a database was built from a bounded newest-file sample.
 - Fixed session-listing target previews so private real-session recommendations skip already-satisfied drivers, rank actionable targets by impact, and stay aligned with report recommendations.

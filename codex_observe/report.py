@@ -1450,6 +1450,7 @@ def compare_reports(
             ],
         },
     }
+    comparison["ingest_scope"] = comparison_ingest_scope(before_report, after_report)
     comparison["headline"] = comparison_headline(comparison)
     comparison["recommendation_detail"] = comparison_recommendation_detail(comparison)
     comparison["recommendation"] = comparison_recommendation(comparison)
@@ -1457,6 +1458,42 @@ def compare_reports(
     comparison["review_path"] = comparison_review_path(comparison)
     comparison["feedback_handoff"] = aggregate_feedback_handoff()
     return comparison
+
+
+def comparison_ingest_scope(
+    before_report: dict[str, Any], after_report: dict[str, Any]
+) -> dict[str, Any] | None:
+    before_scope = before_report.get("ingest_scope")
+    after_scope = after_report.get("ingest_scope")
+    if not isinstance(before_scope, dict) and not isinstance(after_scope, dict):
+        return None
+
+    before_sampled = (
+        isinstance(before_scope, dict) and before_scope.get("sampled") is True
+    )
+    after_sampled = isinstance(after_scope, dict) and after_scope.get("sampled") is True
+    sampled = before_sampled or after_sampled
+    warning = None
+    if sampled:
+        warning = (
+            "Sampled ingest: at least one comparison input came from a bounded "
+            "newest-file sample; treat comparison deltas as sampled evidence."
+        )
+    return {
+        "before": before_scope if isinstance(before_scope, dict) else None,
+        "after": after_scope if isinstance(after_scope, dict) else None,
+        "sampled": sampled,
+        "warning": warning,
+    }
+
+
+def comparison_ingest_scope_markdown_lines(scope: object) -> list[str]:
+    if not isinstance(scope, dict):
+        return []
+    warning = scope.get("warning")
+    if not isinstance(warning, str) or not warning:
+        return []
+    return ["## Ingest Scope", "", f"- {warning}", ""]
 
 
 def load_report_json(path: str) -> dict[str, Any]:
@@ -1488,6 +1525,7 @@ def comparison_markdown(comparison: dict[str, Any]) -> str:
         "",
         "Privacy: aggregate-only comparison. Message text, prompt block previews, event payload JSON, tool arguments, tool commands, and tool output are excluded.",
         "",
+        *comparison_ingest_scope_markdown_lines(comparison.get("ingest_scope")),
         "## Sessions",
         "",
         f"- Before: `{before.get('session_id', 'unknown')}`",

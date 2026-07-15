@@ -2472,6 +2472,17 @@ def release_audit_report(
             and comparison_json_out.exists()
             and comparison_json_out.stat().st_size > 0
             and comparison_payload.get("schema_version") == COMPARISON_SCHEMA_VERSION
+            and comparison_payload.get("ingest_scope", {}).get("sampled") is False
+            and comparison_payload.get("ingest_scope", {})
+            .get("before", {})
+            .get("scan_limit", {})
+            .get("mode")
+            == "all"
+            and comparison_payload.get("ingest_scope", {})
+            .get("after", {})
+            .get("scan_limit", {})
+            .get("mode")
+            == "all"
             and "## Quick Read" in comparison_markdown_text
             and "Verdict: unchanged" in comparison_markdown_text
             and "## Recommended Action" in comparison_markdown_text
@@ -2506,13 +2517,14 @@ def release_audit_report(
             and '"review_path"' in comparison_json_text
             and '"feedback_handoff"' in comparison_json_text
             and '"opportunity_change"' in comparison_json_text
+            and '"ingest_scope"' in comparison_json_text
             and comparison_payload.get("opportunity_change", {}).get("summary")
             and '"delta_pct"' in comparison_json_text
         )
         add(
             "aggregate comparison",
             comparison_has_quick_read,
-            f"{comparison_out}; {comparison_json_out}; quick read, recommended action, triage risk, usage-snapshot deltas, opportunity change, terminal validation command, terminal privacy warning, terminal next commands, structured recommendation, review path, feedback handoff, follow-up commands, and schema verified",
+            f"{comparison_out}; {comparison_json_out}; quick read, recommended action, triage risk, usage-snapshot deltas, opportunity change, terminal validation command, terminal privacy warning, terminal next commands, structured recommendation, review path, feedback handoff, follow-up commands, ingest scope, and schema verified",
         )
     except (FileNotFoundError, ValueError, KeyError) as exc:
         add("aggregate report", False, str(exc))
@@ -3784,6 +3796,7 @@ def comparison_written_lines(path: Path, comparison: dict) -> list[str]:
     ]
     if opportunity_summary:
         lines.append(f"Opportunity change: {opportunity_summary}")
+    lines.extend(ingest_scope_lines(comparison.get("ingest_scope")))
     lines.append(f"Next step: {recommendation}")
     templates = comparison.get("next_command_templates", [])
     if isinstance(templates, list) and templates:

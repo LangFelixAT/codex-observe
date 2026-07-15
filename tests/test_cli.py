@@ -1197,6 +1197,35 @@ def test_doctor_and_sessions_expose_sampled_ingest_scope(
         "Sampled ingest: newest-file limit 2 selected 2 of 3"
         in report_path.read_text(encoding="utf-8")
     )
+    comparison = cli.compare_reports(report, report)
+    assert comparison["ingest_scope"]["sampled"] is True
+    assert "Sampled ingest" in comparison["ingest_scope"]["warning"]
+    comparison_markdown = cli.comparison_markdown(comparison)
+    comparison_payload = json.loads(cli.comparison_json(comparison))
+    assert "## Ingest Scope" in comparison_markdown
+    assert "treat comparison deltas as sampled evidence" in comparison_markdown
+    assert comparison_payload["ingest_scope"]["sampled"] is True
+    comparison_path = tmp_path / "sampled-comparison.json"
+    assert (
+        cli.main(
+            [
+                "compare",
+                "--before-report",
+                str(report_path),
+                "--after-report",
+                str(report_path),
+                "--format",
+                "json",
+                "--out",
+                str(comparison_path),
+            ]
+        )
+        == 0
+    )
+    comparison_output = capsys.readouterr().out
+    assert "Ingest scope: Sampled ingest" in comparison_output
+    assert "Sampled ingest" in comparison_path.read_text(encoding="utf-8")
+    assert str(sessions) not in comparison_output
     assert str(sessions) not in json.dumps(scope)
     assert str(sessions) not in plain_sessions
     assert str(sessions) not in report_output
