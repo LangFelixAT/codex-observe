@@ -5,6 +5,7 @@ All notable changes to Codex Observe will be documented here.
 The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
+- Made `codex-observe private-validate` rebuild its ignored private SQLite database from scratch so bounded real-log samples do not inherit stale full-history rows.
 - Added a dashboard sidebar Risk filter so large histories can be narrowed visually by aggregate triage band while preserving the Overview context.
 - Added `codex-observe sessions --risk high|medium|low|unknown` so large histories can be narrowed by aggregate triage band while preserving full risk-distribution context.
 - Hardened `python scripts/visual_qa.py` port handling so default local runs avoid stale Streamlit servers and explicit port conflicts fail clearly.

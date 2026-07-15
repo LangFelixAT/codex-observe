@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import shlex
+import sqlite3
 
 import sys
 from types import SimpleNamespace
@@ -164,6 +165,34 @@ def test_private_validate_cli_json_is_privacy_safe(tmp_path: Path, capsys) -> No
     assert payload["visual_qa"]["raw_content_included"] is False
     assert payload["visual_qa"]["review_required_before_sharing"] is True
     assert "--profile real" in payload["visual_qa"]["command"]
+
+
+def test_private_validate_starts_from_fresh_private_database(tmp_path: Path) -> None:
+    sessions = tmp_path / "sessions"
+    create_demo_database(tmp_path / "source.sqlite", sessions, keep_sessions=True)
+    output_dir = tmp_path / "private"
+    output_dir.mkdir()
+    stale_db = output_dir / "real-sessions.sqlite"
+    conn = sqlite3.connect(stale_db)
+    try:
+        conn.execute("CREATE TABLE stale_marker(value TEXT)")
+        conn.commit()
+    finally:
+        conn.close()
+    (output_dir / "real-sessions.sqlite-wal").write_text("stale", encoding="utf-8")
+    (output_dir / "real-sessions.sqlite-shm").write_text("stale", encoding="utf-8")
+
+    status, payload = cli.private_validate_payload(
+        str(sessions), output_dir=output_dir, newest_files=25
+    )
+
+    assert status == 0
+    assert payload["status"] == "ok"
+    with sqlite3.connect(stale_db) as conn:
+        stale_table = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='stale_marker'"
+        ).fetchone()
+    assert stale_table is None
 
 
 def test_private_validate_visual_runs_real_profile_visual_qa(

@@ -4112,6 +4112,16 @@ def private_artifact_label(path: Path) -> str:
         return path.name
 
 
+def reset_private_database(database: Path) -> None:
+    for candidate in [
+        database,
+        database.with_name(f"{database.name}-wal"),
+        database.with_name(f"{database.name}-shm"),
+    ]:
+        if candidate.exists():
+            candidate.unlink()
+
+
 def private_visual_qa_args(database: Path, output_dir: Path) -> list[str]:
     return [
         sys.executable,
@@ -4194,6 +4204,7 @@ def private_validate_payload(
     error = ""
     report_written = False
     try:
+        reset_private_database(artifacts["database"])
         result = ingest(sessions, db_path, newest_files=newest_files)
         ingest_payload = ingest_success_payload(sessions, db_path, result)
         artifacts["ingest_json"].write_text(
