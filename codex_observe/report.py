@@ -253,19 +253,25 @@ def session_success_target_preview(recommended: dict[str, Any]) -> dict[str, Any
     repeated = float(recommended.get("repeated_prompt_share_pct") or 0)
     uncached = float(recommended.get("uncached_input_share_pct") or 0)
     tool_chars = _safe_int(recommended.get("largest_tool_output_chars"))
+    total_tokens = _safe_int(recommended.get("total_tokens"))
+    largest_thread_tokens = int(total_tokens * largest_thread / 100)
+    repeated_tokens = int(total_tokens * repeated / 100)
+    uncached_tokens = _safe_int(recommended.get("uncached_input_tokens")) or int(
+        total_tokens * uncached / 100
+    )
     actionable_drivers = [
-        ("Largest thread", largest_thread - 50.0),
-        ("Repeated prompt blocks", repeated - 15.0),
-        ("Uncached input", uncached - 35.0),
-        ("Largest tool output", (tool_chars - 5_000) / 4_000),
+        ("Largest thread", largest_thread > 50.0, largest_thread_tokens),
+        ("Repeated prompt blocks", repeated > 15.0, repeated_tokens),
+        ("Uncached input", uncached > 35.0, uncached_tokens),
+        ("Largest tool output", tool_chars > 5_000, tool_chars / 4),
     ]
     driver = next(
         (
             candidate
-            for candidate, overage in sorted(
-                actionable_drivers, key=lambda item: item[1], reverse=True
+            for candidate, _actionable, _impact in sorted(
+                actionable_drivers, key=lambda item: item[2], reverse=True
             )
-            if overage > 0
+            if _actionable
         ),
         "",
     )

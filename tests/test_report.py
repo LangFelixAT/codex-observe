@@ -352,15 +352,15 @@ def test_session_success_target_preview_skips_satisfied_uncached_target() -> Non
     )
 
     assert preview == {
-        "action": "Narrow commands before large tool output enters context",
-        "current": "40.1k chars",
-        "current_value": 40097,
+        "action": "Set a stop condition for the dominant thread",
+        "current": "56.7%",
+        "current_value": 56.7,
         "direction": "lower_is_better",
-        "driver": "Largest tool output",
-        "metric": "largest_tool_output_chars",
-        "target": "below 5.0k chars",
-        "target_value": 5000,
-        "unit": "chars",
+        "driver": "Largest thread",
+        "metric": "largest_thread_share_pct",
+        "target": "below 50.0%",
+        "target_value": 50.0,
+        "unit": "percent_of_run",
     }
     assert preview["target_value"] < preview["current_value"]
 
