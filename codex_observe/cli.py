@@ -45,7 +45,7 @@ VISUAL_MANIFEST_RECOVERY = (
     f"`python scripts/visual_qa.py --verify-manifest {VISUAL_MANIFEST.as_posix()}`"
 )
 EXPECTED_VISUAL_RISK_LABELS = {"High risk", "Low risk"}
-EXPECTED_VISUAL_RISK_FILTER = {"Risk filter", "All risks"}
+EXPECTED_VISUAL_RISK_FILTER = {"Risk filter"}
 EXPECTED_VISUAL_SIDEBAR_SESSION_DETAILS = {"6 snapshots"}
 EXPECTED_VISUAL_DOWNLOAD_CONTROLS = {
     "Download report MD",

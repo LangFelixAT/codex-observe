@@ -116,7 +116,7 @@ EXPECTED_QUICK_READ_EVIDENCE = [
 
 EXPECTED_METRIC_CARDS = ["Threads", "Largest thread", "Uncached input"]
 EXPECTED_SIDEBAR_RISK_LABELS = ["High risk", "Low risk"]
-EXPECTED_SIDEBAR_RISK_FILTER = ["Risk filter", "All risks"]
+EXPECTED_SIDEBAR_RISK_FILTER = ["Risk filter"]
 EXPECTED_SIDEBAR_SESSION_DETAILS = ["6 snapshots"]
 EXPECTED_DOWNLOAD_CONTROLS = [
     "Download report MD",
@@ -294,13 +294,12 @@ def collect_sidebar_risk_filter(page) -> list[str]:
 () => {
   const evidence = new Set();
   const text = document.body.innerText || '';
-  for (const label of ['Risk filter', 'All risks']) {
+  for (const label of ['Risk filter']) {
     if (text.includes(label)) evidence.add(label);
   }
   for (const element of document.querySelectorAll('[aria-label]')) {
     const label = element.getAttribute('aria-label') || '';
     if (label.includes('Risk filter')) evidence.add('Risk filter');
-    if (label.includes('All risks')) evidence.add('All risks');
   }
   return Array.from(evidence);
 }

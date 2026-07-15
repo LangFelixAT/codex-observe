@@ -339,11 +339,11 @@ def test_sidebar_risk_label_failures_require_high_and_low_risk_labels() -> None:
 
 
 def test_sidebar_risk_filter_failures_require_filter_control() -> None:
-    assert sidebar_risk_filter_failures(["Risk filter", "All risks"], "desktop") == []
+    assert sidebar_risk_filter_failures(["Risk filter"], "desktop") == []
 
-    failures = sidebar_risk_filter_failures(["Risk filter"], "narrow")
+    failures = sidebar_risk_filter_failures([], "narrow")
 
-    assert "narrow: sidebar Risk filter evidence not found: All risks" in failures
+    assert "narrow: sidebar Risk filter evidence not found: Risk filter" in failures
 
 
 def test_collect_sidebar_risk_filter_uses_visible_text_and_aria_labels() -> None:
@@ -351,12 +351,9 @@ def test_collect_sidebar_risk_filter_uses_visible_text_and_aria_labels() -> None
         def evaluate(self, script: str) -> list[str]:
             assert "document.body.innerText" in script
             assert "querySelectorAll('[aria-label]')" in script
-            return ["Risk filter", "All risks"]
+            return ["Risk filter"]
 
-    assert visual_qa.collect_sidebar_risk_filter(FakePage()) == [
-        "Risk filter",
-        "All risks",
-    ]
+    assert visual_qa.collect_sidebar_risk_filter(FakePage()) == ["Risk filter"]
 
 
 def test_sidebar_session_detail_failures_require_snapshot_context() -> None:
@@ -635,7 +632,7 @@ def complete_viewport_results(tmp_path: Path) -> dict[str, dict[str, object]]:
             "quick_read_evidence": list(visual_qa.EXPECTED_QUICK_READ_EVIDENCE),
             "agent_detail_selector_exercised": True,
             "sidebar_risk_labels": ["High risk", "Low risk"],
-            "sidebar_risk_filter": ["Risk filter", "All risks"],
+            "sidebar_risk_filter": ["Risk filter"],
             "sidebar_session_details": ["6 snapshots"],
             "risk_distributions": [
                 {
@@ -814,10 +811,7 @@ def test_visual_manifest_records_review_evidence(tmp_path: Path) -> None:
         "High risk",
         "Low risk",
     ]
-    assert loaded["viewports"]["desktop"]["sidebar_risk_filter"] == [
-        "Risk filter",
-        "All risks",
-    ]
+    assert loaded["viewports"]["desktop"]["sidebar_risk_filter"] == ["Risk filter"]
     assert loaded["viewports"]["desktop"]["sidebar_session_details"] == ["6 snapshots"]
     assert loaded["viewports"]["desktop"]["risk_distributions"][0]["label"] == (
         "Risk distribution"

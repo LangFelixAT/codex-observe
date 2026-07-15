@@ -756,7 +756,7 @@ def test_visual_manifest_evidence_rejects_stale_minimal_manifest_shape(
                 "viewports": {
                     name: {
                         "sidebar_risk_labels": ["High risk", "Low risk"],
-                        "sidebar_risk_filter": ["All risks", "Risk filter"],
+                        "sidebar_risk_filter": ["Risk filter"],
                         "sidebar_session_details": ["6 snapshots"],
                         "metric_cards": [
                             {"label": label, "value": value}
