@@ -2760,6 +2760,11 @@ def release_audit_report(
         and any(
             "report and comparison download controls" in item for item in tour_evidence
         )
+        and any("next-run validation, compare" in item for item in tour_evidence)
+        and any(
+            "baseline Markdown, baseline JSON, next-run JSON" in item
+            for item in tour_success_checks
+        )
         and all(
             any(expected in item for item in tour_evidence)
             for expected in EXPECTED_TOUR_QUICK_READ_TEXT
@@ -2771,9 +2776,9 @@ def release_audit_report(
     add(
         "public tour JSON",
         tour_ok,
-        "schema, privacy, database, evidence bundle, recommended-action evidence, terminal handoff evidence, terminal validation evidence, dashboard quick-read, sampled-scope, and comparison review-path evidence, top-level review path, terminal feedback handoff, text next commands, per-step success checks, and next commands verified"
+        "schema, privacy, database, evidence bundle, recommended-action evidence, terminal handoff evidence, terminal validation evidence, dashboard quick-read, sampled-scope, session validation-loop evidence, and comparison review-path evidence, top-level review path, terminal feedback handoff, text next commands, per-step success checks, and next commands verified"
         if tour_ok
-        else "tour JSON schema_version, privacy, database, evidence bundle key findings, recommended-action evidence, terminal handoff evidence, terminal validation evidence, dashboard quick-read evidence, sampled-scope evidence, comparison review-path evidence, comparison metric delta evidence, report/comparison-download evidence, feedback evidence, top-level review_path, terminal feedback_handoff, text next commands, per-step success checks, or next_commands missing",
+        else "tour JSON schema_version, privacy, database, evidence bundle key findings, recommended-action evidence, terminal handoff evidence, terminal validation evidence, dashboard quick-read evidence, sampled-scope evidence, session validation-loop evidence, comparison review-path evidence, comparison metric delta evidence, report/comparison-download evidence, feedback evidence, top-level review_path, terminal feedback_handoff, text next commands, per-step success checks, or next_commands missing",
     )
 
     ignore_failures = private_artifact_ignore_failures(root)
