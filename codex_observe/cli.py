@@ -271,13 +271,47 @@ def doctor_next_commands(db: Path, status: str) -> list[str]:
     return []
 
 
-def ingest_scope_lines(scope: object) -> list[str]:
+def sampled_ingest_next_command(scope: dict[str, object], db_path: Path | str) -> str:
+    counts = scope.get("counts")
+    scan_limit = scope.get("scan_limit")
+    if not isinstance(counts, dict) or not isinstance(scan_limit, dict):
+        return f"codex-observe ingest ~/.codex/sessions --db {_command_arg(db_path)}"
+    matched = int(counts.get("files_matched") or 0)
+    seen = int(counts.get("files_seen") or 0)
+    newest_files = int(scan_limit.get("newest_files") or seen or 1)
+    next_limit = min(matched, max(newest_files + 1, newest_files * 2))
+    if matched and next_limit > newest_files:
+        return (
+            "codex-observe ingest ~/.codex/sessions "
+            f"--newest-files {next_limit} --db {_command_arg(db_path)}"
+        )
+    return f"codex-observe ingest ~/.codex/sessions --db {_command_arg(db_path)}"
+
+
+def ingest_scope_lines(scope: object, db_path: Path | str | None = None) -> list[str]:
     if not isinstance(scope, dict):
         return []
     lines = []
     warning = scope.get("warning")
     if isinstance(warning, str) and warning:
         lines.append(f"Ingest scope: {warning}")
+    if scope.get("sampled") is not True:
+        return lines
+    counts = scope.get("counts")
+    if isinstance(counts, dict):
+        matched = int(counts.get("files_matched") or 0)
+        seen = int(counts.get("files_seen") or 0)
+        deferred = int(counts.get("files_skipped_by_limit") or 0)
+        coverage = round(seen / matched * 100, 1) if matched > 0 else 0.0
+        lines.append(
+            "Sample coverage: "
+            f"{seen} of {matched} matched files processed ({coverage:.1f}%); "
+            f"{deferred} deferred."
+        )
+    if db_path is not None:
+        lines.append(
+            f"Next sample command: {sampled_ingest_next_command(scope, db_path)}"
+        )
     return lines
 
 
@@ -458,7 +492,7 @@ def doctor_lines(db_path: str) -> tuple[int, list[str]]:
     if report["status"] == "ok":
         for table in DOCTOR_TABLES:
             lines.append(f"{table}: {report['tables'][table]}")
-        lines.extend(ingest_scope_lines(report.get("ingest_scope")))
+        lines.extend(ingest_scope_lines(report.get("ingest_scope"), db_path))
         lines.extend(
             [
                 f"total_tokens: {report['totals']['total_tokens']}",
@@ -2276,7 +2310,9 @@ def release_audit_report(
         report_payload = json.loads(report_json_text)
         summary = report.get("summary", {})
         triage = report.get("triage", {})
-        report_written_text = "\n".join(report_written_lines(out_path, report))
+        report_written_text = "\n".join(
+            report_written_lines(out_path, report, actual_db_path)
+        )
         report_confirmation_has_success_target = (
             "Success target:" in report_written_text
             and "Privacy: review private reports before sharing" in report_written_text
@@ -3853,7 +3889,9 @@ def report_failure_payload(
     }
 
 
-def report_written_lines(path: Path, report: dict) -> list[str]:
+def report_written_lines(
+    path: Path, report: dict, db_path: Path | str | None = None
+) -> list[str]:
     triage = report.get("triage", {})
     risk = str(triage.get("risk_level") or "unknown")
     driver = str(triage.get("primary_driver") or "No high-signal diagnostic")
@@ -3872,7 +3910,7 @@ def report_written_lines(path: Path, report: dict) -> list[str]:
         f"Wrote aggregate-only report: {path}",
         "Privacy: review private reports before sharing; aggregate metrics can still reveal workflow clues.",
     ]
-    lines.extend(ingest_scope_lines(report.get("ingest_scope")))
+    lines.extend(ingest_scope_lines(report.get("ingest_scope"), db_path))
     lines.append(f"Triage: {risk} risk; {driver}")
     if opportunity_line:
         lines.append(opportunity_line)
@@ -4872,7 +4910,7 @@ def main(argv: list[str] | None = None) -> int:
                     )
                 )
             else:
-                lines = ingest_scope_lines(latest_ingest_scope(args.db))
+                lines = ingest_scope_lines(latest_ingest_scope(args.db), args.db)
                 lines.extend(session_summary_lines(args.db, limit=args.limit))
                 print("\n".join(lines))
         except FileNotFoundError:
@@ -5045,7 +5083,7 @@ def main(argv: list[str] | None = None) -> int:
             out_path = Path(args.out).expanduser()
             out_path.parent.mkdir(parents=True, exist_ok=True)
             out_path.write_text(output, encoding="utf-8")
-            print("\n".join(report_written_lines(out_path, report)))
+            print("\n".join(report_written_lines(out_path, report, args.db)))
         else:
             print(output)
         return 0

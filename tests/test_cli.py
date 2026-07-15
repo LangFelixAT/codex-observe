@@ -1220,11 +1220,28 @@ def test_doctor_and_sessions_expose_sampled_ingest_scope(
     assert "Sampled ingest: newest-file limit 2 selected 2 of 3" in scope["warning"]
     assert "sessions, reports, comparisons, and dashboard views" in scope["warning"]
     assert "Ingest scope: Sampled ingest" in "\n".join(lines)
+    doctor_text = "\n".join(lines)
+    assert (
+        "Sample coverage: 2 of 3 matched files processed (66.7%); 1 deferred."
+        in doctor_text
+    )
+    assert (
+        f"Next sample command: codex-observe ingest ~/.codex/sessions --newest-files 3 --db {db}"
+        in doctor_text
+    )
     assert sessions_payload["ingest_scope"] == scope
 
     assert cli.main(["sessions", "--db", str(db), "--limit", "1"]) == 0
     plain_sessions = capsys.readouterr().out
     assert "Ingest scope: Sampled ingest" in plain_sessions
+    assert (
+        "Sample coverage: 2 of 3 matched files processed (66.7%); 1 deferred."
+        in plain_sessions
+    )
+    assert (
+        f"Next sample command: codex-observe ingest ~/.codex/sessions --newest-files 3 --db {db}"
+        in plain_sessions
+    )
     assert "Showing 1 of 2 sessions." in plain_sessions
 
     report = cli.build_report(str(db))
@@ -1244,6 +1261,14 @@ def test_doctor_and_sessions_expose_sampled_ingest_scope(
     )
     report_output = capsys.readouterr().out
     assert "Ingest scope: Sampled ingest" in report_output
+    assert (
+        "Sample coverage: 2 of 3 matched files processed (66.7%); 1 deferred."
+        in report_output
+    )
+    assert (
+        f"Next sample command: codex-observe ingest ~/.codex/sessions --newest-files 3 --db {db}"
+        in report_output
+    )
     assert (
         "Sampled ingest: newest-file limit 2 selected 2 of 3"
         in report_path.read_text(encoding="utf-8")
