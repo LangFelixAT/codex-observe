@@ -4006,6 +4006,14 @@ def private_artifact_label(path: Path) -> str:
         return path.name
 
 
+def private_visual_qa_command(database: Path, output_dir: Path) -> str:
+    script = (Path("scripts") / "visual_qa.py").as_posix()
+    return (
+        f"python {script} --profile real --db {_command_arg(database)} "
+        f"--host 127.0.0.1 --port 8502 --out {_command_arg(output_dir)} --timeout 60"
+    )
+
+
 def private_validate_payload(
     sessions_path: str | None = None,
     *,
@@ -4065,10 +4073,14 @@ def private_validate_payload(
         for key, path in artifacts.items()
         if key != "output_dir"
     }
+    visual_output_dir = out / "visual-real"
+    visual_manifest = visual_output_dir / "visual-qa-manifest.json"
+    visual_command = private_visual_qa_command(artifacts["database"], visual_output_dir)
     next_commands = [
         f"codex-observe doctor --db {_command_arg(artifacts['database'])}",
         f"codex-observe sessions --db {_command_arg(artifacts['database'])}",
         f"codex-observe serve --db {_command_arg(artifacts['database'])}",
+        visual_command,
     ]
     payload: dict[str, object] = {
         "schema_version": PRIVATE_VALIDATE_SCHEMA_VERSION,
@@ -4088,6 +4100,14 @@ def private_validate_payload(
             ),
         },
         "next_commands": next_commands,
+        "visual_qa": {
+            "profile": "real",
+            "command": visual_command,
+            "output_dir": private_artifact_label(visual_output_dir),
+            "manifest": private_artifact_label(visual_manifest),
+            "raw_content_included": False,
+            "review_required_before_sharing": True,
+        },
     }
     if error:
         payload["error"] = error
@@ -4119,6 +4139,15 @@ def private_validate_lines(payload: dict[str, object]) -> list[str]:
                 lines.append(f"- {label}: {artifact}")
     if payload.get("error"):
         lines.append(f"Error: {payload['error']}")
+    visual_qa = payload.get("visual_qa")
+    if isinstance(visual_qa, dict) and visual_qa.get("command"):
+        lines.append("Private visual QA handoff:")
+        lines.append(f"- command: {visual_qa['command']}")
+        if visual_qa.get("manifest"):
+            lines.append(f"- manifest: {visual_qa['manifest']}")
+        lines.append(
+            "- privacy: keep generated screenshots and manifests ignored and review before sharing."
+        )
     lines.append("Next commands:")
     lines.extend(f"- {command}" for command in payload.get("next_commands", []))
     return lines

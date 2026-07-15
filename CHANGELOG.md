@@ -5,6 +5,7 @@ All notable changes to Codex Observe will be documented here.
 The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
+- Added real-profile visual QA handoff metadata to `codex-observe private-validate` so private validation output points directly at ignored browser evidence generation.
 - Added `python scripts/visual_qa.py --profile real` for ignored private real-session dashboard checks, and capped large raw dashboard tables so private histories do not exceed Streamlit websocket limits.
 
 - Added `codex-observe self-check --visual --json` for no-scan visual dependency verification before browser visual QA.

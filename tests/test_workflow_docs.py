@@ -167,6 +167,7 @@ def test_current_state_handoff_covers_gates_evidence_and_real_log_checkpoint() -
         "plain `codex-observe audit` prints",
         "python scripts/visual_qa.py",
         "python scripts/visual_qa.py --verify-manifest .artifacts/visual/visual-qa-manifest.json",
+        "python scripts/visual_qa.py --profile real",
         "metric card evidence",
         "Agent detail thread brief",
         "Timeline quick read",
@@ -400,7 +401,10 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
     assert "docs/CURRENT.md" in release
     assert "dashboard empty-state next actions" in release
     assert "private real-log checkpoint" in release
-    assert "private validation handoff evidence" in release
+    assert (
+        "private validation handoff evidence including real-profile visual QA next-command metadata"
+        in release
+    )
     assert "private-validate` handoff contract" in release
     assert "--newest-files <n>" in release
     assert "risk_distribution" in release
@@ -439,6 +443,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         "codex-observe self-check",
         "self-check --visual",
         "private-validate",
+        "real-profile visual QA handoff",
     ]:
         assert required_changelog_item in changelog
     assert "\\n" not in contributing

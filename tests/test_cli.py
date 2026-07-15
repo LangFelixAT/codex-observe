@@ -127,6 +127,15 @@ def test_private_validate_writes_ignored_private_artifacts(tmp_path: Path) -> No
     assert (output_dir / "real-run-report.md").exists()
     assert (output_dir / "real-run-report.json").exists()
     assert any("codex-observe serve" in item for item in payload["next_commands"])
+    visual_qa = payload["visual_qa"]
+    assert visual_qa["profile"] == "real"
+    assert visual_qa["raw_content_included"] is False
+    assert visual_qa["review_required_before_sharing"] is True
+    assert visual_qa["manifest"] == "visual-qa-manifest.json"
+    assert "--profile real" in visual_qa["command"]
+    assert "--db" in visual_qa["command"]
+    assert "real-sessions.sqlite" in visual_qa["command"]
+    assert visual_qa["command"] in payload["next_commands"]
 
 
 def test_private_validate_cli_json_is_privacy_safe(tmp_path: Path, capsys) -> None:
@@ -152,6 +161,9 @@ def test_private_validate_cli_json_is_privacy_safe(tmp_path: Path, capsys) -> No
     assert "counts" not in payload
     assert "sessions" not in payload
     assert "recommended_session" not in payload
+    assert payload["visual_qa"]["raw_content_included"] is False
+    assert payload["visual_qa"]["review_required_before_sharing"] is True
+    assert "--profile real" in payload["visual_qa"]["command"]
 
 
 def test_private_validate_serve_launches_dashboard_after_success(
@@ -179,6 +191,9 @@ def test_private_validate_serve_launches_dashboard_after_success(
     assert result == 0
     output = capsys.readouterr().out
     assert "Private validation status: ok" in output
+    assert "Private visual QA handoff:" in output
+    assert "--profile real" in output
+    assert "visual-qa-manifest.json" in output.replace("\\", "/")
     call.assert_called_once_with(
         [
             sys.executable,
