@@ -4021,12 +4021,63 @@ def private_artifact_label(path: Path) -> str:
         return path.name
 
 
+def private_visual_qa_args(database: Path, output_dir: Path) -> list[str]:
+    return [
+        sys.executable,
+        str(Path("scripts") / "visual_qa.py"),
+        "--profile",
+        "real",
+        "--db",
+        str(database),
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8502",
+        "--out",
+        str(output_dir),
+        "--timeout",
+        "60",
+    ]
+
+
 def private_visual_qa_command(database: Path, output_dir: Path) -> str:
     script = (Path("scripts") / "visual_qa.py").as_posix()
     return (
         f"python {script} --profile real --db {_command_arg(database)} "
         f"--host 127.0.0.1 --port 8502 --out {_command_arg(output_dir)} --timeout 60"
     )
+
+
+def run_private_visual_qa(payload: dict[str, object], output_dir: str | Path) -> int:
+    artifacts = private_validate_paths(output_dir)
+    visual_output_dir = artifacts["output_dir"] / "visual-real"
+    visual_manifest = visual_output_dir / "visual-qa-manifest.json"
+    result = subprocess.run(
+        private_visual_qa_args(artifacts["database"], visual_output_dir),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    visual_payload = payload.get("visual_qa")
+    if not isinstance(visual_payload, dict):
+        visual_payload = {}
+        payload["visual_qa"] = visual_payload
+    visual_payload.update(
+        {
+            "status": "ok" if result.returncode == 0 else "failed",
+            "returncode": result.returncode,
+            "manifest_exists": visual_manifest.exists(),
+            "raw_content_included": False,
+            "review_required_before_sharing": True,
+        }
+    )
+    if result.returncode != 0:
+        payload["status"] = "visual_failed"
+        payload["error"] = (
+            "Private validation succeeded, but real-profile visual QA failed; "
+            "inspect ignored private artifacts locally."
+        )
+    return result.returncode
 
 
 def private_validate_payload(
@@ -4122,6 +4173,7 @@ def private_validate_payload(
             "manifest": private_artifact_label(visual_manifest),
             "raw_content_included": False,
             "review_required_before_sharing": True,
+            "status": "not_run",
         },
     }
     if error:
@@ -4158,6 +4210,8 @@ def private_validate_lines(payload: dict[str, object]) -> list[str]:
     if isinstance(visual_qa, dict) and visual_qa.get("command"):
         lines.append("Private visual QA handoff:")
         lines.append(f"- command: {visual_qa['command']}")
+        if visual_qa.get("status"):
+            lines.append(f"- status: {visual_qa['status']}")
         if visual_qa.get("manifest"):
             lines.append(f"- manifest: {visual_qa['manifest']}")
         lines.append(
@@ -5056,6 +5110,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Launch the dashboard against the private validation database after success",
     )
     p_private.add_argument(
+        "--visual",
+        action="store_true",
+        help="Run real-profile browser visual QA into the ignored private output directory after validation",
+    )
+    p_private.add_argument(
         "--host",
         default=None,
         help="Streamlit host, for example 127.0.0.1",
@@ -5326,6 +5385,10 @@ def main(argv: list[str] | None = None) -> int:
         status, payload = private_validate_payload(
             args.sessions_path, output_dir=args.out, newest_files=args.newest_files
         )
+        if args.visual and status == 0:
+            visual_status = run_private_visual_qa(payload, args.out)
+            if visual_status != 0:
+                status = visual_status
         if args.json:
             print(json.dumps(payload, indent=2, sort_keys=True))
         else:

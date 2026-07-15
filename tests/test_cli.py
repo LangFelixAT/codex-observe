@@ -166,6 +166,92 @@ def test_private_validate_cli_json_is_privacy_safe(tmp_path: Path, capsys) -> No
     assert "--profile real" in payload["visual_qa"]["command"]
 
 
+def test_private_validate_visual_runs_real_profile_visual_qa(
+    tmp_path: Path, capsys
+) -> None:
+    sessions = tmp_path / "sessions"
+    create_demo_database(tmp_path / "source.sqlite", sessions, keep_sessions=True)
+    output_dir = tmp_path / "private"
+
+    def fake_run(command, capture_output, text, check):
+        assert command[:4] == [
+            sys.executable,
+            str(Path("scripts") / "visual_qa.py"),
+            "--profile",
+            "real",
+        ]
+        assert "--db" in command
+        assert str(output_dir / "real-sessions.sqlite") in command
+        assert "--out" in command
+        visual_dir = Path(command[command.index("--out") + 1])
+        visual_dir.mkdir(parents=True, exist_ok=True)
+        (visual_dir / "visual-qa-manifest.json").write_text("{}", encoding="utf-8")
+        assert capture_output is True
+        assert text is True
+        assert check is False
+        return SimpleNamespace(returncode=0)
+
+    with patch("codex_observe.cli.subprocess.run", side_effect=fake_run) as run:
+        result = cli.main(
+            [
+                "private-validate",
+                str(sessions),
+                "--out",
+                str(output_dir),
+                "--visual",
+                "--json",
+            ]
+        )
+
+    assert result == 0
+    run.assert_called_once()
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "ok"
+    assert payload["visual_qa"]["status"] == "ok"
+    assert payload["visual_qa"]["returncode"] == 0
+    assert payload["visual_qa"]["manifest_exists"] is True
+    assert payload["visual_qa"]["raw_content_included"] is False
+    assert payload["visual_qa"]["review_required_before_sharing"] is True
+    assert "stdout" not in payload["visual_qa"]
+    assert "stderr" not in payload["visual_qa"]
+
+
+def test_private_validate_visual_failure_is_privacy_safe(
+    tmp_path: Path, capsys
+) -> None:
+    sessions = tmp_path / "sessions"
+    create_demo_database(tmp_path / "source.sqlite", sessions, keep_sessions=True)
+    output_dir = tmp_path / "private"
+
+    with patch(
+        "codex_observe.cli.subprocess.run",
+        return_value=SimpleNamespace(
+            returncode=1, stdout="private stdout", stderr="private stderr"
+        ),
+    ) as run:
+        result = cli.main(
+            [
+                "private-validate",
+                str(sessions),
+                "--out",
+                str(output_dir),
+                "--visual",
+                "--json",
+            ]
+        )
+
+    assert result == 1
+    run.assert_called_once()
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "visual_failed"
+    assert payload["visual_qa"]["status"] == "failed"
+    assert payload["visual_qa"]["returncode"] == 1
+    assert payload["visual_qa"]["manifest_exists"] is False
+    assert "stdout" not in json.dumps(payload)
+    assert "stderr" not in json.dumps(payload)
+    assert "real-profile visual QA failed" in payload["error"]
+
+
 def test_private_validate_serve_launches_dashboard_after_success(
     tmp_path: Path, capsys
 ) -> None:
