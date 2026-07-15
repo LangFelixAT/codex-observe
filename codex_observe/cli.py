@@ -3119,14 +3119,14 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
                 "recommended_session chooses the highest-risk run",
                 "plain-text sessions output includes Snapshots and Tool out columns plus a recommended-action block with top aggregate drivers, including largest tool output",
                 "recommendation_detail explains the risk, recency tie-breakers, structured aggregate drivers, and ordered driver_summary display labels",
-                "plain-text sessions output includes terminal Next commands for the recommended report exports",
-                "review_path turns the recommendation into report, compare, validation, and safe-feedback steps",
+                "plain-text sessions output includes terminal Next commands for baseline report export, next-run validation, and comparison",
+                "review_path turns the recommendation into report, next-run validation, compare, and safe-feedback steps",
             ],
             "success_checks": [
                 "recommended_session targets the highest-risk run, not merely the latest run",
                 "recommendation_detail.driver_summary includes display labels for aggregate drivers",
-                "plain-text sessions output includes Next commands for Markdown and JSON report exports",
-                "review_path includes report JSON, comparison, next-run validation, and safe-feedback steps",
+                "plain-text sessions output includes Next commands for baseline Markdown, baseline JSON, next-run JSON, and comparison",
+                "review_path includes report JSON, next-run validation, comparison, and safe-feedback steps",
             ],
             "commands": [
                 f"codex-observe sessions --db {db_path}",

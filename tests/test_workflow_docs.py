@@ -285,6 +285,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         "dashboard comparison quick-read, sampled-ingest warning when present, review-path, metric delta cards including usage snapshots, safe feedback handoff, and next validation command cards plus report and comparison download controls",
         "codex-observe doctor --db .artifacts/demo/codex_observe_demo.sqlite --json",
         "codex-observe sessions --db .artifacts/demo/codex_observe_demo.sqlite --json",
+        "structured `next_commands` for baseline report export, next-run report export, and comparison automation",
         "aggregate triage risk",
         "aggregate triage risk",
         "codex-observe report --db .artifacts/demo/codex_observe_demo.sqlite --out .artifacts/demo/run-report.md",

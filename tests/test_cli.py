@@ -1431,6 +1431,11 @@ def test_public_tour_payload_is_private_log_free_and_points_to_visual_verificati
     assert any("structured aggregate drivers" in item for item in evidence)
     assert any("driver_summary" in item for item in evidence)
     assert any("review_path" in item for item in evidence)
+    assert any("next-run validation, compare" in item for item in evidence)
+    assert any(
+        "baseline Markdown, baseline JSON, next-run JSON" in item
+        for item in success_checks
+    )
     assert any(
         "plain doctor output includes terminal Review path" in item for item in evidence
     )
