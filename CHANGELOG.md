@@ -6,6 +6,7 @@ The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
 
+- Preserved sampled-ingest coverage metadata in comparison confirmations.
 - Added terminal sample-coverage and expansion-command guidance for bounded ingests.
 - Added an actionable dashboard sample-coverage card for bounded real-history ingests.
 - Quoted shell-sensitive database paths in report-module follow-up commands and review paths.

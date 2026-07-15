@@ -3834,7 +3834,9 @@ def compare_failure_payload(
     }
 
 
-def comparison_written_lines(path: Path, comparison: dict) -> list[str]:
+def comparison_written_lines(
+    path: Path, comparison: dict, db_path: Path | str | None = None
+) -> list[str]:
     risk = comparison.get("triage_risk", {})
     direction = str(risk.get("direction") or "unknown")
     before = str(risk.get("before") or "unknown")
@@ -3852,7 +3854,7 @@ def comparison_written_lines(path: Path, comparison: dict) -> list[str]:
     ]
     if opportunity_summary:
         lines.append(f"Opportunity change: {opportunity_summary}")
-    lines.extend(ingest_scope_lines(comparison.get("ingest_scope")))
+    lines.extend(ingest_scope_lines(comparison.get("ingest_scope"), db_path))
     lines.append(f"Next step: {recommendation}")
     templates = comparison.get("next_command_templates", [])
     if isinstance(templates, list) and templates:
@@ -5036,7 +5038,12 @@ def main(argv: list[str] | None = None) -> int:
             out_path = Path(args.out).expanduser()
             out_path.parent.mkdir(parents=True, exist_ok=True)
             out_path.write_text(output, encoding="utf-8")
-            print("\n".join(comparison_written_lines(out_path, comparison)))
+            comparison_db_path = args.db if has_session_inputs else None
+            print(
+                "\n".join(
+                    comparison_written_lines(out_path, comparison, comparison_db_path)
+                )
+            )
         else:
             print(output)
         return 0

@@ -1497,17 +1497,28 @@ def comparison_ingest_scope(
     after_sampled = isinstance(after_scope, dict) and after_scope.get("sampled") is True
     sampled = before_sampled or after_sampled
     warning = None
+    sampled_scope = None
     if sampled:
         warning = (
             "Sampled ingest: at least one comparison input came from a bounded "
             "newest-file sample; treat comparison deltas as sampled evidence."
         )
-    return {
+        for candidate in [after_scope, before_scope]:
+            if isinstance(candidate, dict) and candidate.get("sampled") is True:
+                sampled_scope = candidate
+                break
+    scope = {
         "before": before_scope if isinstance(before_scope, dict) else None,
         "after": after_scope if isinstance(after_scope, dict) else None,
         "sampled": sampled,
         "warning": warning,
     }
+    if isinstance(sampled_scope, dict):
+        for key in ["counts", "scan_limit", "skipped"]:
+            value = sampled_scope.get(key)
+            if isinstance(value, dict):
+                scope[key] = value
+    return scope
 
 
 def comparison_ingest_scope_markdown_lines(scope: object) -> list[str]:

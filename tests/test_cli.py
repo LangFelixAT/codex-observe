@@ -1300,7 +1300,40 @@ def test_doctor_and_sessions_expose_sampled_ingest_scope(
     )
     comparison_output = capsys.readouterr().out
     assert "Ingest scope: Sampled ingest" in comparison_output
+    assert (
+        "Sample coverage: 2 of 3 matched files processed (66.7%); 1 deferred."
+        in comparison_output
+    )
+    assert "Next sample command:" not in comparison_output
     assert "Sampled ingest" in comparison_path.read_text(encoding="utf-8")
+    same_db_comparison_path = tmp_path / "sampled-same-db-comparison.md"
+    assert (
+        cli.main(
+            [
+                "compare",
+                "--db",
+                str(db),
+                "--before-session",
+                "session-middle",
+                "--after-session",
+                "session-newest",
+                "--out",
+                str(same_db_comparison_path),
+            ]
+        )
+        == 0
+    )
+    same_db_comparison_output = capsys.readouterr().out
+    assert "Ingest scope: Sampled ingest" in same_db_comparison_output
+    assert (
+        "Sample coverage: 2 of 3 matched files processed (66.7%); 1 deferred."
+        in same_db_comparison_output
+    )
+    assert (
+        f"Next sample command: codex-observe ingest ~/.codex/sessions --newest-files 3 --db {db}"
+        in same_db_comparison_output
+    )
+    assert same_db_comparison_path.exists()
     assert str(sessions) not in comparison_output
     assert str(sessions) not in json.dumps(scope)
     assert str(sessions) not in plain_sessions
