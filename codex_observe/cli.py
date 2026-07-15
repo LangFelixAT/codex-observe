@@ -202,6 +202,7 @@ DEMO_SCHEMA_VERSION = "codex-observe.demo.v1"
 INGEST_SCHEMA_VERSION = "codex-observe.ingest.v1"
 EVIDENCE_BUNDLE_SCHEMA_VERSION = "codex-observe.evidence-bundle.v1"
 PATHS_SCHEMA_VERSION = "codex-observe.paths.v1"
+PRIVATE_VALIDATE_SCHEMA_VERSION = "codex-observe.private-validate.v1"
 RELEASE_REQUIRED_FILES = [
     "README.md",
     "LICENSE",
@@ -3821,6 +3822,147 @@ def paths_lines(
     return lines
 
 
+def private_validate_paths(output_dir: str | Path) -> dict[str, Path]:
+    out = Path(output_dir).expanduser()
+    return {
+        "output_dir": out,
+        "database": out / "real-sessions.sqlite",
+        "paths_json": out / "real-paths.json",
+        "ingest_json": out / "real-ingest.json",
+        "doctor_json": out / "real-doctor.json",
+        "sessions_json": out / "real-sessions-list.json",
+        "report_md": out / "real-run-report.md",
+        "report_json": out / "real-run-report.json",
+    }
+
+
+def private_artifact_label(path: Path) -> str:
+    if not path.is_absolute():
+        return path.as_posix()
+    try:
+        return path.relative_to(Path.cwd()).as_posix()
+    except ValueError:
+        return path.name
+
+
+def private_validate_payload(
+    sessions_path: str | None = None,
+    *,
+    output_dir: str | Path = ".artifacts/private",
+    newest_files: int = 25,
+) -> tuple[int, dict[str, object]]:
+    artifacts = private_validate_paths(output_dir)
+    out = artifacts["output_dir"]
+    out.mkdir(parents=True, exist_ok=True)
+    db_path = str(artifacts["database"])
+    sessions = str(
+        Path(sessions_path).expanduser() if sessions_path else default_sessions_path()
+    )
+
+    paths = paths_payload(db_path=db_path, sessions_path=sessions)
+    artifacts["paths_json"].write_text(
+        json.dumps(paths, indent=2, sort_keys=True), encoding="utf-8"
+    )
+
+    status = "ok"
+    error = ""
+    report_written = False
+    try:
+        result = ingest(sessions, db_path, newest_files=newest_files)
+        ingest_payload = ingest_success_payload(sessions, db_path, result)
+        artifacts["ingest_json"].write_text(
+            json.dumps(ingest_payload, indent=2, sort_keys=True), encoding="utf-8"
+        )
+
+        doctor_status, doctor = doctor_report(db_path)
+        artifacts["doctor_json"].write_text(
+            json.dumps(doctor, indent=2, sort_keys=True), encoding="utf-8"
+        )
+        if doctor_status != 0:
+            status = str(doctor.get("status") or "doctor_failed")
+            error = str(doctor.get("error") or "doctor check failed")
+
+        sessions_payload = sessions_json_payload(db_path)
+        artifacts["sessions_json"].write_text(
+            json.dumps(sessions_payload, indent=2, sort_keys=True), encoding="utf-8"
+        )
+        recommended = sessions_payload.get("recommended_session")
+        if status == "ok" and isinstance(recommended, dict):
+            report = build_report(db_path, str(recommended.get("session_id") or ""))
+            artifacts["report_md"].write_text(report_markdown(report), encoding="utf-8")
+            artifacts["report_json"].write_text(report_json(report), encoding="utf-8")
+            report_written = True
+        elif status == "ok":
+            status = "empty"
+            error = "No reportable sessions were found after ingest."
+    except (FileNotFoundError, PermissionError, ValueError, sqlite3.Error) as exc:
+        status = "failed"
+        error = str(exc)
+
+    artifact_labels = {
+        key: private_artifact_label(path)
+        for key, path in artifacts.items()
+        if key != "output_dir"
+    }
+    next_commands = [
+        f"codex-observe doctor --db {_command_arg(artifacts['database'])}",
+        f"codex-observe sessions --db {_command_arg(artifacts['database'])}",
+        f"codex-observe serve --db {_command_arg(artifacts['database'])}",
+    ]
+    payload: dict[str, object] = {
+        "schema_version": PRIVATE_VALIDATE_SCHEMA_VERSION,
+        "status": status,
+        "sessions_path_exists": bool(paths.get("sessions_path_exists")),
+        "database_exists": artifacts["database"].exists(),
+        "newest_files": newest_files,
+        "artifacts": artifact_labels,
+        "report_written": report_written,
+        "privacy": {
+            "raw_content_included": False,
+            "terminal_output_includes_counts": False,
+            "review_required_before_sharing": True,
+            "share_warning": (
+                "Artifacts are private aggregate evidence; keep them ignored and "
+                "review before sharing."
+            ),
+        },
+        "next_commands": next_commands,
+    }
+    if error:
+        payload["error"] = error
+    return (0 if status == "ok" else 1), payload
+
+
+def private_validate_lines(payload: dict[str, object]) -> list[str]:
+    lines = [
+        f"Private validation status: {payload['status']}",
+        (
+            "Privacy: terminal output omits private counts, filenames, session IDs, "
+            "prompts, tool output, and raw log content."
+        ),
+        "Artifacts written under ignored private output:",
+    ]
+    artifacts = payload.get("artifacts", {})
+    if isinstance(artifacts, dict):
+        for label in [
+            "database",
+            "paths_json",
+            "ingest_json",
+            "doctor_json",
+            "sessions_json",
+            "report_md",
+            "report_json",
+        ]:
+            artifact = artifacts.get(label)
+            if artifact:
+                lines.append(f"- {label}: {artifact}")
+    if payload.get("error"):
+        lines.append(f"Error: {payload['error']}")
+    lines.append("Next commands:")
+    lines.extend(f"- {command}" for command in payload.get("next_commands", []))
+    return lines
+
+
 def missing_database_hint(db_path: str) -> str:
     db_arg = _command_arg(db_path)
     return (
@@ -4659,6 +4801,37 @@ def main(argv: list[str] | None = None) -> int:
         help="Emit path guidance as schema-versioned JSON",
     )
 
+    p_private = sub.add_parser(
+        "private-validate",
+        help="Run the private real-session validation loop into ignored artifacts",
+        description=(
+            "Ingest a bounded sample of local Codex sessions, verify the database, "
+            "list aggregate sessions, and export the recommended aggregate report "
+            "under an ignored private artifact directory."
+        ),
+    )
+    p_private.add_argument(
+        "sessions_path",
+        nargs="?",
+        default=str(default_sessions_path()),
+        help="Codex sessions directory or JSONL file; defaults to ~/.codex/sessions",
+    )
+    p_private.add_argument(
+        "--out",
+        default=".artifacts/private",
+        help="Ignored private output directory for database and aggregate evidence",
+    )
+    p_private.add_argument(
+        "--newest-files",
+        type=positive_int,
+        default=25,
+        help="Only ingest the newest N JSONL files; default 25",
+    )
+    p_private.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit privacy-safe private validation status as JSON",
+    )
     p_ingest = sub.add_parser(
         "ingest",
         help="Ingest Codex JSONL files into SQLite",
@@ -4906,6 +5079,15 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
         return 0
+    if args.cmd == "private-validate":
+        status, payload = private_validate_payload(
+            args.sessions_path, output_dir=args.out, newest_files=args.newest_files
+        )
+        if args.json:
+            print(json.dumps(payload, indent=2, sort_keys=True))
+        else:
+            print("\n".join(private_validate_lines(payload)))
+        return status
     if args.cmd == "evidence-bundle":
         status, manifest = public_evidence_bundle(
             args.out, run_visual=not args.skip_visual

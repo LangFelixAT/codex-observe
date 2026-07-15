@@ -6,6 +6,7 @@ The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
 
+- Added `codex-observe private-validate` to run the bounded real-session validation loop into ignored private artifacts with privacy-safe terminal and JSON status.
 - Added a validated local backlog draft scaffold command so fresh demoable GitHub issue candidates start with tests, visual QA, privacy review, and approval-gate metadata.
 - Surfaced the aggregate next-run brief in the dashboard Overview and visual QA manifest so the copy-pasteable plan is verified before release.
 - Added an aggregate-only next-run brief to report JSON/Markdown so private real-session validation has a copy-pasteable plan for the next Codex run.

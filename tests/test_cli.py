@@ -10,10 +10,72 @@ from pathlib import Path
 from unittest.mock import patch
 
 from codex_observe import cli
+from codex_observe.demo import create_demo_database
 
 
 def dashboard_path() -> str:
     return str(Path(cli.__file__).with_name("dashboard.py"))
+
+
+def test_private_validate_writes_ignored_private_artifacts(tmp_path: Path) -> None:
+    sessions = tmp_path / "sessions"
+    create_demo_database(tmp_path / "source.sqlite", sessions, keep_sessions=True)
+    output_dir = tmp_path / "private"
+
+    status, payload = cli.private_validate_payload(
+        str(sessions), output_dir=output_dir, newest_files=25
+    )
+
+    assert status == 0
+    assert payload["schema_version"] == "codex-observe.private-validate.v1"
+    assert payload["status"] == "ok"
+    assert payload["sessions_path_exists"] is True
+    assert payload["database_exists"] is True
+    assert payload["report_written"] is True
+    assert payload["privacy"] == {
+        "raw_content_included": False,
+        "terminal_output_includes_counts": False,
+        "review_required_before_sharing": True,
+        "share_warning": (
+            "Artifacts are private aggregate evidence; keep them ignored and "
+            "review before sharing."
+        ),
+    }
+    artifacts = payload["artifacts"]
+    assert artifacts["database"].endswith("real-sessions.sqlite")
+    assert artifacts["report_md"].endswith("real-run-report.md")
+    assert (output_dir / "real-paths.json").exists()
+    assert (output_dir / "real-ingest.json").exists()
+    assert (output_dir / "real-doctor.json").exists()
+    assert (output_dir / "real-sessions-list.json").exists()
+    assert (output_dir / "real-run-report.md").exists()
+    assert (output_dir / "real-run-report.json").exists()
+    assert any("codex-observe serve" in item for item in payload["next_commands"])
+
+
+def test_private_validate_cli_json_is_privacy_safe(tmp_path: Path, capsys) -> None:
+    sessions = tmp_path / "sessions"
+    create_demo_database(tmp_path / "source.sqlite", sessions, keep_sessions=True)
+    output_dir = tmp_path / "private"
+
+    result = cli.main(
+        [
+            "private-validate",
+            str(sessions),
+            "--out",
+            str(output_dir),
+            "--json",
+        ]
+    )
+
+    assert result == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["schema_version"] == "codex-observe.private-validate.v1"
+    assert payload["privacy"]["raw_content_included"] is False
+    assert payload["privacy"]["terminal_output_includes_counts"] is False
+    assert "counts" not in payload
+    assert "sessions" not in payload
+    assert "recommended_session" not in payload
 
 
 def test_serve_passes_host_and_port_to_streamlit_before_app_separator(
