@@ -4828,6 +4828,19 @@ def main(argv: list[str] | None = None) -> int:
         help="Only ingest the newest N JSONL files; default 25",
     )
     p_private.add_argument(
+        "--serve",
+        action="store_true",
+        help="Launch the dashboard against the private validation database after success",
+    )
+    p_private.add_argument(
+        "--host",
+        default=None,
+        help="Streamlit host, for example 127.0.0.1",
+    )
+    p_private.add_argument(
+        "--port", default=None, help="Streamlit port, for example 8501"
+    )
+    p_private.add_argument(
         "--json",
         action="store_true",
         help="Emit privacy-safe private validation status as JSON",
@@ -5087,7 +5100,17 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(payload, indent=2, sort_keys=True))
         else:
             print("\n".join(private_validate_lines(payload)))
-        return status
+        if not args.serve or status != 0:
+            return status
+        app_path = Path(__file__).with_name("dashboard.py")
+        cmd = [sys.executable, "-m", "streamlit", "run", str(app_path)]
+        if args.host:
+            cmd.extend(["--server.address", args.host])
+        if args.port:
+            cmd.extend(["--server.port", str(args.port)])
+        private_db = private_validate_paths(args.out)["database"]
+        cmd.extend(["--", "--db", str(private_db)])
+        return subprocess.call(cmd)
     if args.cmd == "evidence-bundle":
         status, manifest = public_evidence_bundle(
             args.out, run_visual=not args.skip_visual

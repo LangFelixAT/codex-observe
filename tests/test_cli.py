@@ -78,6 +78,49 @@ def test_private_validate_cli_json_is_privacy_safe(tmp_path: Path, capsys) -> No
     assert "recommended_session" not in payload
 
 
+def test_private_validate_serve_launches_dashboard_after_success(
+    tmp_path: Path, capsys
+) -> None:
+    sessions = tmp_path / "sessions"
+    create_demo_database(tmp_path / "source.sqlite", sessions, keep_sessions=True)
+    output_dir = tmp_path / "private"
+
+    with patch("codex_observe.cli.subprocess.call", return_value=0) as call:
+        result = cli.main(
+            [
+                "private-validate",
+                str(sessions),
+                "--out",
+                str(output_dir),
+                "--serve",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                "8503",
+            ]
+        )
+
+    assert result == 0
+    output = capsys.readouterr().out
+    assert "Private validation status: ok" in output
+    call.assert_called_once_with(
+        [
+            sys.executable,
+            "-m",
+            "streamlit",
+            "run",
+            dashboard_path(),
+            "--server.address",
+            "127.0.0.1",
+            "--server.port",
+            "8503",
+            "--",
+            "--db",
+            str(output_dir / "real-sessions.sqlite"),
+        ]
+    )
+
+
 def test_serve_passes_host_and_port_to_streamlit_before_app_separator(
     tmp_path: Path,
 ) -> None:
