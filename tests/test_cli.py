@@ -252,6 +252,12 @@ def write_valid_visual_manifest(root: Path) -> None:
                     "body": "Next run checklist Before next run During next run After next run Set a stop condition for the dominant thread largest_thread_share_pct Export next-run-report.json",
                 }
             ],
+            "next_run_briefs": [
+                {
+                    "label": "Next run brief",
+                    "body": "Next run brief Next Codex run plan Set a stop condition for the dominant thread Largest thread drives the run largest_thread_share_pct: 57.7% -> below 50.0% Pause or split the run when the same aggregate driver starts to dominate. Copy prompt",
+                }
+            ],
             "feedback_handoffs": [
                 {
                     "label": "Safe feedback handoff",
@@ -815,7 +821,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
         == "manifest, terminal and reviewer README action plan, key findings, review checklist, feedback handoff, feedback runbook, feedback issue template, reproduce-local commands, validation commands, limitations doc, aggregate reports, and audit artifact verified"
     )
     assert (
-        "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, sidebar session details, risk distribution, metric cards, dashboard quick reads, report and comparison downloads, report scope-warning evidence, comparison preview, comparison scope-warning evidence, comparison review path, deltas, operator briefing, next review path, next-run checklist, safe feedback handoff, and success target verified"
+        "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, sidebar session details, risk distribution, metric cards, dashboard quick reads, report and comparison downloads, report scope-warning evidence, comparison preview, comparison scope-warning evidence, comparison review path, deltas, operator briefing, next review path, next-run checklist, next-run brief, safe feedback handoff, and success target verified"
         in checks["visual QA manifest evidence"]["detail"]
     )
     report_payload = json.loads(report.with_suffix(".json").read_text(encoding="utf-8"))

@@ -129,6 +129,16 @@ EXPECTED_NEXT_RUN_CHECKLIST = [
     "Export next-run-report.json",
 ]
 
+EXPECTED_NEXT_RUN_BRIEF = [
+    "Next run brief",
+    "Next Codex run plan",
+    "Set a stop condition for the dominant thread",
+    "Largest thread drives the run",
+    "largest_thread_share_pct: 57.7% -> below 50.0%",
+    "Pause or split the run when the same aggregate driver starts to dominate.",
+    "Copy prompt",
+]
+
 EXPECTED_FEEDBACK_HANDOFF = [
     "Safe feedback handoff",
     "docs/PUBLIC_TOUR_FEEDBACK.md",
@@ -578,6 +588,30 @@ def next_run_checklist_failures(
     ]
 
 
+def collect_next_run_briefs(page) -> list[dict[str, str]]:
+    return page.evaluate(
+        r"""
+() => Array.from(document.querySelectorAll('.co-next-run-brief')).map((card) => ({
+  label: (card.querySelector('h3')?.innerText || '').replace(/\s+/g, ' ').trim(),
+  body: (card.innerText || '').replace(/\s+/g, ' ').trim(),
+})).filter((item) => item.label || item.body)
+        """
+    )
+
+
+def next_run_brief_failures(
+    briefs: list[dict[str, str]], viewport_name: str
+) -> list[str]:
+    if not briefs:
+        return [f"{viewport_name}: next run brief card not rendered"]
+    body = str(briefs[0].get("body") or "")
+    return [
+        f"{viewport_name}: next run brief missing: {expected}"
+        for expected in EXPECTED_NEXT_RUN_BRIEF
+        if expected not in body
+    ]
+
+
 def collect_feedback_handoffs(page) -> list[dict[str, str]]:
     return page.evaluate(
         r"""
@@ -699,6 +733,7 @@ def validate_dashboard_page(
     operator_briefings = collect_operator_briefings(page)
     review_paths = collect_review_paths(page)
     next_run_checklists = collect_next_run_checklists(page)
+    next_run_briefs = collect_next_run_briefs(page)
     feedback_handoffs = collect_feedback_handoffs(page)
     download_controls = collect_download_controls(page)
     report_scope_warnings = collect_report_scope_warnings(page)
@@ -711,6 +746,7 @@ def validate_dashboard_page(
     failures.extend(operator_briefing_failures(operator_briefings, viewport_name))
     failures.extend(review_path_failures(review_paths, viewport_name))
     failures.extend(next_run_checklist_failures(next_run_checklists, viewport_name))
+    failures.extend(next_run_brief_failures(next_run_briefs, viewport_name))
     failures.extend(feedback_handoff_failures(feedback_handoffs, viewport_name))
     failures.extend(download_control_failures(download_controls, viewport_name))
     failures.extend(comparison_preview_failures(comparison_previews, viewport_name))
@@ -782,6 +818,7 @@ def validate_dashboard_page(
         "operator_briefings": operator_briefings,
         "review_paths": review_paths,
         "next_run_checklists": next_run_checklists,
+        "next_run_briefs": next_run_briefs,
         "feedback_handoffs": feedback_handoffs,
         "download_controls": download_controls,
         "report_scope_warnings": report_scope_warnings,
@@ -1257,6 +1294,16 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
             failures.extend(
                 failure.replace(f"{name}: ", f"manifest {name} ")
                 for failure in checklist_failures
+            )
+
+        next_run_briefs = raw.get("next_run_briefs")
+        if not isinstance(next_run_briefs, list):
+            failures.append(f"manifest {name} missing next run brief evidence")
+        else:
+            brief_failures = next_run_brief_failures(next_run_briefs, name)
+            failures.extend(
+                failure.replace(f"{name}: ", f"manifest {name} ")
+                for failure in brief_failures
             )
 
         feedback_handoffs = raw.get("feedback_handoffs")

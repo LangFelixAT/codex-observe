@@ -37,6 +37,7 @@ from codex_observe.report import (
     latest_ingest_scope,
     report_json,
     report_markdown,
+    report_next_run_brief,
     report_next_run_checklist,
     report_success_target,
     session_risk_distribution,
@@ -445,6 +446,63 @@ def dashboard_css() -> str:
   color: var(--co-accent-2);
   font-weight: 700;
   margin-top: 0.28rem;
+}
+
+.co-next-run-brief {
+  background: color-mix(in srgb, var(--co-accent) 7%, var(--co-panel));
+  border: 1px solid var(--co-border);
+  border-radius: 8px;
+  margin: 0 0 1rem 0;
+  padding: 0.9rem 1rem;
+}
+
+.co-next-run-brief h3 {
+  font-size: 1rem;
+  letter-spacing: 0;
+  line-height: 1.25;
+  margin: 0 0 0.35rem 0;
+}
+
+.co-next-run-brief p {
+  color: var(--co-muted);
+  font-size: 0.88rem;
+  margin: 0.2rem 0 0.65rem 0;
+}
+
+.co-next-run-brief-grid {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+
+.co-next-run-brief-item {
+  background: var(--co-surface);
+  border: 1px solid var(--co-border);
+  border-radius: 8px;
+  min-width: 0;
+  padding: 0.65rem 0.75rem;
+}
+
+.co-next-run-brief-item strong {
+  color: var(--co-ink);
+  display: block;
+  font-size: 0.82rem;
+  line-height: 1.22;
+  margin-bottom: 0.24rem;
+}
+
+.co-next-run-brief-item span,
+.co-next-run-brief-item code {
+  color: var(--co-muted);
+  display: block;
+  font-size: 0.8rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.co-next-run-brief-prompt {
+  margin-top: 0.65rem;
 }
 
 .co-feedback-handoff {
@@ -1241,6 +1299,60 @@ def next_run_checklist_html(checklist: object) -> str:
             "  <p>Use this before, during, and after the next run to prove the workflow change.</p>",
             '  <div class="co-next-run-items">',
             *[f"    {item}" for item in items],
+            "  </div>",
+            "</section>",
+        ]
+    )
+
+
+def next_run_brief_html(brief: object) -> str:
+    if not isinstance(brief, dict):
+        return ""
+    habit = str(brief.get("habit") or "Apply the top recommended workflow habit.")
+    watch = str(brief.get("watch") or "top aggregate driver")
+    metric = str(brief.get("target_metric") or "target metric")
+    current = str(brief.get("current") or "current value")
+    target = str(brief.get("target") or "target value")
+    guardrail = str(
+        brief.get("guardrail")
+        or "Pause, split, or summarize before the same driver dominates the run."
+    )
+    prompt = str(brief.get("copy_prompt") or "").strip()
+    if not prompt:
+        prompt = "\n".join(
+            [
+                "Next Codex run plan:",
+                f"- Try: {habit}",
+                f"- Watch: {watch}",
+                f"- Target: move {metric} from {current} toward {target}",
+                f"- Guardrail: {guardrail}",
+            ]
+        )
+    items = [
+        ("Try", habit),
+        ("Watch", watch),
+        ("Target", f"{metric}: {current} -> {target}"),
+        ("Guardrail", guardrail),
+    ]
+    item_html = []
+    for label, value in items:
+        item_html.append(
+            '<div class="co-next-run-brief-item">'
+            f"<strong>{html.escape(label)}</strong>"
+            f"<span>{html.escape(value)}</span>"
+            "</div>"
+        )
+    return "\n".join(
+        [
+            '<section class="co-next-run-brief">',
+            "  <h3>Next run brief</h3>",
+            "  <p>Copy this aggregate-only plan into the next Codex run before exporting comparison evidence.</p>",
+            '  <div class="co-next-run-brief-grid">',
+            *[f"    {item}" for item in item_html],
+            "  </div>",
+            '  <div class="co-next-run-brief-item co-next-run-brief-prompt">',
+            "    <strong>Copy prompt</strong>",
+            f"    <code>{html.escape(prompt)}</code>",
             "  </div>",
             "</section>",
         ]
@@ -2417,6 +2529,12 @@ def main() -> None:
         st.markdown(
             next_run_checklist_html(
                 report.get("next_run_checklist") or report_next_run_checklist(report)
+            ),
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            next_run_brief_html(
+                report.get("next_run_brief") or report_next_run_brief(report)
             ),
             unsafe_allow_html=True,
         )

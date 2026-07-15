@@ -31,6 +31,7 @@ operator_briefing_failures = visual_qa.operator_briefing_failures
 collect_review_paths = visual_qa.collect_review_paths
 review_path_failures = visual_qa.review_path_failures
 next_run_checklist_failures = visual_qa.next_run_checklist_failures
+next_run_brief_failures = visual_qa.next_run_brief_failures
 feedback_handoff_failures = visual_qa.feedback_handoff_failures
 download_control_failures = visual_qa.download_control_failures
 collect_report_scope_warnings = visual_qa.collect_report_scope_warnings
@@ -372,6 +373,35 @@ def test_next_run_checklist_failures_require_operational_steps() -> None:
     )
 
 
+def test_next_run_brief_failures_require_copyable_plan() -> None:
+    assert (
+        next_run_brief_failures(
+            [
+                {
+                    "label": "Next run brief",
+                    "body": "Next run brief Next Codex run plan Set a stop condition for the dominant thread Largest thread drives the run largest_thread_share_pct: 57.7% -> below 50.0% Pause or split the run when the same aggregate driver starts to dominate. Copy prompt",
+                }
+            ],
+            "desktop",
+        )
+        == []
+    )
+
+    failures = next_run_brief_failures([], "narrow")
+
+    assert "narrow: next run brief card not rendered" in failures
+
+    failures = next_run_brief_failures(
+        [{"label": "Next run brief", "body": "Next run brief"}], "desktop"
+    )
+
+    assert "desktop: next run brief missing: Next Codex run plan" in failures
+    assert (
+        "desktop: next run brief missing: largest_thread_share_pct: 57.7% -> below 50.0%"
+        in failures
+    )
+
+
 def test_feedback_handoff_failures_require_safe_feedback_contract() -> None:
     assert (
         feedback_handoff_failures(
@@ -489,6 +519,12 @@ def complete_viewport_results(tmp_path: Path) -> dict[str, dict[str, object]]:
                 {
                     "label": "Next run checklist",
                     "body": "Next run checklist Before next run During next run After next run Set a stop condition for the dominant thread largest_thread_share_pct Export next-run-report.json",
+                }
+            ],
+            "next_run_briefs": [
+                {
+                    "label": "Next run brief",
+                    "body": "Next run brief Next Codex run plan Set a stop condition for the dominant thread Largest thread drives the run largest_thread_share_pct: 57.7% -> below 50.0% Pause or split the run when the same aggregate driver starts to dominate. Copy prompt",
                 }
             ],
             "feedback_handoffs": [
@@ -656,6 +692,13 @@ def test_visual_manifest_records_review_evidence(tmp_path: Path) -> None:
         "Before next run"
         in loaded["viewports"]["desktop"]["next_run_checklists"][0]["body"]
     )
+    assert loaded["viewports"]["desktop"]["next_run_briefs"][0]["label"] == (
+        "Next run brief"
+    )
+    assert (
+        "Next Codex run plan"
+        in loaded["viewports"]["desktop"]["next_run_briefs"][0]["body"]
+    )
     assert loaded["viewports"]["desktop"]["feedback_handoffs"][0]["label"] == (
         "Safe feedback handoff"
     )
@@ -721,6 +764,7 @@ def test_visual_manifest_failures_rejects_incomplete_evidence(tmp_path: Path) ->
                 "operator_briefings": [],
                 "review_paths": [],
                 "next_run_checklists": [],
+                "next_run_briefs": [],
                 "feedback_handoffs": [],
                 "comparison_previews": [],
                 "comparison_review_paths": [],

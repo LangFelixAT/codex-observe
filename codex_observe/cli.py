@@ -113,6 +113,16 @@ EXPECTED_VISUAL_NEXT_RUN_CHECKLIST = {
     "Export next-run-report.json",
 }
 
+EXPECTED_VISUAL_NEXT_RUN_BRIEF = {
+    "Next run brief",
+    "Next Codex run plan",
+    "Set a stop condition for the dominant thread",
+    "Largest thread drives the run",
+    "largest_thread_share_pct: 57.7% -> below 50.0%",
+    "Pause or split the run when the same aggregate driver starts to dominate.",
+    "Copy prompt",
+}
+
 EXPECTED_VISUAL_FEEDBACK_HANDOFF = {
     "Safe feedback handoff",
     "docs/PUBLIC_TOUR_FEEDBACK.md",
@@ -1845,6 +1855,27 @@ def visual_manifest_evidence_failures(root: Path) -> list[str]:
                     f"visual QA manifest {viewport_name} missing next run checklist evidence: {', '.join(sorted(missing_checklist))}"
                 )
 
+        next_run_briefs = viewport.get("next_run_briefs")
+        if not isinstance(next_run_briefs, list) or not next_run_briefs:
+            failures.append(
+                f"visual QA manifest missing {viewport_name} next run brief evidence"
+            )
+        else:
+            brief_text = "\n".join(
+                str(item.get("body") or item.get("label") or "")
+                for item in next_run_briefs
+                if isinstance(item, dict)
+            )
+            missing_brief = EXPECTED_VISUAL_NEXT_RUN_BRIEF - {
+                expected
+                for expected in EXPECTED_VISUAL_NEXT_RUN_BRIEF
+                if expected in brief_text
+            }
+            if missing_brief:
+                failures.append(
+                    f"visual QA manifest {viewport_name} missing next run brief evidence: {', '.join(sorted(missing_brief))}"
+                )
+
         feedback_handoffs = viewport.get("feedback_handoffs")
         if not isinstance(feedback_handoffs, list) or not feedback_handoffs:
             failures.append(
@@ -2907,7 +2938,7 @@ def release_audit_report(
         f"{VISUAL_MANIFEST.as_posix()}; "
         f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['desktop']).as_posix()}; "
         f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['narrow']).as_posix()}; "
-        "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, sidebar session details, risk distribution, metric cards, dashboard quick reads, report and comparison downloads, report scope-warning evidence, comparison preview, comparison scope-warning evidence, comparison review path, deltas, operator briefing, next review path, next-run checklist, safe feedback handoff, and success target verified"
+        "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, sidebar session details, risk distribution, metric cards, dashboard quick reads, report and comparison downloads, report scope-warning evidence, comparison preview, comparison scope-warning evidence, comparison review path, deltas, operator briefing, next review path, next-run checklist, next-run brief, safe feedback handoff, and success target verified"
         if not visual_manifest_failures
         else "; ".join(visual_manifest_failures[:3]),
     )

@@ -6,6 +6,7 @@ The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
 
+- Surfaced the aggregate next-run brief in the dashboard Overview and visual QA manifest so the copy-pasteable plan is verified before release.
 - Added an aggregate-only next-run brief to report JSON/Markdown so private real-session validation has a copy-pasteable plan for the next Codex run.
 - Preserved sampled-ingest coverage metadata in comparison confirmations.
 - Added terminal sample-coverage and expansion-command guidance for bounded ingests.
