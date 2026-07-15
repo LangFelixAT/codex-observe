@@ -249,8 +249,26 @@ def session_risk_distribution_line(distribution: dict[str, int]) -> str:
 
 
 def session_success_target_preview(recommended: dict[str, Any]) -> dict[str, Any]:
-    opportunities = opportunity_df(recommended, limit=1).to_dict("records")
-    driver = str(opportunities[0].get("Driver") or "") if opportunities else ""
+    largest_thread = float(recommended.get("largest_thread_share_pct") or 0)
+    repeated = float(recommended.get("repeated_prompt_share_pct") or 0)
+    uncached = float(recommended.get("uncached_input_share_pct") or 0)
+    tool_chars = _safe_int(recommended.get("largest_tool_output_chars"))
+    actionable_drivers = [
+        ("Largest thread", largest_thread - 50.0),
+        ("Repeated prompt blocks", repeated - 15.0),
+        ("Uncached input", uncached - 35.0),
+        ("Largest tool output", (tool_chars - 5_000) / 4_000),
+    ]
+    driver = next(
+        (
+            candidate
+            for candidate, overage in sorted(
+                actionable_drivers, key=lambda item: item[1], reverse=True
+            )
+            if overage > 0
+        ),
+        "",
+    )
 
     if driver == "Largest thread":
         current = float(recommended.get("largest_thread_share_pct") or 0)

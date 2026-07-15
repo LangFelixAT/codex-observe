@@ -6,6 +6,7 @@ The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
 
+- Fixed session-listing target previews so private real-session recommendations skip already-satisfied drivers and point at an over-threshold next-run target.
 - Added session-listing next-run target previews in text and JSON so users see the measurable next-run goal before exporting a report.
 - Added release-audit coverage and release-gate documentation for `codex-observe paths --json`, verifying no-scan privacy metadata, sampled private-validation commands, and structured review-path evidence.
 - Added report and comparison terminal privacy warnings so private aggregate artifacts are reviewed before sharing.

@@ -980,14 +980,14 @@ def test_sessions_json_payload_limits_rows_without_changing_recommendation(
     assert payload["recommended_session"]["session_id"] == "demo-session-cost-review"
     assert payload["recommendation_detail"]["target"] == "demo-session-cost-review"
     assert payload["recommendation_detail"]["success_target_preview"] == {
-        "action": "Filter or summarize fresh context before the next run",
-        "current": "39.5%",
-        "current_value": 39.5,
+        "action": "Set a stop condition for the dominant thread",
+        "current": "57.7%",
+        "current_value": 57.7,
         "direction": "lower_is_better",
-        "driver": "Uncached input",
-        "metric": "uncached_input_share_pct",
-        "target": "below 35.0%",
-        "target_value": 35.0,
+        "driver": "Largest thread",
+        "metric": "largest_thread_share_pct",
+        "target": "below 50.0%",
+        "target_value": 50.0,
         "unit": "percent_of_run",
     }
 

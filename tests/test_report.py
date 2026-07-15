@@ -22,6 +22,7 @@ from codex_observe.report import (
     report_json,
     report_markdown,
     session_summaries,
+    session_success_target_preview,
     sort_session_summaries,
     session_summary_lines,
 )
@@ -338,6 +339,32 @@ def test_sort_session_summaries_prefers_highest_risk_then_latest() -> None:
     ]
 
 
+def test_session_success_target_preview_skips_satisfied_uncached_target() -> None:
+    preview = session_success_target_preview(
+        {
+            "total_tokens": 1_715_184_509,
+            "uncached_input_tokens": 40_328_859,
+            "largest_thread_share_pct": 56.7,
+            "repeated_prompt_share_pct": 0.9,
+            "uncached_input_share_pct": 2.4,
+            "largest_tool_output_chars": 40_097,
+        }
+    )
+
+    assert preview == {
+        "action": "Narrow commands before large tool output enters context",
+        "current": "40.1k chars",
+        "current_value": 40097,
+        "direction": "lower_is_better",
+        "driver": "Largest tool output",
+        "metric": "largest_tool_output_chars",
+        "target": "below 5.0k chars",
+        "target_value": 5000,
+        "unit": "chars",
+    }
+    assert preview["target_value"] < preview["current_value"]
+
+
 def test_session_summaries_are_aggregate_only(tmp_path: Path) -> None:
     db = demo_db(tmp_path)
 
@@ -406,10 +433,8 @@ def test_session_summaries_are_aggregate_only(tmp_path: Path) -> None:
         "Top drivers: largest thread share: 57.7%; repeated prompt share: 17.4%; uncached input share: 39.5%; largest tool output: 4.0k chars"
         in lines
     )
-    assert "Next-run target: uncached_input_share_pct 39.5% -> below 35.0%" in lines
-    assert (
-        "Habit to try: Filter or summarize fresh context before the next run" in lines
-    )
+    assert "Next-run target: largest_thread_share_pct 57.7% -> below 50.0%" in lines
+    assert "Habit to try: Set a stop condition for the dominant thread" in lines
     assert "Review path:" in lines
     assert "Save report JSON: codex-observe report --db" in lines
     assert (

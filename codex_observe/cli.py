@@ -2173,9 +2173,9 @@ def release_audit_report(
             and isinstance(recommendation_detail.get("driver_summary"), list)
             and isinstance(recommendation_detail.get("success_target_preview"), dict)
             and recommendation_detail["success_target_preview"].get("metric")
-            == "uncached_input_share_pct"
+            == "largest_thread_share_pct"
             and recommendation_detail["success_target_preview"].get("target")
-            == "below 35.0%"
+            == "below 50.0%"
             and any(
                 row.get("driver") == "largest_tool_output_chars"
                 for row in recommendation_detail["driver_summary"]
