@@ -4,6 +4,7 @@ import argparse
 import contextlib
 import json
 import os
+import socket
 import sqlite3
 import subprocess
 import sys
@@ -20,11 +21,66 @@ VISUAL_MANIFEST_SCHEMA_VERSION = "codex-observe.visual-manifest.v1"
 PROFILE_DEMO = "demo"
 PROFILE_REAL = "real"
 VISUAL_PROFILES = {PROFILE_DEMO, PROFILE_REAL}
+DEFAULT_VISUAL_QA_PORT = 8501
+AUTO_PORT_SEARCH_START = 8600
+AUTO_PORT_SEARCH_END = 8700
 
 VIEWPORTS = {
     "desktop": {"width": 1440, "height": 1000},
     "narrow": {"width": 390, "height": 900},
 }
+
+
+def port_is_available(host: str, port: int) -> bool:
+    probe_host = "127.0.0.1" if host in {"", "0.0.0.0"} else host
+    try:
+        with socket.create_connection((probe_host, port), timeout=0.25):
+            return False
+    except OSError:
+        pass
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.bind((host, port))
+    except OSError:
+        return False
+    return True
+
+
+def port_block_is_available(host: str, base_port: int, width: int = 3) -> bool:
+    return all(port_is_available(host, base_port + offset) for offset in range(width))
+
+
+def find_free_port_block(
+    host: str,
+    *,
+    start: int = AUTO_PORT_SEARCH_START,
+    end: int = AUTO_PORT_SEARCH_END,
+    width: int = 3,
+) -> int | None:
+    for base_port in range(start, end - width + 2):
+        if port_block_is_available(host, base_port, width):
+            return base_port
+    return None
+
+
+def resolve_visual_qa_port(host: str, requested_port: int) -> int:
+    if requested_port < 1 or requested_port > 65533:
+        raise RuntimeError("Visual QA needs a base port between 1 and 65533.")
+    if port_block_is_available(host, requested_port):
+        return requested_port
+    if requested_port != DEFAULT_VISUAL_QA_PORT:
+        raise RuntimeError(
+            f"Visual QA port block {requested_port}-{requested_port + 2} is busy. "
+            "Stop the existing server or pass a different --port."
+        )
+    fallback = find_free_port_block(host)
+    if fallback is None:
+        raise RuntimeError(
+            f"Visual QA port block {requested_port}-{requested_port + 2} is busy, "
+            f"and no free 3-port block was found from {AUTO_PORT_SEARCH_START} "
+            f"through {AUTO_PORT_SEARCH_END}. Stop an existing server or pass --port."
+        )
+    return fallback
 
 
 def wait_for_server(url: str, timeout_s: float) -> None:
@@ -1734,12 +1790,23 @@ def main() -> int:
 
     output_dir = Path(args.out)
     output_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        visual_port = resolve_visual_qa_port(args.host, args.port)
+    except RuntimeError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    if visual_port != args.port:
+        print(
+            f"Visual QA port block {args.port}-{args.port + 2} is busy; "
+            f"using {visual_port}-{visual_port + 2} instead.",
+            file=sys.stderr,
+        )
     app = Path(__file__).resolve().parents[1] / "codex_observe" / "dashboard.py"
     empty_state_results: dict[str, dict[str, object]] = {}
 
     state_specs = [
-        ("missing_database", output_dir / "missing-dashboard.sqlite", args.port + 1),
-        ("empty_database", output_dir / "empty-dashboard.sqlite", args.port + 2),
+        ("missing_database", output_dir / "missing-dashboard.sqlite", visual_port + 1),
+        ("empty_database", output_dir / "empty-dashboard.sqlite", visual_port + 2),
     ]
     for state_name, state_db, state_port in state_specs:
         if state_db.exists():
@@ -1767,9 +1834,9 @@ def main() -> int:
         finally:
             stop_process_tree(process)
 
-    url = f"http://{args.host}:{args.port}"
+    url = f"http://{args.host}:{visual_port}"
     process = subprocess.Popen(
-        streamlit_command(app, args.host, args.port, db),
+        streamlit_command(app, args.host, visual_port, db),
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import json
+import socket
 from copy import deepcopy
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
+
+import pytest
 
 from PIL import Image, ImageDraw
 
@@ -41,6 +44,52 @@ comparison_review_path_failures = visual_qa.comparison_review_path_failures
 comparison_delta_failures = visual_qa.comparison_delta_failures
 collect_comparison_scope_warnings = visual_qa.collect_comparison_scope_warnings
 visual_empty_state_failures = visual_qa.visual_empty_state_failures
+
+
+def test_port_is_available_detects_existing_listener() -> None:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
+        server.bind(("127.0.0.1", 0))
+        server.listen()
+        port = server.getsockname()[1]
+
+        assert visual_qa.port_is_available("127.0.0.1", port) is False
+
+
+def test_resolve_visual_qa_port_uses_requested_block_when_free(monkeypatch) -> None:
+    checked_ports = []
+
+    def fake_port_is_available(host: str, port: int) -> bool:
+        assert host == "127.0.0.1"
+        checked_ports.append(port)
+        return True
+
+    monkeypatch.setattr(visual_qa, "port_is_available", fake_port_is_available)
+
+    assert visual_qa.resolve_visual_qa_port("127.0.0.1", 8501) == 8501
+    assert checked_ports == [8501, 8502, 8503]
+
+
+def test_resolve_visual_qa_port_falls_back_when_default_block_is_busy(
+    monkeypatch,
+) -> None:
+    busy_ports = {8501}
+
+    def fake_port_is_available(host: str, port: int) -> bool:
+        return port not in busy_ports
+
+    monkeypatch.setattr(visual_qa, "port_is_available", fake_port_is_available)
+
+    assert visual_qa.resolve_visual_qa_port("127.0.0.1", 8501) == 8600
+
+
+def test_resolve_visual_qa_port_rejects_explicit_busy_block(monkeypatch) -> None:
+    def fake_port_is_available(host: str, port: int) -> bool:
+        return port != 8765
+
+    monkeypatch.setattr(visual_qa, "port_is_available", fake_port_is_available)
+
+    with pytest.raises(RuntimeError, match="8765-8767 is busy"):
+        visual_qa.resolve_visual_qa_port("127.0.0.1", 8765)
 
 
 def test_playwright_install_hint_uses_project_extras() -> None:
