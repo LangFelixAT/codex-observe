@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 
 import sys
 from types import SimpleNamespace
@@ -1132,6 +1133,50 @@ def test_ingest_payload_and_text_include_bounded_scan_summary() -> None:
     assert payload["counts"]["files_skipped_by_limit"] == 7
     assert payload["scan_limit"] == {"mode": "newest_files", "newest_files": 5}
     assert "newest-file limit 5 selected from 12 matched (7 deferred)" in text
+
+
+def test_doctor_and_sessions_expose_sampled_ingest_scope(
+    tmp_path: Path, capsys
+) -> None:
+    sessions = tmp_path / "sessions"
+    sessions.mkdir()
+    for index, name in enumerate(["older", "middle", "newest"], start=1):
+        path = sessions / f"{name}.jsonl"
+        row = {
+            "type": "session_meta",
+            "timestamp": f"2026-01-01T12:0{index}:00Z",
+            "payload": {
+                "id": f"thread-{name}",
+                "session_id": f"session-{name}",
+                "timestamp": f"2026-01-01T12:0{index}:00Z",
+            },
+        }
+        path.write_text(json.dumps(row) + "\n", encoding="utf-8")
+        os.utime(path, (index * 1000, index * 1000))
+    db = tmp_path / "sampled.sqlite"
+
+    cli.ingest(str(sessions), str(db), newest_files=2)
+
+    _status, doctor = cli.doctor_report(str(db))
+    _lines_status, lines = cli.doctor_lines(str(db))
+    sessions_payload = cli.sessions_json_payload(str(db))
+    scope = doctor["ingest_scope"]
+
+    assert scope["sampled"] is True
+    assert scope["scan_limit"] == {"mode": "newest_files", "newest_files": 2}
+    assert scope["counts"]["files_matched"] == 3
+    assert scope["counts"]["files_seen"] == 2
+    assert scope["counts"]["files_skipped_by_limit"] == 1
+    assert "Sampled ingest: newest-file limit 2 selected 2 of 3" in scope["warning"]
+    assert "Ingest scope: Sampled ingest" in "\n".join(lines)
+    assert sessions_payload["ingest_scope"] == scope
+
+    assert cli.main(["sessions", "--db", str(db), "--limit", "1"]) == 0
+    plain_sessions = capsys.readouterr().out
+    assert "Ingest scope: Sampled ingest" in plain_sessions
+    assert "Showing 1 of 2 sessions." in plain_sessions
+    assert str(sessions) not in json.dumps(scope)
+    assert str(sessions) not in plain_sessions
 
 
 def test_doctor_report_includes_review_path_for_healthy_and_missing_databases(

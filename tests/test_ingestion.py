@@ -787,7 +787,16 @@ def test_ingest_newest_files_limits_large_history_without_paths(
         session_ids = {
             row[0] for row in conn.execute("SELECT session_id FROM conversations")
         }
+        scope = conn.execute(
+            """
+            SELECT scan_mode, newest_files, files_matched, files_seen, files_imported, files_skipped_by_limit
+            FROM ingest_runs
+            ORDER BY id DESC
+            LIMIT 1
+            """
+        ).fetchone()
     assert session_ids == {"middle-session", "newest-session"}
+    assert tuple(scope) == ("newest_files", 2, 3, 2, 2, 1)
 
 
 def test_utf8_bom_prefixed_jsonl_is_accepted(tmp_path: Path) -> None:

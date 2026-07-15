@@ -267,6 +267,76 @@ def doctor_next_commands(db: Path, status: str) -> list[str]:
     return []
 
 
+def latest_ingest_scope(db_path: str | Path) -> dict[str, object] | None:
+    db = Path(db_path).expanduser()
+    if not db.exists():
+        return None
+    try:
+        with sqlite3.connect(db) as conn:
+            conn.row_factory = sqlite3.Row
+            has_table = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='ingest_runs'"
+            ).fetchone()
+            if not has_table:
+                return None
+            row = conn.execute(
+                """
+                SELECT * FROM ingest_runs
+                ORDER BY id DESC
+                LIMIT 1
+                """
+            ).fetchone()
+    except sqlite3.DatabaseError:
+        return None
+    if row is None:
+        return None
+    counts = {
+        "files_matched": int(row["files_matched"] or 0),
+        "files_seen": int(row["files_seen"] or 0),
+        "files_imported": int(row["files_imported"] or 0),
+        "files_skipped_by_limit": int(row["files_skipped_by_limit"] or 0),
+        "threads": int(row["threads"] or 0),
+        "events": int(row["events"] or 0),
+    }
+    skipped = {
+        "duplicate_files": int(row["duplicate_files"] or 0),
+        "empty_files": int(row["empty_files"] or 0),
+        "malformed_files": int(row["malformed_files"] or 0),
+        "malformed_lines": int(row["malformed_lines"] or 0),
+        "missing_meta_files": int(row["missing_meta_files"] or 0),
+        "unreadable_files": int(row["unreadable_files"] or 0),
+    }
+    sampled = str(row["scan_mode"] or "") == "newest_files"
+    warning = None
+    if sampled:
+        warning = (
+            f"Sampled ingest: newest-file limit {int(row['newest_files'] or 0)} selected "
+            f"{counts['files_seen']} of {counts['files_matched']} matched JSONL files "
+            f"({counts['files_skipped_by_limit']} deferred); treat sessions and reports as sampled evidence."
+        )
+    return {
+        "imported_at": row["imported_at"],
+        "scan_limit": {
+            "mode": row["scan_mode"],
+            "newest_files": row["newest_files"],
+        },
+        "counts": counts,
+        "skipped": skipped,
+        "sampled": sampled,
+        "warning": warning,
+    }
+
+
+def ingest_scope_lines(scope: object) -> list[str]:
+    if not isinstance(scope, dict):
+        return []
+    lines = []
+    warning = scope.get("warning")
+    if isinstance(warning, str) and warning:
+        lines.append(f"Ingest scope: {warning}")
+    return lines
+
+
 def doctor_review_path(db: Path, status: str) -> list[dict[str, str]]:
     if status == "ok":
         return [
@@ -339,6 +409,7 @@ def doctor_report(db_path: str) -> tuple[int, dict]:
         "next": "run `codex-observe serve --db <this-db>` to inspect the dashboard.",
         "next_commands": [],
         "review_path": [],
+        "ingest_scope": None,
     }
     if not db.exists():
         report.update(
@@ -409,6 +480,7 @@ def doctor_report(db_path: str) -> tuple[int, dict]:
         return 1, report
 
     report["tables"] = counts
+    report["ingest_scope"] = latest_ingest_scope(db)
     report["totals"] = {
         "total_tokens": int(totals["total_tokens"]),
         "uncached_input_tokens": int(totals["uncached_input"]),
@@ -441,6 +513,7 @@ def doctor_lines(db_path: str) -> tuple[int, list[str]]:
     if report["status"] == "ok":
         for table in DOCTOR_TABLES:
             lines.append(f"{table}: {report['tables'][table]}")
+        lines.extend(ingest_scope_lines(report.get("ingest_scope")))
         lines.extend(
             [
                 f"total_tokens: {report['totals']['total_tokens']}",
@@ -3018,6 +3091,7 @@ def sessions_json_payload(
         "truncated": len(displayed) < len(summaries),
         "limit": effective_limit,
         "risk_distribution": session_risk_distribution(summaries),
+        "ingest_scope": latest_ingest_scope(db_path),
     }
     if summaries:
         recommended = summaries[0]
@@ -4817,7 +4891,9 @@ def main(argv: list[str] | None = None) -> int:
                     )
                 )
             else:
-                print("\n".join(session_summary_lines(args.db, limit=args.limit)))
+                lines = ingest_scope_lines(latest_ingest_scope(args.db))
+                lines.extend(session_summary_lines(args.db, limit=args.limit))
+                print("\n".join(lines))
         except FileNotFoundError:
             if args.json:
                 print(

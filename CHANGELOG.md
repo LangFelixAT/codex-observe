@@ -6,6 +6,7 @@ The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
 
+- Added persisted ingest-scope metadata so doctor and sessions warn when a database was built from a bounded newest-file sample.
 - Fixed session-listing target previews so private real-session recommendations skip already-satisfied drivers, rank actionable targets by impact, and stay aligned with report recommendations.
 - Added session-listing next-run target previews in text and JSON so users see the measurable next-run goal before exporting a report.
 - Added release-audit coverage and release-gate documentation for `codex-observe paths --json`, verifying no-scan privacy metadata, sampled private-validation commands, and structured review-path evidence.

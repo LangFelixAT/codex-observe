@@ -129,6 +129,24 @@ CREATE TABLE IF NOT EXISTS prompt_blocks (
   preview TEXT,
   PRIMARY KEY(block_hash, thread_id, event_pk, label)
 );
+CREATE TABLE IF NOT EXISTS ingest_runs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  imported_at TEXT NOT NULL,
+  scan_mode TEXT NOT NULL,
+  newest_files INTEGER,
+  files_matched INTEGER DEFAULT 0,
+  files_seen INTEGER DEFAULT 0,
+  files_imported INTEGER DEFAULT 0,
+  files_skipped_by_limit INTEGER DEFAULT 0,
+  duplicate_files INTEGER DEFAULT 0,
+  empty_files INTEGER DEFAULT 0,
+  malformed_files INTEGER DEFAULT 0,
+  malformed_lines INTEGER DEFAULT 0,
+  missing_meta_files INTEGER DEFAULT 0,
+  unreadable_files INTEGER DEFAULT 0,
+  threads INTEGER DEFAULT 0,
+  events INTEGER DEFAULT 0
+);
 
 CREATE INDEX IF NOT EXISTS idx_threads_session ON threads(session_id);
 CREATE INDEX IF NOT EXISTS idx_threads_parent ON threads(parent_thread_id);

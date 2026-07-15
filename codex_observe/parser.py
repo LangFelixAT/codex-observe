@@ -389,8 +389,34 @@ class CodexIngestor:
             result.threads += r.threads
             result.events += r.events
         self.recompute_rollups()
+        self._record_ingest_run(result)
         self.conn.commit()
         return result
+
+    def _record_ingest_run(self, result: IngestResult) -> None:
+        self.conn.execute(
+            """INSERT INTO ingest_runs(
+                imported_at,scan_mode,newest_files,files_matched,files_seen,files_imported,files_skipped_by_limit,
+                duplicate_files,empty_files,malformed_files,malformed_lines,missing_meta_files,unreadable_files,threads,events
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                utc_now(),
+                "newest_files" if result.newest_files_limit is not None else "all",
+                result.newest_files_limit,
+                result.files_matched,
+                result.files_seen,
+                result.files_imported,
+                result.files_skipped_by_limit,
+                result.duplicate_files,
+                result.empty_files,
+                result.malformed_files,
+                result.malformed_lines,
+                result.missing_meta_files,
+                result.unreadable_files,
+                result.threads,
+                result.events,
+            ),
+        )
 
     def _delete_thread_rows(self, thread_id: str) -> None:
         for table in [
