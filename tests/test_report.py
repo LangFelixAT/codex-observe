@@ -713,6 +713,45 @@ def test_session_portfolio_drivers_rank_cross_session_patterns() -> None:
     }
 
 
+def test_session_summaries_bound_replayed_prompt_share_to_total_tokens(
+    tmp_path: Path,
+) -> None:
+    db = demo_db(tmp_path)
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            """
+            UPDATE conversations
+            SET total_tokens=1000,
+                total_input_tokens=1000,
+                total_uncached_input_tokens=100,
+                total_cached_input_tokens=900
+            WHERE session_id='demo-session-cost-review'
+            """
+        )
+        conn.execute(
+            """
+            UPDATE prompt_blocks
+            SET approx_tokens=2500
+            WHERE thread_id IN (
+                SELECT thread_id FROM threads
+                WHERE session_id='demo-session-cost-review'
+            )
+            """
+        )
+
+    summaries = session_summaries(str(db))
+    recommended = next(
+        row for row in summaries if row["session_id"] == "demo-session-cost-review"
+    )
+    report = build_report(str(db), "demo-session-cost-review")
+
+    assert recommended["repeated_prompt_share_pct"] == 100.0
+    assert (
+        report["summary"]["repeated_prompt_tokens"] > report["summary"]["total_tokens"]
+    )
+    assert report["summary"]["repeated_prompt_share_pct"] == 100.0
+
+
 def test_compare_reports_marks_improved_metrics_and_privacy_safe_output(
     tmp_path: Path,
 ) -> None:

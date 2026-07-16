@@ -171,8 +171,10 @@ def available_sessions(db_path: str) -> list[str]:
 RISK_RANK = {"low": 0, "moderate": 1, "high": 2}
 
 
-def _pct_of_total(value: int, total: int) -> float:
-    return round(value / (total or 1) * 100, 1)
+def _pct_of_total(value: int | float, total: int | float) -> float:
+    if total <= 0 or value <= 0:
+        return 0.0
+    return round(min(value / total * 100, 100.0), 1)
 
 
 def sort_session_summaries(summaries: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -1032,9 +1034,6 @@ def build_report(db_path: str, session_id: str | None = None) -> dict[str, Any]:
         else 0
     )
 
-    def pct_of_total(value: int) -> float:
-        return round(value / (total_tokens or 1) * 100, 1)
-
     opportunities = opportunity_df(
         {
             "total_tokens": total_tokens,
@@ -1093,14 +1092,18 @@ def build_report(db_path: str, session_id: str | None = None) -> dict[str, Any]:
             "cached_input_tokens": cached,
             "cache_pct": round(cache_pct, 1),
             "largest_thread_tokens": largest_thread_tokens,
-            "largest_thread_share_pct": pct_of_total(largest_thread_tokens),
+            "largest_thread_share_pct": _pct_of_total(
+                largest_thread_tokens, total_tokens
+            ),
             "largest_thread_kind": str(largest_thread["kind"].iloc[0])
             if not largest_thread.empty
             else "",
             "repeated_prompt_tokens": repeated_prompt_tokens,
-            "repeated_prompt_share_pct": pct_of_total(repeated_prompt_tokens),
-            "uncached_input_share_pct": pct_of_total(
-                int(conv["total_uncached_input_tokens"] or 0)
+            "repeated_prompt_share_pct": _pct_of_total(
+                repeated_prompt_tokens, total_tokens
+            ),
+            "uncached_input_share_pct": _pct_of_total(
+                int(conv["total_uncached_input_tokens"] or 0), total_tokens
             ),
             "largest_tool_output_chars": largest_tool_output_chars,
         },

@@ -1606,9 +1606,9 @@ def pct_of_total(value: object, total: object) -> float:
         denominator = float(total or 0)
     except (TypeError, ValueError):
         return 0.0
-    if denominator <= 0:
+    if denominator <= 0 or numerator <= 0:
         return 0.0
-    return round(numerator / denominator * 100, 1)
+    return round(min(numerator / denominator * 100, 100.0), 1)
 
 
 def safe_download_stem(value: object, fallback: str) -> str:

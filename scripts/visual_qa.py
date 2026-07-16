@@ -518,6 +518,21 @@ def comparison_delta_failures(
             if profile == PROFILE_REAL
             else [f"{viewport_name}: comparison delta cards not rendered"]
         )
+    if profile == PROFILE_REAL:
+        failures = []
+        direction_words = ("improved", "regressed", "changed", "unchanged")
+        for index, item in enumerate(deltas, start=1):
+            label = str(item.get("label") or "") if isinstance(item, dict) else ""
+            delta = str(item.get("delta") or "") if isinstance(item, dict) else ""
+            if not label:
+                failures.append(
+                    f"{viewport_name}: comparison delta card {index} missing label"
+                )
+            if not any(word in delta for word in direction_words):
+                failures.append(
+                    f"{viewport_name}: comparison delta {label or index} missing direction"
+                )
+        return failures
     failures = []
     observed = {
         str(item.get("label") or ""): str(item.get("delta") or "")

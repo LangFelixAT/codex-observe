@@ -5,6 +5,7 @@ All notable changes to Codex Observe will be documented here.
 The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
+- Bounded percentage-of-total metrics at 100% in reports, sessions summaries, and dashboard calculations so real-history replay-token outliers do not produce impossible percentage displays.
 - Added sampled/full-history scope guidance to codex-observe private-validate review summaries so users know whether the recommendation reflects a newest-file sample or complete local history.
 - Added `codex-observe private-validate --all` and a sampled-run full-history follow-up command so users can graduate from newest-file validation to complete real-history validation without guessing the command.
 - Added a compact private review summary to `codex-observe private-validate` so real-session validation immediately names the dominant portfolio pattern, recommended focus, report artifact, and dashboard command.

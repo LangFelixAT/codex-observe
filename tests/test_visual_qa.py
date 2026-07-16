@@ -516,6 +516,28 @@ def test_comparison_delta_failures_require_metric_delta_cards() -> None:
     assert "narrow: comparison delta not found: Largest thread tokens" in failures
 
 
+def test_real_profile_comparison_delta_failures_are_data_driven() -> None:
+    assert (
+        comparison_delta_failures(
+            [
+                {"label": "Total tokens", "delta": "regressed: 2.2B (536289.2%)"},
+                {"label": "Uncached input tokens", "delta": "changed: 53.4M"},
+            ],
+            "desktop",
+            profile="real",
+        )
+        == []
+    )
+
+    failures = comparison_delta_failures(
+        [{"label": "Total tokens", "delta": "2.2B"}],
+        "desktop",
+        profile="real",
+    )
+
+    assert "desktop: comparison delta Total tokens missing direction" in failures
+
+
 def test_review_path_failures_require_next_review_path_contract() -> None:
     assert (
         review_path_failures(
