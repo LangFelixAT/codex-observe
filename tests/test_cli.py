@@ -128,6 +128,9 @@ def test_private_validate_writes_ignored_private_artifacts(tmp_path: Path) -> No
     assert (output_dir / "real-run-report.md").exists()
     assert (output_dir / "real-run-report.json").exists()
     assert any("codex-observe serve" in item for item in payload["next_commands"])
+    assert payload["scan_scope"] == "newest"
+    assert payload["newest_files"] == 25
+    assert any("--all --json" in item for item in payload["next_commands"])
     review_summary = payload["review_summary"]
     assert review_summary["status"] == "ready"
     assert review_summary["portfolio_pattern"] == "Largest thread concentration"
@@ -138,6 +141,7 @@ def test_private_validate_writes_ignored_private_artifacts(tmp_path: Path) -> No
     assert review_summary["sessions_artifact"].endswith("real-sessions-list.json")
     assert review_summary["report_markdown"].endswith("real-run-report.md")
     assert "codex-observe serve" in review_summary["dashboard_command"]
+    assert "--all --json" in review_summary["full_history_command"]
     assert "session_id" not in json.dumps(review_summary)
     visual_qa = payload["visual_qa"]
     assert visual_qa["profile"] == "real"
@@ -148,6 +152,26 @@ def test_private_validate_writes_ignored_private_artifacts(tmp_path: Path) -> No
     assert "--db" in visual_qa["command"]
     assert "real-sessions.sqlite" in visual_qa["command"]
     assert visual_qa["command"] in payload["next_commands"]
+
+
+def test_private_validate_all_scans_full_history_without_repeat_prompt(
+    tmp_path: Path,
+) -> None:
+    sessions = tmp_path / "sessions"
+    create_demo_database(tmp_path / "source.sqlite", sessions, keep_sessions=True)
+    output_dir = tmp_path / "private"
+
+    status, payload = cli.private_validate_payload(
+        str(sessions), output_dir=output_dir, newest_files=None
+    )
+
+    assert status == 0
+    assert payload["status"] == "ok"
+    assert payload["scan_scope"] == "all"
+    assert payload["newest_files"] is None
+    assert payload["review_summary"]["full_history_command"] is None
+    assert not any("--all" in item for item in payload["next_commands"])
+    assert any("codex-observe serve" in item for item in payload["next_commands"])
 
 
 def test_private_validate_cli_json_is_privacy_safe(tmp_path: Path, capsys) -> None:
@@ -322,6 +346,7 @@ def test_private_validate_serve_launches_dashboard_after_success(
     assert "recommended focus: Set a stop condition" in output
     assert "success target: largest_thread_share_pct -> below 50.0%" in output
     assert "dashboard: codex-observe serve" in output
+    assert "full history: codex-observe private-validate" in output
     assert "Private visual QA handoff:" in output
     assert "--profile real" in output
     assert "visual-qa-manifest.json" in output.replace("\\", "/")
@@ -1165,7 +1190,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     )
     assert checks["private validation handoff"]["ok"] is True
     assert checks["private validation handoff"]["detail"] == (
-        "schema, bounded sample, ignored artifacts, report export, privacy metadata, private review summary, dashboard next command, and visual QA handoff status verified"
+        "schema, bounded sample, ignored artifacts, report export, privacy metadata, private review summary, full-history follow-up, dashboard next command, and visual QA handoff status verified"
     )
     assert checks["visual QA manifest evidence"]["ok"] is True
     assert checks["CI reviewer evidence bundle"]["ok"] is True

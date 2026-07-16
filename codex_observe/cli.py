@@ -2841,6 +2841,7 @@ def release_audit_report(
         and private_validate.get("sessions_path_exists") is True
         and private_validate.get("database_exists") is True
         and private_validate.get("newest_files") == 25
+        and private_validate.get("scan_scope") == "newest"
         and private_validate.get("report_written") is True
         and private_validate_privacy.get("raw_content_included") is False
         and private_validate_privacy.get("terminal_output_includes_counts") is False
@@ -2855,6 +2856,10 @@ def release_audit_report(
         and isinstance(private_validate.get("next_commands"), list)
         and any(
             "codex-observe serve" in str(command)
+            for command in private_validate.get("next_commands", [])
+        )
+        and any(
+            "--all --json" in str(command)
             for command in private_validate.get("next_commands", [])
         )
         and isinstance(private_validate_review, dict)
@@ -2883,9 +2888,9 @@ def release_audit_report(
     add(
         "private validation handoff",
         private_validate_ok,
-        "schema, bounded sample, ignored artifacts, report export, privacy metadata, private review summary, dashboard next command, and visual QA handoff status verified"
+        "schema, bounded sample, ignored artifacts, report export, privacy metadata, private review summary, full-history follow-up, dashboard next command, and visual QA handoff status verified"
         if private_validate_ok
-        else "private validation schema, bounded sample, artifacts, report export, privacy metadata, private review summary, dashboard next command, visual QA handoff status, or privacy-safe top-level payload missing",
+        else "private validation schema, bounded sample, artifacts, report export, privacy metadata, private review summary, full-history follow-up, dashboard next command, visual QA handoff status, or privacy-safe top-level payload missing",
     )
 
     try:
@@ -4190,12 +4195,19 @@ def private_validate_review_summary(
     artifact_labels: dict[str, str],
     next_commands: list[str],
 ) -> dict[str, object]:
+    dashboard_command = next(
+        (command for command in next_commands if "codex-observe serve" in command), None
+    )
+    full_history_command = next(
+        (command for command in next_commands if "--all" in command), None
+    )
     summary: dict[str, object] = {
         "status": "empty",
         "sessions_artifact": artifact_labels.get("sessions_json"),
         "report_markdown": artifact_labels.get("report_md"),
         "report_json": artifact_labels.get("report_json"),
-        "dashboard_command": next_commands[2] if len(next_commands) > 2 else None,
+        "dashboard_command": dashboard_command,
+        "full_history_command": full_history_command,
     }
     if not isinstance(sessions_payload, dict):
         return summary
@@ -4309,7 +4321,7 @@ def private_validate_payload(
     sessions_path: str | None = None,
     *,
     output_dir: str | Path = ".artifacts/private",
-    newest_files: int = 25,
+    newest_files: int | None = 25,
 ) -> tuple[int, dict[str, object]]:
     artifacts = private_validate_paths(output_dir)
     out = artifacts["output_dir"]
@@ -4369,12 +4381,20 @@ def private_validate_payload(
     visual_output_dir = out / "visual-real"
     visual_manifest = visual_output_dir / "visual-qa-manifest.json"
     visual_command = private_visual_qa_command(artifacts["database"], visual_output_dir)
-    next_commands = [
-        f"codex-observe doctor --db {_command_arg(artifacts['database'])}",
-        f"codex-observe sessions --db {_command_arg(artifacts['database'])}",
-        f"codex-observe serve --db {_command_arg(artifacts['database'])}",
-        visual_command,
-    ]
+    next_commands = []
+    if newest_files is not None:
+        next_commands.append(
+            "codex-observe private-validate "
+            f"{_command_arg(sessions)} --out {_command_arg(out)} --all --json"
+        )
+    next_commands.extend(
+        [
+            f"codex-observe doctor --db {_command_arg(artifacts['database'])}",
+            f"codex-observe sessions --db {_command_arg(artifacts['database'])}",
+            f"codex-observe serve --db {_command_arg(artifacts['database'])}",
+            visual_command,
+        ]
+    )
     review_summary = private_validate_review_summary(
         sessions_payload, artifact_labels, next_commands
     )
@@ -4384,6 +4404,7 @@ def private_validate_payload(
         "sessions_path_exists": bool(paths.get("sessions_path_exists")),
         "database_exists": artifacts["database"].exists(),
         "newest_files": newest_files,
+        "scan_scope": "all" if newest_files is None else "newest",
         "artifacts": artifact_labels,
         "report_written": report_written,
         "privacy": {
@@ -4453,6 +4474,8 @@ def private_validate_lines(payload: dict[str, object]) -> list[str]:
             )
         if review_summary.get("report_markdown"):
             lines.append(f"- report: {review_summary['report_markdown']}")
+        if review_summary.get("full_history_command"):
+            lines.append(f"- full history: {review_summary['full_history_command']}")
         if review_summary.get("dashboard_command"):
             lines.append(f"- dashboard: {review_summary['dashboard_command']}")
         if review_summary.get("next_step"):
@@ -5363,6 +5386,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Only ingest the newest N JSONL files; default 25",
     )
     p_private.add_argument(
+        "--all",
+        action="store_true",
+        help="Ingest all matching JSONL files instead of the default newest-file sample",
+    )
+    p_private.add_argument(
         "--serve",
         action="store_true",
         help="Launch the dashboard against the private validation database after success",
@@ -5652,7 +5680,9 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.cmd == "private-validate":
         status, payload = private_validate_payload(
-            args.sessions_path, output_dir=args.out, newest_files=args.newest_files
+            args.sessions_path,
+            output_dir=args.out,
+            newest_files=None if args.all else args.newest_files,
         )
         if args.visual and status == 0:
             visual_status = run_private_visual_qa(payload, args.out)
