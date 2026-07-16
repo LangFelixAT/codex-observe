@@ -23,6 +23,7 @@ from codex_observe.report import (
     report_json,
     report_markdown,
     report_review_path,
+    session_portfolio_drivers,
     session_portfolio_summary,
     session_summaries,
     session_success_target_preview,
@@ -661,6 +662,8 @@ def test_session_portfolio_summary_distinguishes_workflow_patterns() -> None:
         "low_risk_sessions": 0,
         "unknown_risk_sessions": 0,
         "high_risk_share_pct": 100.0,
+        "top_driver": None,
+        "drivers": [],
     }
 
     mixed = session_portfolio_summary(
@@ -671,6 +674,43 @@ def test_session_portfolio_summary_distinguishes_workflow_patterns() -> None:
     assert mixed["headline"] == "1 of 2 sessions are high risk."
     assert mixed["matching_sessions"] == 1
     assert mixed["filter_note"] == "Current filter shows 1 of 2 sessions."
+
+
+def test_session_portfolio_drivers_rank_cross_session_patterns() -> None:
+    drivers = session_portfolio_drivers(
+        [
+            {
+                "triage_risk": "high",
+                "total_tokens": 100_000,
+                "largest_thread_share_pct": 75.0,
+                "session_duration_hours": 30.0,
+                "largest_tool_output_chars": 20_000,
+            },
+            {
+                "triage_risk": "high",
+                "total_tokens": 50_000,
+                "largest_thread_share_pct": 65.0,
+                "uncached_input_share_pct": 40.0,
+            },
+        ]
+    )
+
+    assert drivers[0] == {
+        "driver": "largest_thread_share_pct",
+        "label": "Largest thread concentration",
+        "sessions": 2,
+        "share_pct": 100.0,
+        "max_value": 75.0,
+        "max_display": "75.0%",
+        "threshold": 50.0,
+        "threshold_display": "50.0%",
+        "action": "Set stop conditions before one thread dominates repeated work.",
+    }
+    assert {driver["label"] for driver in drivers} >= {
+        "Multi-day session duration",
+        "High uncached input share",
+        "Large tool output",
+    }
 
 
 def test_compare_reports_marks_improved_metrics_and_privacy_safe_output(

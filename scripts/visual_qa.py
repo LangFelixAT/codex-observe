@@ -165,6 +165,8 @@ EXPECTED_PORTFOLIO_BRIEFING = [
     "Portfolio briefing",
     "1 of 2 sessions are high risk.",
     "Start with the recommended high-risk run",
+    "Dominant pattern: Largest thread concentration",
+    "max 57.7%",
     "50.0% high risk.",
 ]
 

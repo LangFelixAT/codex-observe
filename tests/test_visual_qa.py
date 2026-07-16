@@ -675,7 +675,7 @@ def complete_viewport_results(tmp_path: Path) -> dict[str, dict[str, object]]:
             "portfolio_briefings": [
                 {
                     "label": "Portfolio briefing",
-                    "body": "Portfolio briefing 1 of 2 sessions are high risk. Start with the recommended high-risk run, then compare against a lower-risk follow-up to find which habits worked. 50.0% high risk. Current view includes every imported session.",
+                    "body": "Portfolio briefing 1 of 2 sessions are high risk. Start with the recommended high-risk run, then compare against a lower-risk follow-up to find which habits worked. Dominant pattern: Largest thread concentration in 1 of 2 sessions; max 57.7%. Set stop conditions before one thread dominates repeated work. 50.0% high risk. Current view includes every imported session.",
                 }
             ],
             "metric_cards": [
@@ -1091,7 +1091,7 @@ def test_real_profile_manifest_accepts_private_aggregate_variance(
         raw["portfolio_briefings"] = [
             {
                 "label": "Portfolio briefing",
-                "body": "Portfolio briefing 2 of 11 sessions are high risk. Current view includes every imported session.",
+                "body": "Portfolio briefing 2 of 11 sessions are high risk. Dominant pattern: Largest thread concentration in 8 of 11 sessions; max 100.0%. Current view includes every imported session.",
             }
         ]
         raw["metric_cards"] = [

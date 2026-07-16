@@ -347,6 +347,116 @@ def session_risk_distribution_line(distribution: dict[str, int]) -> str:
     )
 
 
+def _portfolio_driver_catalog() -> list[dict[str, Any]]:
+    return [
+        {
+            "driver": "largest_thread_share_pct",
+            "label": "Largest thread concentration",
+            "threshold": 50.0,
+            "unit": "percent",
+            "action": "Set stop conditions before one thread dominates repeated work.",
+        },
+        {
+            "driver": "session_duration_hours",
+            "label": "Multi-day session duration",
+            "threshold": 24.0,
+            "unit": "hours",
+            "action": "Start fresh sessions at durable checkpoints.",
+        },
+        {
+            "driver": "uncached_input_share_pct",
+            "label": "High uncached input share",
+            "threshold": 35.0,
+            "unit": "percent",
+            "action": "Filter or summarize fresh context before it enters the run.",
+        },
+        {
+            "driver": "repeated_prompt_share_pct",
+            "label": "Repeated prompt blocks",
+            "threshold": 15.0,
+            "unit": "percent",
+            "action": "Reference stable instructions instead of replaying them.",
+        },
+        {
+            "driver": "largest_tool_output_chars",
+            "label": "Large tool output",
+            "threshold": 5_000.0,
+            "unit": "chars",
+            "action": "Narrow bulky commands before sharing output back into context.",
+        },
+    ]
+
+
+def _portfolio_driver_display(value: float, unit: str) -> str:
+    if unit == "percent":
+        return f"{value:.1f}%"
+    if unit == "hours":
+        if value >= 24:
+            return f"{value / 24:.1f} days"
+        return f"{value:.1f} hours"
+    if unit == "chars":
+        return f"{fmt_short(value)} chars"
+    return fmt_short(value)
+
+
+def session_portfolio_drivers(summaries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    total = len(summaries)
+    if total == 0:
+        return []
+    rows: list[dict[str, Any]] = []
+    for order, definition in enumerate(_portfolio_driver_catalog()):
+        driver = str(definition["driver"])
+        unit = str(definition["unit"])
+        threshold = float(definition["threshold"])
+        values: list[float] = []
+        total_impact = 0.0
+        for summary in summaries:
+            try:
+                value = float(summary.get(driver) or 0)
+            except (TypeError, ValueError):
+                value = 0.0
+            if value >= threshold:
+                values.append(value)
+                if unit == "percent":
+                    total_impact += (
+                        float(summary.get("total_tokens") or 0) * value / 100
+                    )
+                elif unit == "hours":
+                    total_impact += value
+                else:
+                    total_impact += value
+        if not values:
+            continue
+        max_value = max(values)
+        rows.append(
+            {
+                "driver": driver,
+                "label": definition["label"],
+                "sessions": len(values),
+                "share_pct": round(len(values) / total * 100, 1),
+                "max_value": round(max_value, 1),
+                "max_display": _portfolio_driver_display(max_value, unit),
+                "threshold": threshold,
+                "threshold_display": _portfolio_driver_display(threshold, unit),
+                "action": definition["action"],
+                "_impact": total_impact,
+                "_order": order,
+            }
+        )
+    rows.sort(
+        key=lambda row: (
+            int(row["sessions"]),
+            float(row["_impact"]),
+            -int(row["_order"]),
+        ),
+        reverse=True,
+    )
+    for row in rows:
+        row.pop("_impact", None)
+        row.pop("_order", None)
+    return rows
+
+
 def session_portfolio_summary(
     summaries: list[dict[str, Any]],
     matching_summaries: list[dict[str, Any]] | None = None,
@@ -360,6 +470,8 @@ def session_portfolio_summary(
     low = int(distribution.get("low", 0) or 0)
     unknown = int(distribution.get("unknown", 0) or 0)
     high_share = round(high / total * 100, 1) if total else 0.0
+    portfolio_drivers = session_portfolio_drivers(summaries)
+    top_driver = portfolio_drivers[0] if portfolio_drivers else None
 
     if total == 0:
         posture = "empty"
@@ -401,13 +513,24 @@ def session_portfolio_summary(
         "low_risk_sessions": low,
         "unknown_risk_sessions": unknown,
         "high_risk_share_pct": high_share,
+        "top_driver": top_driver,
+        "drivers": portfolio_drivers,
     }
 
 
 def session_portfolio_summary_line(summary: dict[str, Any]) -> str:
     headline = str(summary.get("headline") or "No portfolio summary available.")
     action = str(summary.get("action") or "Review the recommended session.")
-    return f"Portfolio: {headline} {action}"
+    top_driver = summary.get("top_driver")
+    if isinstance(top_driver, dict):
+        driver_line = (
+            f" Dominant pattern: {top_driver.get('label')} in "
+            f"{top_driver.get('sessions')} of {summary.get('total_sessions')} sessions "
+            f"(max {top_driver.get('max_display')})."
+        )
+    else:
+        driver_line = ""
+    return f"Portfolio: {headline} {action}{driver_line}"
 
 
 def session_success_target_preview(recommended: dict[str, Any]) -> dict[str, Any]:

@@ -59,6 +59,13 @@ def test_portfolio_briefing_html_surfaces_workflow_pattern() -> None:
             "action": "Treat this as a workflow pattern.",
             "filter_note": "Current view includes every imported session.",
             "high_risk_share_pct": 100.0,
+            "total_sessions": 10,
+            "top_driver": {
+                "label": "Largest thread concentration",
+                "sessions": 10,
+                "max_display": "100.0%",
+                "action": "Set stop conditions before one thread dominates repeated work.",
+            },
         }
     )
 
@@ -66,6 +73,9 @@ def test_portfolio_briefing_html_surfaces_workflow_pattern() -> None:
     assert "All 10 sessions are high risk." in html
     assert "Treat this as a workflow pattern." in html
     assert "100.0% high risk." in html
+    assert "Dominant pattern: Largest thread concentration" in html
+    assert "10 of 10 sessions" in html
+    assert "Set stop conditions" in html
 
 
 def test_dataframe_preview_caps_large_real_history_tables() -> None:

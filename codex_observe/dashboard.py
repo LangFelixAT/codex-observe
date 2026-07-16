@@ -1279,6 +1279,14 @@ def portfolio_briefing_html(summary: object) -> str:
     headline = str(summary.get("headline") or "No portfolio summary available.")
     action = str(summary.get("action") or "Review the recommended session.")
     filter_note = str(summary.get("filter_note") or "")
+    top_driver = summary.get("top_driver")
+    driver_line = ""
+    if isinstance(top_driver, dict):
+        driver_line = (
+            f"Dominant pattern: {top_driver.get('label')} in "
+            f"{top_driver.get('sessions')} of {summary.get('total_sessions')} sessions; "
+            f"max {top_driver.get('max_display')}. {top_driver.get('action')}"
+        )
     high_share = summary.get("high_risk_share_pct")
     high_share_text = ""
     if high_share is not None:
@@ -1293,6 +1301,7 @@ def portfolio_briefing_html(summary: object) -> str:
             "  <h3>Portfolio briefing</h3>",
             f"  <p><strong>{html.escape(headline)}</strong></p>",
             f"  <p>{html.escape(action)}</p>",
+            f"  <p>{html.escape(driver_line)}</p>" if driver_line else "",
             f"  <p>{html.escape(details)}</p>" if details else "",
             "</section>",
         ]

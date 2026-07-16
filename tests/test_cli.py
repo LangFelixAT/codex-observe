@@ -540,7 +540,7 @@ def write_valid_visual_manifest(root: Path) -> None:
             "portfolio_briefings": [
                 {
                     "label": "Portfolio briefing",
-                    "body": "Portfolio briefing 1 of 2 sessions are high risk. Start with the recommended high-risk run, then compare against a lower-risk follow-up to find which habits worked. 50.0% high risk. Current view includes every imported session.",
+                    "body": "Portfolio briefing 1 of 2 sessions are high risk. Start with the recommended high-risk run, then compare against a lower-risk follow-up to find which habits worked. Dominant pattern: Largest thread concentration in 1 of 2 sessions; max 57.7%. Set stop conditions before one thread dominates repeated work. 50.0% high risk. Current view includes every imported session.",
                 }
             ],
             "metric_cards": [
