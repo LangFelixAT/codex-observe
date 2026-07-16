@@ -49,7 +49,7 @@ VISUAL_MANIFEST_RECOVERY = (
 EXPECTED_VISUAL_RISK_LABELS = {"High risk", "Low risk"}
 EXPECTED_VISUAL_RISK_FILTER = {"Risk filter"}
 EXPECTED_VISUAL_SIDEBAR_SESSION_SEARCH = {"Find session"}
-EXPECTED_VISUAL_SIDEBAR_SESSION_DETAILS = {"6 snapshots"}
+EXPECTED_VISUAL_SIDEBAR_SESSION_DETAILS = {"24 min duration", "6 snapshots"}
 EXPECTED_VISUAL_DOWNLOAD_CONTROLS = {
     "Download report MD",
     "Download report JSON",
@@ -86,6 +86,7 @@ EXPECTED_VISUAL_RISK_DISTRIBUTION = {
 
 EXPECTED_VISUAL_METRICS = {
     "Threads": "3",
+    "Duration": "24 min",
     "Largest thread": "33.2k tokens (57.7%)",
     "Uncached input": "22.7k tokens (39.5%)",
 }

@@ -720,7 +720,7 @@ def test_visual_manifest_evidence_failures_validate_saved_sidebar_metric_and_suc
     payload["viewports"]["desktop"]["quick_read_evidence"] = [
         {"tab": "Overview", "text": "Run triage"}
     ]
-    payload["viewports"]["narrow"]["metric_cards"][1]["value"] = "2.9k tokens (34.5%)"
+    payload["viewports"]["narrow"]["metric_cards"][2]["value"] = "2.9k tokens (34.5%)"
     payload["viewports"]["desktop"]["success_targets"][0]["current"] = "34.5%"
     payload["viewports"]["desktop"]["operator_briefings"][0]["best_habit"] = (
         "Read raw tables"
@@ -736,7 +736,7 @@ def test_visual_manifest_evidence_failures_validate_saved_sidebar_metric_and_suc
 
     assert "visual QA manifest desktop missing risk labels: Low risk" in failures
     assert (
-        "visual QA manifest desktop missing sidebar session details: 6 snapshots"
+        "visual QA manifest desktop missing sidebar session details: 24 min duration, 6 snapshots"
         in failures
     )
     assert "visual QA manifest missing desktop sidebar Risk filter evidence" in failures
@@ -794,7 +794,7 @@ def test_visual_manifest_evidence_rejects_stale_minimal_manifest_shape(
                         "sidebar_risk_labels": ["High risk", "Low risk"],
                         "sidebar_risk_filter": ["Risk filter"],
                         "sidebar_session_search": ["Find session"],
-                        "sidebar_session_details": ["6 snapshots"],
+                        "sidebar_session_details": ["24 min duration", "6 snapshots"],
                         "metric_cards": [
                             {"label": label, "value": value}
                             for label, value in cli.EXPECTED_VISUAL_METRICS.items()

@@ -272,6 +272,7 @@ def test_layout_review_failures_ignores_transient_streamlit_stop_control() -> No
 def test_metric_card_failures_require_key_overview_cards() -> None:
     cards = [
         {"label": "Threads", "value": "3"},
+        {"label": "Duration", "value": "24 min"},
         {"label": "Largest thread", "value": "33.2k tokens (57.7%)"},
         {"label": "Uncached input", "value": "22.7k tokens (39.5%)"},
     ]
@@ -376,10 +377,14 @@ def test_collect_sidebar_session_search_uses_visible_text_and_aria_labels() -> N
 
 
 def test_sidebar_session_detail_failures_require_snapshot_context() -> None:
-    assert sidebar_session_detail_failures(["6 snapshots"], "desktop") == []
+    assert (
+        sidebar_session_detail_failures(["24 min duration", "6 snapshots"], "desktop")
+        == []
+    )
 
     failures = sidebar_session_detail_failures([], "narrow")
 
+    assert "narrow: sidebar session detail not found: 24 min duration" in failures
     assert "narrow: sidebar session detail not found: 6 snapshots" in failures
 
 
@@ -387,10 +392,17 @@ def test_collect_sidebar_session_details_uses_javascript_word_boundaries() -> No
     class FakePage:
         def evaluate(self, script: str) -> list[str]:
             assert r"/\b[\d,.]+[kKmMbB]?\s+snapshots?\b/g" in script
+            assert (
+                r"/\b\d+(?:\.\d+)?\s+(?:min|hours?|days?)(?:\s+|[^\w]+)duration\b/g"
+                in script
+            )
             assert r"/\\b" not in script
-            return ["6 snapshots"]
+            return ["24 min duration", "6 snapshots"]
 
-    assert visual_qa.collect_sidebar_session_details(FakePage()) == ["6 snapshots"]
+    assert visual_qa.collect_sidebar_session_details(FakePage()) == [
+        "24 min duration",
+        "6 snapshots",
+    ]
 
 
 def test_download_control_failures_require_report_exports() -> None:
@@ -653,7 +665,7 @@ def complete_viewport_results(tmp_path: Path) -> dict[str, dict[str, object]]:
             "sidebar_risk_labels": ["High risk", "Low risk"],
             "sidebar_risk_filter": ["Risk filter"],
             "sidebar_session_search": ["Find session"],
-            "sidebar_session_details": ["6 snapshots"],
+            "sidebar_session_details": ["24 min duration", "6 snapshots"],
             "risk_distributions": [
                 {
                     "label": "Risk distribution",
@@ -662,6 +674,7 @@ def complete_viewport_results(tmp_path: Path) -> dict[str, dict[str, object]]:
             ],
             "metric_cards": [
                 {"label": "Threads", "value": "3"},
+                {"label": "Duration", "value": "24 min"},
                 {"label": "Largest thread", "value": "33.2k tokens (57.7%)"},
                 {"label": "Uncached input", "value": "22.7k tokens (39.5%)"},
             ],
@@ -833,11 +846,18 @@ def test_visual_manifest_records_review_evidence(tmp_path: Path) -> None:
     ]
     assert loaded["viewports"]["desktop"]["sidebar_risk_filter"] == ["Risk filter"]
     assert loaded["viewports"]["desktop"]["sidebar_session_search"] == ["Find session"]
-    assert loaded["viewports"]["desktop"]["sidebar_session_details"] == ["6 snapshots"]
+    assert loaded["viewports"]["desktop"]["sidebar_session_details"] == [
+        "24 min duration",
+        "6 snapshots",
+    ]
     assert loaded["viewports"]["desktop"]["risk_distributions"][0]["label"] == (
         "Risk distribution"
     )
     assert loaded["viewports"]["desktop"]["metric_cards"][1] == {
+        "label": "Duration",
+        "value": "24 min",
+    }
+    assert loaded["viewports"]["desktop"]["metric_cards"][2] == {
         "label": "Largest thread",
         "value": "33.2k tokens (57.7%)",
     }
@@ -1064,6 +1084,7 @@ def test_real_profile_manifest_accepts_private_aggregate_variance(
         ]
         raw["metric_cards"] = [
             {"label": "Threads", "value": "8"},
+            {"label": "Duration", "value": "6.9 days"},
             {"label": "Largest thread", "value": "1.1B tokens (56.1%)"},
             {"label": "Uncached input", "value": "47.7M tokens (2.4%)"},
         ]

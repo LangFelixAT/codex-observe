@@ -43,6 +43,7 @@ from codex_observe.report import (
     report_success_target,
     session_risk_distribution,
     report_triage,
+    session_duration_hours,
     session_summaries,
 )
 
@@ -1889,6 +1890,16 @@ def order_conversations_for_review(
         str(summary.get("session_id")): int(summary.get("usage_snapshots") or 0)
         for summary in summaries
     }
+    duration_hours_by_session = {
+        str(summary.get("session_id")): float(
+            summary.get("session_duration_hours") or 0
+        )
+        for summary in summaries
+    }
+    duration_days_by_session = {
+        str(summary.get("session_id")): float(summary.get("session_duration_days") or 0)
+        for summary in summaries
+    }
     if not order_by_session:
         return conversations
     ordered = conversations.copy()
@@ -1899,6 +1910,14 @@ def order_conversations_for_review(
     ]
     ordered["usage_snapshots"] = [
         usage_snapshots_by_session.get(str(session_id), 0)
+        for session_id in ordered["session_id"]
+    ]
+    ordered["session_duration_hours"] = [
+        duration_hours_by_session.get(str(session_id), 0.0)
+        for session_id in ordered["session_id"]
+    ]
+    ordered["session_duration_days"] = [
+        duration_days_by_session.get(str(session_id), 0.0)
         for session_id in ordered["session_id"]
     ]
     ordered["_review_order"] = [
@@ -1968,6 +1987,21 @@ def filter_conversations_by_search(
     for term in terms:
         mask &= haystack.str.contains(term, regex=False)
     return conversations[mask].reset_index(drop=True)
+
+
+def format_session_duration(hours: object) -> str:
+    try:
+        value = float(hours or 0)
+    except (TypeError, ValueError):
+        value = 0.0
+    if value <= 0:
+        return "0 min"
+    if value < 1:
+        minutes = max(1, int(round(value * 60)))
+        return f"{minutes} min"
+    if value < 24:
+        return f"{value:.1f} hours"
+    return f"{value / 24:.1f} days"
 
 
 def risk_marker(risk: str) -> str:
@@ -2460,6 +2494,9 @@ def main() -> None:
                 )
                 if t:
                     bits.append(t)
+                bits.append(
+                    f"{format_session_duration(row.get('session_duration_hours'))} duration"
+                )
                 bits.append(f"{int(row.get('thread_count') or 0)} threads")
                 bits.append(f"{fmt_int(row.get('sidebar_tool_calls') or 0)} tools")
                 bits.append(f"{fmt_int(row.get('usage_snapshots') or 0)} snapshots")
@@ -2522,9 +2559,12 @@ def main() -> None:
         largest_thread["final_total_tokens"] if largest_thread is not None else 0
     )
 
+    selected_duration_hours = session_duration_hours(conv.first_seen, conv.last_seen)
+
     render_metric_grid(
         [
             ("Threads", fmt_int(conv.thread_count)),
+            ("Duration", format_session_duration(selected_duration_hours)),
             ("Workers", fmt_int(workers)),
             ("Explorers", fmt_int(explorers)),
             ("Guardians", fmt_int(guardians)),

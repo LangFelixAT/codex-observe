@@ -114,11 +114,11 @@ EXPECTED_QUICK_READ_EVIDENCE = [
     {"tab": tab, "text": text} for tab, text in TAB_CHECKS.items()
 ]
 
-EXPECTED_METRIC_CARDS = ["Threads", "Largest thread", "Uncached input"]
+EXPECTED_METRIC_CARDS = ["Threads", "Duration", "Largest thread", "Uncached input"]
 EXPECTED_SIDEBAR_RISK_LABELS = ["High risk", "Low risk"]
 EXPECTED_SIDEBAR_RISK_FILTER = ["Risk filter"]
 EXPECTED_SIDEBAR_SESSION_SEARCH = ["Find session"]
-EXPECTED_SIDEBAR_SESSION_DETAILS = ["6 snapshots"]
+EXPECTED_SIDEBAR_SESSION_DETAILS = ["24 min duration", "6 snapshots"]
 EXPECTED_DOWNLOAD_CONTROLS = [
     "Download report MD",
     "Download report JSON",
@@ -148,6 +148,7 @@ EXPECTED_COMPARISON_REVIEW_PATH = [
 ]
 EXPECTED_DEFAULT_METRIC_VALUES = {
     "Threads": "3",
+    "Duration": "24 min",
     "Largest thread": "33.2k tokens (57.7%)",
     "Uncached input": "22.7k tokens (39.5%)",
 }
@@ -350,8 +351,9 @@ def collect_sidebar_session_details(page) -> list[str]:
         r"""
 () => {
   const text = document.body.innerText || '';
-  const matches = text.match(/\b[\d,.]+[kKmMbB]?\s+snapshots?\b/g) || [];
-  return Array.from(new Set(matches));
+  const snapshotMatches = text.match(/\b[\d,.]+[kKmMbB]?\s+snapshots?\b/g) || [];
+  const durationMatches = text.match(/\b\d+(?:\.\d+)?\s+(?:min|hours?|days?)(?:\s+|[^\w]+)duration\b/g) || [];
+  return Array.from(new Set([...durationMatches, ...snapshotMatches]));
 }
         """
     )

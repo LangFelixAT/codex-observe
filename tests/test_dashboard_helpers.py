@@ -30,6 +30,7 @@ from codex_observe.dashboard import (
     feedback_handoff_html,
     filter_conversations_by_risk,
     filter_conversations_by_search,
+    format_session_duration,
     risk_marker,
     sidebar_risk_filter_options,
     order_conversations_for_review,
@@ -86,8 +87,20 @@ def test_order_conversations_for_review_uses_risk_aware_session_summaries() -> N
         ]
     )
     summaries = [
-        {"session_id": "older-high", "triage_risk": "high", "usage_snapshots": 6},
-        {"session_id": "newer-low", "triage_risk": "low", "usage_snapshots": 3},
+        {
+            "session_id": "older-high",
+            "triage_risk": "high",
+            "usage_snapshots": 6,
+            "session_duration_hours": 84.0,
+            "session_duration_days": 3.5,
+        },
+        {
+            "session_id": "newer-low",
+            "triage_risk": "low",
+            "usage_snapshots": 3,
+            "session_duration_hours": 0.2,
+            "session_duration_days": 0.0,
+        },
     ]
 
     ordered = order_conversations_for_review(conversations, summaries)
@@ -95,7 +108,18 @@ def test_order_conversations_for_review_uses_risk_aware_session_summaries() -> N
     assert ordered["session_id"].tolist() == ["older-high", "newer-low"]
     assert ordered["triage_risk"].tolist() == ["high", "low"]
     assert ordered["usage_snapshots"].tolist() == [6, 3]
+    assert ordered["session_duration_hours"].tolist() == [84.0, 0.2]
+    assert ordered["session_duration_days"].tolist() == [3.5, 0.0]
     assert "_review_order" not in ordered.columns
+
+
+def test_format_session_duration_is_compact_for_sidebar_and_metrics() -> None:
+    assert format_session_duration(0) == "0 min"
+    assert format_session_duration(0.38) == "23 min"
+    assert format_session_duration(1.5) == "1.5 hours"
+    assert format_session_duration(25) == "1.0 days"
+    assert format_session_duration(164.5) == "6.9 days"
+    assert format_session_duration("bad") == "0 min"
 
 
 def test_sidebar_risk_filter_options_count_risk_bands() -> None:
