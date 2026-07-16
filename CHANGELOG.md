@@ -5,6 +5,7 @@ All notable changes to Codex Observe will be documented here.
 The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
+- Added a sessions portfolio briefing in CLI JSON/text and the dashboard Overview so all-high-risk real histories are treated as workflow patterns, not isolated runs.
 - Surfaced selected-run duration in the dashboard sidebar and Overview metric grid with visual QA evidence.
 - Added session-duration metadata to `codex-observe sessions` text/JSON output so multi-day runs recommend checkpointing and restarting before report export.
 - Added a multi-day session diagnostic, opportunity, playbook habit, and success target so real long-running Codex sessions recommend checkpointing and restarting instead of only reporting a dominant thread.

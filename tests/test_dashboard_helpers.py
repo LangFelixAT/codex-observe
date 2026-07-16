@@ -31,24 +31,41 @@ from codex_observe.dashboard import (
     filter_conversations_by_risk,
     filter_conversations_by_search,
     format_session_duration,
-    risk_marker,
-    sidebar_risk_filter_options,
-    order_conversations_for_review,
     metric_with_share,
-    risk_distribution_html,
     next_run_checklist_html,
     operator_briefing_html,
+    order_conversations_for_review,
     pct_of_total,
-    review_path_html,
+    portfolio_briefing_html,
     report_download_payloads,
     report_ingest_scope_warning_html,
+    review_path_html,
+    risk_distribution_html,
+    risk_marker,
     sampled_ingest_coverage_html,
-    triage_card_html,
+    sidebar_risk_filter_options,
     success_target_html,
-    timeline_quick_read_html,
     thread_brief_html,
+    timeline_quick_read_html,
     tool_quick_read_html,
+    triage_card_html,
 )
+
+
+def test_portfolio_briefing_html_surfaces_workflow_pattern() -> None:
+    html = portfolio_briefing_html(
+        {
+            "headline": "All 10 sessions are high risk.",
+            "action": "Treat this as a workflow pattern.",
+            "filter_note": "Current view includes every imported session.",
+            "high_risk_share_pct": 100.0,
+        }
+    )
+
+    assert "Portfolio briefing" in html
+    assert "All 10 sessions are high risk." in html
+    assert "Treat this as a workflow pattern." in html
+    assert "100.0% high risk." in html
 
 
 def test_dataframe_preview_caps_large_real_history_tables() -> None:

@@ -537,6 +537,12 @@ def write_valid_visual_manifest(root: Path) -> None:
                     "body": "Risk distribution 2 imported conversations High risk 1 Medium risk 0 Low risk 1 Unknown 0",
                 }
             ],
+            "portfolio_briefings": [
+                {
+                    "label": "Portfolio briefing",
+                    "body": "Portfolio briefing 1 of 2 sessions are high risk. Start with the recommended high-risk run, then compare against a lower-risk follow-up to find which habits worked. 50.0% high risk. Current view includes every imported session.",
+                }
+            ],
             "metric_cards": [
                 {"label": label, "value": value}
                 for label, value in cli.EXPECTED_VISUAL_METRICS.items()

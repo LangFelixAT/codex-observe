@@ -347,6 +347,69 @@ def session_risk_distribution_line(distribution: dict[str, int]) -> str:
     )
 
 
+def session_portfolio_summary(
+    summaries: list[dict[str, Any]],
+    matching_summaries: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    matching = summaries if matching_summaries is None else matching_summaries
+    distribution = session_risk_distribution(summaries)
+    total = len(summaries)
+    matching_count = len(matching)
+    high = int(distribution.get("high", 0) or 0)
+    medium = int(distribution.get("medium", 0) or 0)
+    low = int(distribution.get("low", 0) or 0)
+    unknown = int(distribution.get("unknown", 0) or 0)
+    high_share = round(high / total * 100, 1) if total else 0.0
+
+    if total == 0:
+        posture = "empty"
+        headline = "No sessions imported yet."
+        action = "Ingest local logs or create the synthetic demo before looking for workflow patterns."
+    elif high == total:
+        posture = "all_high"
+        headline = f"All {total} sessions are high risk."
+        action = "Treat this as a workflow pattern: start with the recommended run, apply one habit, then compare the next run before continuing."
+    elif high > 0:
+        posture = "mixed_high"
+        headline = f"{high} of {total} sessions are high risk."
+        action = "Start with the recommended high-risk run, then compare against a lower-risk follow-up to find which habits worked."
+    elif medium > 0:
+        posture = "watchlist"
+        headline = (
+            f"No high-risk sessions; {medium} of {total} sessions are medium risk."
+        )
+        action = "Review the medium-risk run before it turns into a long-lived or repeated-context workflow pattern."
+    else:
+        posture = "healthy"
+        headline = f"No high- or medium-risk sessions across {total} sessions."
+        action = "Keep the current workflow, and use comparisons after the next substantial run to catch regressions early."
+
+    if matching_summaries is not None and matching_count != total:
+        filter_note = f"Current filter shows {matching_count} of {total} sessions."
+    else:
+        filter_note = "Current view includes every imported session."
+
+    return {
+        "risk_posture": posture,
+        "headline": headline,
+        "action": action,
+        "filter_note": filter_note,
+        "total_sessions": total,
+        "matching_sessions": matching_count,
+        "high_risk_sessions": high,
+        "medium_risk_sessions": medium,
+        "low_risk_sessions": low,
+        "unknown_risk_sessions": unknown,
+        "high_risk_share_pct": high_share,
+    }
+
+
+def session_portfolio_summary_line(summary: dict[str, Any]) -> str:
+    headline = str(summary.get("headline") or "No portfolio summary available.")
+    action = str(summary.get("action") or "Review the recommended session.")
+    return f"Portfolio: {headline} {action}"
+
+
 def session_success_target_preview(recommended: dict[str, Any]) -> dict[str, Any]:
     duration_hours = float(recommended.get("session_duration_hours") or 0)
     if duration_hours >= 24:
@@ -534,7 +597,11 @@ def session_summary_lines(
         ]
     distribution = session_risk_distribution(summaries)
     filtered = filter_session_summaries_by_risk(summaries, risk_filter)
-    lines = [session_risk_distribution_line(distribution)]
+    portfolio = session_portfolio_summary(summaries, filtered)
+    lines = [
+        session_risk_distribution_line(distribution),
+        session_portfolio_summary_line(portfolio),
+    ]
     if risk_filter:
         normalized = risk_filter.strip().lower()
         lines.append(

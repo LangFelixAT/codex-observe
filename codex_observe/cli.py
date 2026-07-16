@@ -31,6 +31,7 @@ from .report import (
     latest_ingest_scope,
     report_json,
     report_markdown,
+    session_portfolio_summary,
     session_report_hint,
     session_risk_distribution,
     session_summaries,
@@ -90,6 +91,13 @@ EXPECTED_VISUAL_METRICS = {
     "Largest thread": "33.2k tokens (57.7%)",
     "Uncached input": "22.7k tokens (39.5%)",
 }
+EXPECTED_VISUAL_PORTFOLIO_BRIEFING = {
+    "Portfolio briefing",
+    "1 of 2 sessions are high risk.",
+    "Start with the recommended high-risk run",
+    "50.0% high risk.",
+}
+
 EXPECTED_VISUAL_SUCCESS_TARGET = {
     "metric": "largest_thread_share_pct",
     "current": "57.7%",
@@ -1831,6 +1839,27 @@ def visual_manifest_evidence_failures(root: Path) -> list[str]:
                 failures.append(
                     f"visual QA manifest {viewport_name} missing report download controls: {', '.join(sorted(missing_controls))}"
                 )
+        portfolio_briefings = viewport.get("portfolio_briefings")
+        if not isinstance(portfolio_briefings, list) or not portfolio_briefings:
+            failures.append(
+                f"visual QA manifest missing {viewport_name} portfolio briefing evidence"
+            )
+        else:
+            portfolio_text = "\n".join(
+                str(item.get("body") or item.get("label") or "")
+                for item in portfolio_briefings
+                if isinstance(item, dict)
+            )
+            missing_portfolio = EXPECTED_VISUAL_PORTFOLIO_BRIEFING - {
+                expected
+                for expected in EXPECTED_VISUAL_PORTFOLIO_BRIEFING
+                if expected in portfolio_text
+            }
+            if missing_portfolio:
+                failures.append(
+                    f"visual QA manifest {viewport_name} missing portfolio briefing evidence: {', '.join(sorted(missing_portfolio))}"
+                )
+
         operator_briefings = viewport.get("operator_briefings")
         if not isinstance(operator_briefings, list) or not operator_briefings:
             failures.append(
@@ -3206,6 +3235,7 @@ def sessions_missing_json_payload(
         "risk_filter": risk_filter,
         "matching_sessions": 0,
         "risk_distribution": {"high": 0, "medium": 0, "low": 0, "unknown": 0},
+        "portfolio_summary": session_portfolio_summary([]),
         "recommended_session": None,
         "recommendation_detail": None,
         "review_path": sessions_review_path(db_path),
@@ -3340,6 +3370,7 @@ def sessions_json_payload(
         "limit": effective_limit,
         "risk_filter": risk_filter,
         "risk_distribution": session_risk_distribution(summaries),
+        "portfolio_summary": session_portfolio_summary(summaries, filtered),
         "ingest_scope": latest_ingest_scope(db_path),
     }
     if filtered:

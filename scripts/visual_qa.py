@@ -161,6 +161,13 @@ EXPECTED_RISK_DISTRIBUTION = [
     "2 imported conversations",
 ]
 
+EXPECTED_PORTFOLIO_BRIEFING = [
+    "Portfolio briefing",
+    "1 of 2 sessions are high risk.",
+    "Start with the recommended high-risk run",
+    "50.0% high risk.",
+]
+
 EXPECTED_SUCCESS_TARGET = {
     "metric": "largest_thread_share_pct",
     "current": "57.7%",
@@ -564,6 +571,38 @@ def risk_distribution_failures(
     ]
 
 
+def collect_portfolio_briefings(page) -> list[dict[str, str]]:
+    return page.evaluate(
+        r"""
+() => Array.from(document.querySelectorAll('.co-portfolio-briefing')).map((card) => ({
+  label: (card.querySelector('h3')?.innerText || '').replace(/\s+/g, ' ').trim(),
+  body: (card.innerText || '').replace(/\s+/g, ' ').trim(),
+})).filter((item) => item.label || item.body)
+        """
+    )
+
+
+def portfolio_briefing_failures(
+    briefings: list[dict[str, str]],
+    viewport_name: str,
+    profile: str = PROFILE_DEMO,
+) -> list[str]:
+    if not briefings:
+        return [f"{viewport_name}: portfolio briefing card not rendered"]
+    body = str(briefings[0].get("body") or "")
+    if profile == PROFILE_REAL:
+        return [
+            f"{viewport_name}: portfolio briefing missing: {expected}"
+            for expected in ["Portfolio briefing", "high risk"]
+            if expected not in body
+        ]
+    return [
+        f"{viewport_name}: portfolio briefing missing: {expected}"
+        for expected in EXPECTED_PORTFOLIO_BRIEFING
+        if expected not in body
+    ]
+
+
 def collect_metric_cards(page) -> list[dict[str, str]]:
     return page.evaluate(
         r"""
@@ -956,6 +995,10 @@ def validate_dashboard_page(
     failures.extend(
         risk_distribution_failures(risk_distributions, viewport_name, profile)
     )
+    portfolio_briefings = collect_portfolio_briefings(page)
+    failures.extend(
+        portfolio_briefing_failures(portfolio_briefings, viewport_name, profile)
+    )
     metric_cards = collect_metric_cards(page)
     failures.extend(metric_card_failures(metric_cards, viewport_name))
     failures.extend(metric_card_value_failures(metric_cards, viewport_name, profile))
@@ -1084,6 +1127,7 @@ name => {
         "quick_read_evidence": quick_read_evidence,
         "agent_detail_selector_exercised": agent_selector_exercised,
         "risk_distributions": risk_distributions,
+        "portfolio_briefings": portfolio_briefings,
         "metric_cards": metric_cards,
         "sidebar_risk_labels": sidebar_risk_labels,
         "sidebar_risk_filter": sidebar_risk_filter,
@@ -1558,6 +1602,18 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
             failures.extend(
                 failure.replace(f"{name}: ", f"manifest {name} ")
                 for failure in distribution_failures
+            )
+
+        portfolio_briefings = raw.get("portfolio_briefings")
+        if not isinstance(portfolio_briefings, list):
+            failures.append(f"manifest {name} missing portfolio briefing evidence")
+        else:
+            portfolio_failures = portfolio_briefing_failures(
+                portfolio_briefings, name, profile
+            )
+            failures.extend(
+                failure.replace(f"{name}: ", f"manifest {name} ")
+                for failure in portfolio_failures
             )
 
         metric_cards = raw.get("metric_cards")

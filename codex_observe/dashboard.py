@@ -41,6 +41,7 @@ from codex_observe.report import (
     report_next_run_brief,
     report_next_run_checklist,
     report_success_target,
+    session_portfolio_summary,
     session_risk_distribution,
     report_triage,
     session_duration_hours,
@@ -1267,6 +1268,32 @@ def review_path_html(success_target: dict[str, object], has_comparison: bool) ->
             '  <div class="co-review-steps">',
             *[f"    {step}" for step in rendered_steps],
             "  </div>",
+            "</section>",
+        ]
+    )
+
+
+def portfolio_briefing_html(summary: object) -> str:
+    if not isinstance(summary, dict):
+        return ""
+    headline = str(summary.get("headline") or "No portfolio summary available.")
+    action = str(summary.get("action") or "Review the recommended session.")
+    filter_note = str(summary.get("filter_note") or "")
+    high_share = summary.get("high_risk_share_pct")
+    high_share_text = ""
+    if high_share is not None:
+        try:
+            high_share_text = f"{float(high_share):.1f}% high risk."
+        except (TypeError, ValueError):
+            high_share_text = ""
+    details = " ".join(part for part in [high_share_text, filter_note] if part)
+    return "\n".join(
+        [
+            '<section class="co-portfolio-briefing">',
+            "  <h3>Portfolio briefing</h3>",
+            f"  <p><strong>{html.escape(headline)}</strong></p>",
+            f"  <p>{html.escape(action)}</p>",
+            f"  <p>{html.escape(details)}</p>" if details else "",
             "</section>",
         ]
     )
@@ -2672,6 +2699,10 @@ def main() -> None:
     with tab_overview:
         st.markdown(
             operator_briefing_html(triage, success_target, opportunities),
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            portfolio_briefing_html(session_portfolio_summary(summaries)),
             unsafe_allow_html=True,
         )
         st.markdown(

@@ -672,6 +672,12 @@ def complete_viewport_results(tmp_path: Path) -> dict[str, dict[str, object]]:
                     "body": "Risk distribution 2 imported conversations High risk 1 Medium risk 0 Low risk 1 Unknown 0",
                 }
             ],
+            "portfolio_briefings": [
+                {
+                    "label": "Portfolio briefing",
+                    "body": "Portfolio briefing 1 of 2 sessions are high risk. Start with the recommended high-risk run, then compare against a lower-risk follow-up to find which habits worked. 50.0% high risk. Current view includes every imported session.",
+                }
+            ],
             "metric_cards": [
                 {"label": "Threads", "value": "3"},
                 {"label": "Duration", "value": "24 min"},
@@ -1080,6 +1086,12 @@ def test_real_profile_manifest_accepts_private_aggregate_variance(
             {
                 "label": "Risk distribution",
                 "body": "Risk distribution 11 imported conversations High risk 2 Medium risk 4",
+            }
+        ]
+        raw["portfolio_briefings"] = [
+            {
+                "label": "Portfolio briefing",
+                "body": "Portfolio briefing 2 of 11 sessions are high risk. Current view includes every imported session.",
             }
         ]
         raw["metric_cards"] = [

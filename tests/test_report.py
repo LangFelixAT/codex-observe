@@ -14,20 +14,21 @@ from codex_observe.report import (
     build_report,
     command_arg,
     compare_reports,
-    default_report_session,
-    report_follow_up_commands,
-    report_review_path,
     comparison_json,
     comparison_markdown,
     comparison_review_path,
+    default_report_session,
     load_report_json,
+    report_follow_up_commands,
     report_json,
     report_markdown,
+    report_review_path,
+    session_portfolio_summary,
     session_summaries,
     session_success_target_preview,
-    sort_session_summaries,
     session_summary_lines,
     session_validation_commands,
+    sort_session_summaries,
 )
 from codex_observe.schema import SCHEMA_SQL
 
@@ -639,6 +640,37 @@ def test_session_listing_prioritizes_multi_day_target_preview(
         "driver": "Session duration",
         "action": "Start a fresh Codex session at each durable checkpoint",
     }
+
+
+def test_session_portfolio_summary_distinguishes_workflow_patterns() -> None:
+    all_high = session_portfolio_summary(
+        [
+            {"triage_risk": "high"},
+            {"triage_risk": "high"},
+        ]
+    )
+    assert all_high == {
+        "risk_posture": "all_high",
+        "headline": "All 2 sessions are high risk.",
+        "action": "Treat this as a workflow pattern: start with the recommended run, apply one habit, then compare the next run before continuing.",
+        "filter_note": "Current view includes every imported session.",
+        "total_sessions": 2,
+        "matching_sessions": 2,
+        "high_risk_sessions": 2,
+        "medium_risk_sessions": 0,
+        "low_risk_sessions": 0,
+        "unknown_risk_sessions": 0,
+        "high_risk_share_pct": 100.0,
+    }
+
+    mixed = session_portfolio_summary(
+        [{"triage_risk": "high"}, {"triage_risk": "low"}],
+        [{"triage_risk": "low"}],
+    )
+    assert mixed["risk_posture"] == "mixed_high"
+    assert mixed["headline"] == "1 of 2 sessions are high risk."
+    assert mixed["matching_sessions"] == 1
+    assert mixed["filter_note"] == "Current filter shows 1 of 2 sessions."
 
 
 def test_compare_reports_marks_improved_metrics_and_privacy_safe_output(
