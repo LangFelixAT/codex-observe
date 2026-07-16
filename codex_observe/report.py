@@ -356,6 +356,7 @@ def _portfolio_driver_catalog() -> list[dict[str, Any]]:
             "label": "Largest thread concentration",
             "threshold": 50.0,
             "unit": "percent",
+            "min_threads": 2,
             "action": "Set stop conditions before one thread dominates repeated work.",
         },
         {
@@ -410,9 +411,17 @@ def session_portfolio_drivers(summaries: list[dict[str, Any]]) -> list[dict[str,
         driver = str(definition["driver"])
         unit = str(definition["unit"])
         threshold = float(definition["threshold"])
+        min_threads = definition.get("min_threads")
         values: list[float] = []
         total_impact = 0.0
         for summary in summaries:
+            if min_threads is not None and "threads" in summary:
+                try:
+                    thread_count = int(summary.get("threads") or 0)
+                except (TypeError, ValueError):
+                    thread_count = 0
+                if thread_count < int(min_threads):
+                    continue
             try:
                 value = float(summary.get(driver) or 0)
             except (TypeError, ValueError):

@@ -713,6 +713,34 @@ def test_session_portfolio_drivers_rank_cross_session_patterns() -> None:
     }
 
 
+def test_session_portfolio_drivers_ignore_single_thread_largest_share_noise() -> None:
+    drivers = session_portfolio_drivers(
+        [
+            {
+                "triage_risk": "high",
+                "threads": 1,
+                "total_tokens": 40_000,
+                "largest_thread_share_pct": 100.0,
+                "largest_tool_output_chars": 8_000,
+            },
+            {
+                "triage_risk": "high",
+                "threads": 2,
+                "total_tokens": 30_000,
+                "largest_thread_share_pct": 80.0,
+            },
+        ]
+    )
+
+    largest_thread = next(
+        driver for driver in drivers if driver["driver"] == "largest_thread_share_pct"
+    )
+
+    assert largest_thread["sessions"] == 1
+    assert largest_thread["share_pct"] == 50.0
+    assert largest_thread["max_display"] == "80.0%"
+
+
 def test_session_summaries_bound_replayed_prompt_share_to_total_tokens(
     tmp_path: Path,
 ) -> None:
