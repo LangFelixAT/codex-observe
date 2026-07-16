@@ -1124,7 +1124,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     assert report.with_name("run-comparison.json").exists()
     assert (
         checks["session listing"]["detail"]
-        == "2 sessions; triage risk, risk distribution, status, schema, limit and risk-filter metadata, usage snapshots, text recommended action, session table tool-output column, tool-output driver, structured driver summary, success-target preview, recommendation detail, review path, text validation next commands, and structured validation next commands verified"
+        == "2 sessions; triage risk, risk distribution, status, schema, limit and risk-filter metadata, usage snapshots, duration metadata, text recommended action, session table duration and tool-output columns, duration and tool-output drivers, structured driver summary, success-target preview, recommendation detail, review path, text validation next commands, and structured validation next commands verified"
     )
     assert checks["database doctor"]["detail"] == (
         "ok; schema, text next commands, next commands, and review path verified"
@@ -1877,6 +1877,7 @@ def test_session_recommendation_detail_includes_structured_tool_output_driver() 
         "repeated_prompt_share_pct": 17.4,
         "uncached_input_share_pct": 39.5,
         "largest_tool_output_chars": 3960,
+        "session_duration_hours": None,
     }
 
     review_path = cli.sessions_review_path("demo.sqlite", "session-high")
@@ -1896,6 +1897,12 @@ def test_session_recommendation_detail_includes_structured_tool_output_driver() 
     assert review_path[-1]["command"] == "docs/PUBLIC_TOUR_FEEDBACK.md"
 
     assert detail["driver_summary"] == [
+        {
+            "driver": "session_duration_hours",
+            "label": "Session duration",
+            "value": None,
+            "display": "0.0 days",
+        },
         {
             "driver": "largest_thread_share_pct",
             "label": "Largest thread share",

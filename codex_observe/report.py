@@ -265,10 +265,12 @@ def session_summaries(db_path: str) -> list[dict[str, Any]]:
         largest_thread_share_pct = _pct_of_total(largest_thread_tokens, total_tokens)
         repeated_prompt_share_pct = _pct_of_total(repeated_prompt_tokens, total_tokens)
         uncached_input_share_pct = _pct_of_total(uncached_input_tokens, total_tokens)
+        duration_hours = session_duration_hours(row["first_seen"], row["last_seen"])
         triage = report_triage(
             {
                 "summary": {
                     "total_tokens": total_tokens,
+                    "session_duration_hours": duration_hours,
                     "largest_thread_share_pct": largest_thread_share_pct,
                     "repeated_prompt_share_pct": repeated_prompt_share_pct,
                     "uncached_input_share_pct": uncached_input_share_pct,
@@ -289,6 +291,8 @@ def session_summaries(db_path: str) -> list[dict[str, Any]]:
                 "threads": int(row["thread_count"] or 0),
                 "tool_calls": int(row["tool_calls"] or 0),
                 "usage_snapshots": int(row["usage_snapshots"] or 0),
+                "session_duration_hours": round(duration_hours, 1),
+                "session_duration_days": round(duration_hours / 24, 1),
                 "total_tokens": total_tokens,
                 "uncached_input_tokens": uncached_input_tokens,
                 "cached_input_tokens": int(row["total_cached_input_tokens"] or 0),
@@ -344,6 +348,21 @@ def session_risk_distribution_line(distribution: dict[str, int]) -> str:
 
 
 def session_success_target_preview(recommended: dict[str, Any]) -> dict[str, Any]:
+    duration_hours = float(recommended.get("session_duration_hours") or 0)
+    if duration_hours >= 24:
+        current_days = duration_hours / 24
+        return {
+            "metric": "session_duration_hours",
+            "direction": "lower_is_better",
+            "current_value": round(duration_hours, 1),
+            "target_value": 24.0,
+            "unit": "hours",
+            "current": f"{current_days:.1f} days",
+            "target": "below 24.0 hours",
+            "driver": "Session duration",
+            "action": "Start a fresh Codex session at each durable checkpoint",
+        }
+
     largest_thread = float(recommended.get("largest_thread_share_pct") or 0)
     repeated = float(recommended.get("repeated_prompt_share_pct") or 0)
     uncached = float(recommended.get("uncached_input_share_pct") or 0)
@@ -461,6 +480,9 @@ def session_recommended_action_lines(recommended: dict[str, Any]) -> list[str]:
         driver_parts.append(
             f"largest tool output: {fmt_short(tool_output_chars)} chars"
         )
+    duration_hours = float(recommended.get("session_duration_hours") or 0)
+    if duration_hours >= 24:
+        driver_parts.insert(0, f"session duration: {duration_hours / 24:.1f} days")
     target = session_success_target_preview(recommended)
     return [
         "Recommended action:",
@@ -527,7 +549,7 @@ def session_summary_lines(
         )
         return lines
     lines.append(
-        "Session ID | Last seen | Risk | Threads | Tools | Snapshots | Tool out | Tokens | Uncached"
+        "Session ID | Last seen | Risk | Duration | Threads | Tools | Snapshots | Tool out | Tokens | Uncached"
     )
     display_limit = len(filtered) if limit is None else max(1, int(limit))
     displayed = filtered[:display_limit]
@@ -538,6 +560,7 @@ def session_summary_lines(
                     str(row["session_id"]),
                     str(row.get("last_seen") or "unknown"),
                     str(row["triage_risk"]),
+                    f"{float(row.get('session_duration_hours') or 0) / 24:.1f}d",
                     str(row["threads"]),
                     str(row["tool_calls"]),
                     fmt_short(row.get("usage_snapshots", 0)),

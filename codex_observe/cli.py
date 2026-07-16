@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import gc
 import importlib.util
 import textwrap
 import json
@@ -11,6 +12,7 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 from . import __version__
@@ -2313,16 +2315,19 @@ def release_audit_report(
             and recommendation_detail.get("ranked_by") == ["triage_risk", "last_seen"]
             and isinstance(recommendation_detail.get("drivers"), dict)
             and "largest_tool_output_chars" in recommendation_detail["drivers"]
+            and "session_duration_hours" in recommendation_detail["drivers"]
             and isinstance(recommendation_detail.get("driver_summary"), list)
             and isinstance(recommendation_detail.get("success_target_preview"), dict)
             and recommendation_detail["success_target_preview"].get("metric")
             == "largest_thread_share_pct"
             and recommendation_detail["success_target_preview"].get("target")
             == "below 50.0%"
-            and any(
-                row.get("driver") == "largest_tool_output_chars"
-                for row in recommendation_detail["driver_summary"]
-                if isinstance(row, dict)
+            and {"largest_tool_output_chars", "session_duration_hours"}.issubset(
+                {
+                    row.get("driver")
+                    for row in recommendation_detail["driver_summary"]
+                    if isinstance(row, dict)
+                }
             )
         )
         sessions_has_review_path = (
@@ -2364,6 +2369,7 @@ def release_audit_report(
             )
             and all("largest_tool_output_chars" in row for row in sessions)
             and all("usage_snapshots" in row for row in sessions)
+            and all("session_duration_hours" in row for row in sessions)
         )
         session_listing_ok = (
             sessions_have_risk
@@ -2381,9 +2387,9 @@ def release_audit_report(
         add(
             "session listing",
             session_listing_ok,
-            f"{len(sessions)} sessions; triage risk, risk distribution, status, schema, limit and risk-filter metadata, usage snapshots, text recommended action, session table tool-output column, tool-output driver, structured driver summary, success-target preview, recommendation detail, review path, text validation next commands, and structured validation next commands verified"
+            f"{len(sessions)} sessions; triage risk, risk distribution, status, schema, limit and risk-filter metadata, usage snapshots, duration metadata, text recommended action, session table duration and tool-output columns, duration and tool-output drivers, structured driver summary, success-target preview, recommendation detail, review path, text validation next commands, and structured validation next commands verified"
             if session_listing_ok
-            else "session listing missing aggregate triage risk, risk_distribution, status, schema_version, limit and risk-filter metadata, usage snapshots, text recommended action, recommended_session, recommendation_detail, review_path, text validation next commands, session table tool-output column, tool-output driver, structured driver summary, success-target preview, validation next_commands, or next_commands",
+            else "session listing missing aggregate triage risk, risk_distribution, status, schema_version, limit and risk-filter metadata, usage snapshots, duration metadata, text recommended action, recommended_session, recommendation_detail, review_path, text validation next commands, session table duration and tool-output columns, duration or tool-output driver, structured driver summary, success-target preview, validation next_commands, or next_commands",
         )
     except FileNotFoundError as exc:
         sessions = []
@@ -3213,6 +3219,12 @@ def sessions_missing_json_payload(
 def session_driver_summary(recommended: dict[str, object]) -> list[dict[str, object]]:
     return [
         {
+            "driver": "session_duration_hours",
+            "label": "Session duration",
+            "value": recommended.get("session_duration_hours"),
+            "display": f"{float(recommended.get('session_duration_hours') or 0) / 24:.1f} days",
+        },
+        {
             "driver": "largest_thread_share_pct",
             "label": "Largest thread share",
             "value": recommended.get("largest_thread_share_pct"),
@@ -3252,6 +3264,7 @@ def session_recommendation_detail(recommended: dict[str, object]) -> dict[str, o
             "repeated_prompt_share_pct": recommended.get("repeated_prompt_share_pct"),
             "uncached_input_share_pct": recommended.get("uncached_input_share_pct"),
             "largest_tool_output_chars": recommended.get("largest_tool_output_chars"),
+            "session_duration_hours": recommended.get("session_duration_hours"),
         },
         "driver_summary": session_driver_summary(recommended),
         "success_target_preview": session_success_target_preview(recommended),
@@ -4128,13 +4141,22 @@ def private_artifact_label(path: Path) -> str:
 
 
 def reset_private_database(database: Path) -> None:
-    for candidate in [
+    candidates = [
         database,
         database.with_name(f"{database.name}-wal"),
         database.with_name(f"{database.name}-shm"),
-    ]:
-        if candidate.exists():
-            candidate.unlink()
+    ]
+    for attempt in range(5):
+        try:
+            gc.collect()
+            for candidate in candidates:
+                if candidate.exists():
+                    candidate.unlink()
+            return
+        except PermissionError:
+            if attempt == 4:
+                raise
+            time.sleep(0.1)
 
 
 def private_visual_qa_args(database: Path, output_dir: Path) -> list[str]:

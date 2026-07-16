@@ -506,6 +506,8 @@ def test_session_summaries_are_aggregate_only(tmp_path: Path) -> None:
             "threads": 3,
             "tool_calls": 2,
             "usage_snapshots": 6,
+            "session_duration_hours": 0.4,
+            "session_duration_days": 0.0,
             "total_tokens": 57510,
             "uncached_input_tokens": 22700,
             "cached_input_tokens": 32000,
@@ -522,6 +524,8 @@ def test_session_summaries_are_aggregate_only(tmp_path: Path) -> None:
             "threads": 3,
             "tool_calls": 1,
             "usage_snapshots": 3,
+            "session_duration_hours": 0.2,
+            "session_duration_days": 0.0,
             "total_tokens": 8400,
             "uncached_input_tokens": 1200,
             "cached_input_tokens": 6300,
@@ -534,15 +538,15 @@ def test_session_summaries_are_aggregate_only(tmp_path: Path) -> None:
     ]
     assert "Risk distribution: high 1, medium 0, low 1, unknown 0" in lines
     assert (
-        "Session ID | Last seen | Risk | Threads | Tools | Snapshots | Tool out | Tokens | Uncached"
+        "Session ID | Last seen | Risk | Duration | Threads | Tools | Snapshots | Tool out | Tokens | Uncached"
         in lines
     )
     assert (
-        "demo-session-cost-review | 2026-01-01T12:23:00Z | high | 3 | 2 | 6 | 4.0k | 57.5k | 22.7k"
+        "demo-session-cost-review | 2026-01-01T12:23:00Z | high | 0.0d | 3 | 2 | 6 | 4.0k | 57.5k | 22.7k"
         in lines
     )
     assert (
-        "demo-session-focused-followup | 2026-01-01T12:35:00Z | low | 3 | 1 | 3 | 880 | 8.4k | 1.2k"
+        "demo-session-focused-followup | 2026-01-01T12:35:00Z | low | 0.0d | 3 | 1 | 3 | 880 | 8.4k | 1.2k"
         in lines
     )
     limited_lines = "\n".join(session_summary_lines(str(db), limit=1))
@@ -590,6 +594,51 @@ def test_session_summaries_are_aggregate_only(tmp_path: Path) -> None:
     assert "--session-id demo-session-cost-review --out run-report.md" in lines
     for private in PRIVATE_DEMO_STRINGS:
         assert private not in serialized
+
+
+def test_session_listing_prioritizes_multi_day_target_preview(
+    tmp_path: Path,
+) -> None:
+    db = demo_db(tmp_path)
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            """
+            UPDATE conversations
+            SET first_seen='2026-01-01T00:00:00Z',
+                last_seen='2026-01-04T12:00:00Z'
+            WHERE session_id='demo-session-cost-review'
+            """
+        )
+
+    summaries = session_summaries(str(db))
+    recommended = summaries[0]
+    lines = "\n".join(session_summary_lines(str(db)))
+    target = session_success_target_preview(recommended)
+
+    assert recommended["session_duration_hours"] == 84.0
+    assert recommended["session_duration_days"] == 3.5
+    assert "Session ID | Last seen | Risk | Duration | Threads" in lines
+    assert "demo-session-cost-review | 2026-01-04T12:00:00Z | high | 3.5d" in lines
+    assert (
+        "Top drivers: session duration: 3.5 days; largest thread share: 57.7%" in lines
+    )
+    assert (
+        "Next-run target: session_duration_hours 3.5 days -> below 24.0 hours" in lines
+    )
+    assert (
+        "Habit to try: Start a fresh Codex session at each durable checkpoint" in lines
+    )
+    assert target == {
+        "metric": "session_duration_hours",
+        "direction": "lower_is_better",
+        "current_value": 84.0,
+        "target_value": 24.0,
+        "unit": "hours",
+        "current": "3.5 days",
+        "target": "below 24.0 hours",
+        "driver": "Session duration",
+        "action": "Start a fresh Codex session at each durable checkpoint",
+    }
 
 
 def test_compare_reports_marks_improved_metrics_and_privacy_safe_output(

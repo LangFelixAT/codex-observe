@@ -5,6 +5,7 @@ All notable changes to Codex Observe will be documented here.
 The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
+- Added session-duration metadata to `codex-observe sessions` text/JSON output so multi-day runs recommend checkpointing and restarting before report export.
 - Added a multi-day session diagnostic, opportunity, playbook habit, and success target so real long-running Codex sessions recommend checkpointing and restarting instead of only reporting a dominant thread.
 - Added a sidebar Find session search box in the dashboard so large real-history databases can be narrowed by session fragment, preview label, date, or risk while preserving the risk filter.
 - Made `codex-observe private-validate` rebuild its ignored private SQLite database from scratch so bounded real-log samples do not inherit stale full-history rows.
