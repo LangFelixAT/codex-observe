@@ -849,6 +849,23 @@ def report_review_path(
     ]
 
 
+def report_next_run_guardrail(success_target: dict[str, Any]) -> str:
+    metric = str(success_target.get("metric") or "")
+    if metric == "session_duration_hours":
+        return "Write a short handoff and start a fresh session before the run crosses one day."
+    if metric == "largest_thread_share_pct":
+        return "Pause or split the run when one thread starts to dominate the work."
+    if metric == "largest_tool_output_chars":
+        return "Stop broad commands before large output enters the conversation; rerun with a narrower query or saved artifact."
+    if metric == "repeated_prompt_share_pct":
+        return "Move repeated instructions into a stable reference before launching another worker or approval thread."
+    if metric == "uncached_input_share_pct":
+        return "Summarize or filter fresh context before adding it to the next prompt."
+    if metric == "compactions":
+        return "Create a handoff before context has to be compacted."
+    return "Pause, split, or summarize before the same driver dominates the run."
+
+
 def report_next_run_checklist(report: dict[str, Any]) -> list[dict[str, str]]:
     success_target = report.get("success_target", {})
     next_action = report.get("next_action_detail", {})
@@ -872,7 +889,7 @@ def report_next_run_checklist(report: dict[str, Any]) -> list[dict[str, str]]:
         },
         {
             "phase": "During next run",
-            "action": "Pause or split the run when the same aggregate driver starts to dominate.",
+            "action": report_next_run_guardrail(success_target),
             "success_check": f"{target_metric} moves from {current} toward {target}.",
         },
         {

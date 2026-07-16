@@ -622,7 +622,7 @@ def write_valid_visual_manifest(root: Path) -> None:
             "next_run_briefs": [
                 {
                     "label": "Next run brief",
-                    "body": "Next run brief Next Codex run plan Set a stop condition for the dominant thread Largest thread drives the run largest_thread_share_pct: 57.7% -> below 50.0% Pause or split the run when the same aggregate driver starts to dominate. Copy prompt",
+                    "body": "Next run brief Next Codex run plan Set a stop condition for the dominant thread Largest thread drives the run largest_thread_share_pct: 57.7% -> below 50.0% Pause or split the run when one thread starts to dominate the work. Copy prompt",
                 }
             ],
             "feedback_handoffs": [

@@ -124,9 +124,9 @@ def test_build_report_returns_privacy_safe_diagnostics_and_playbook(
         "target_metric": "largest_thread_share_pct",
         "current": "57.7%",
         "target": "below 50.0%",
-        "guardrail": "Pause or split the run when the same aggregate driver starts to dominate.",
+        "guardrail": "Pause or split the run when one thread starts to dominate the work.",
         "verification": "Export the next run as report JSON and compare largest_thread_share_pct before adopting the workflow change.",
-        "copy_prompt": "Next Codex run plan:\n- Try: Set a stop condition for the dominant thread\n- Watch: Largest thread drives the run\n- Target: move largest_thread_share_pct from 57.7% toward below 50.0%\n- Guardrail: Pause or split the run when the same aggregate driver starts to dominate.\n- Afterward: Export the next run as report JSON and compare largest_thread_share_pct before adopting the workflow change.",
+        "copy_prompt": "Next Codex run plan:\n- Try: Set a stop condition for the dominant thread\n- Watch: Largest thread drives the run\n- Target: move largest_thread_share_pct from 57.7% toward below 50.0%\n- Guardrail: Pause or split the run when one thread starts to dominate the work.\n- Afterward: Export the next run as report JSON and compare largest_thread_share_pct before adopting the workflow change.",
     }
     assert report["next_commands"] == [
         f"codex-observe sessions --db {db} --json",
@@ -207,7 +207,14 @@ def test_build_report_prioritizes_multi_day_session_checkpointing(
         "verification": "Export the next run as report JSON and compare session_duration_hours before adopting the workflow change.",
     }
     assert report["next_run_brief"]["target_metric"] == "session_duration_hours"
+    assert report["next_run_brief"]["guardrail"] == (
+        "Write a short handoff and start a fresh session before the run crosses one day."
+    )
     assert "Start a fresh Codex session" in report["next_run_brief"]["copy_prompt"]
+    assert "before the run crosses one day" in report["next_run_brief"]["copy_prompt"]
+    assert report["next_run_checklist"][1]["action"] == (
+        "Write a short handoff and start a fresh session before the run crosses one day."
+    )
     assert "session_duration_hours" in report["next_run_checklist"][1]["success_check"]
 
 
