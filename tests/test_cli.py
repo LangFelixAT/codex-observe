@@ -128,6 +128,17 @@ def test_private_validate_writes_ignored_private_artifacts(tmp_path: Path) -> No
     assert (output_dir / "real-run-report.md").exists()
     assert (output_dir / "real-run-report.json").exists()
     assert any("codex-observe serve" in item for item in payload["next_commands"])
+    review_summary = payload["review_summary"]
+    assert review_summary["status"] == "ready"
+    assert review_summary["portfolio_pattern"] == "Largest thread concentration"
+    assert review_summary["portfolio_action"].startswith("Set stop conditions")
+    assert review_summary["recommended_focus"].startswith("Set a stop condition")
+    assert review_summary["success_metric"] == "largest_thread_share_pct"
+    assert review_summary["success_target"] == "below 50.0%"
+    assert review_summary["sessions_artifact"].endswith("real-sessions-list.json")
+    assert review_summary["report_markdown"].endswith("real-run-report.md")
+    assert "codex-observe serve" in review_summary["dashboard_command"]
+    assert "session_id" not in json.dumps(review_summary)
     visual_qa = payload["visual_qa"]
     assert visual_qa["profile"] == "real"
     assert visual_qa["raw_content_included"] is False
@@ -306,6 +317,11 @@ def test_private_validate_serve_launches_dashboard_after_success(
     assert result == 0
     output = capsys.readouterr().out
     assert "Private validation status: ok" in output
+    assert "Private review summary:" in output
+    assert "portfolio pattern: Largest thread concentration" in output
+    assert "recommended focus: Set a stop condition" in output
+    assert "success target: largest_thread_share_pct -> below 50.0%" in output
+    assert "dashboard: codex-observe serve" in output
     assert "Private visual QA handoff:" in output
     assert "--profile real" in output
     assert "visual-qa-manifest.json" in output.replace("\\", "/")
@@ -1149,7 +1165,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     )
     assert checks["private validation handoff"]["ok"] is True
     assert checks["private validation handoff"]["detail"] == (
-        "schema, bounded sample, ignored artifacts, report export, privacy metadata, dashboard next command, and visual QA handoff status verified"
+        "schema, bounded sample, ignored artifacts, report export, privacy metadata, private review summary, dashboard next command, and visual QA handoff status verified"
     )
     assert checks["visual QA manifest evidence"]["ok"] is True
     assert checks["CI reviewer evidence bundle"]["ok"] is True

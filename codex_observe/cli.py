@@ -2833,6 +2833,7 @@ def release_audit_report(
     private_validate_artifacts = private_validate.get("artifacts", {})
     private_validate_privacy = private_validate.get("privacy", {})
     private_validate_visual = private_validate.get("visual_qa", {})
+    private_validate_review = private_validate.get("review_summary", {})
     private_validate_ok = (
         private_validate_status == 0
         and private_validate.get("schema_version") == PRIVATE_VALIDATE_SCHEMA_VERSION
@@ -2856,6 +2857,16 @@ def release_audit_report(
             "codex-observe serve" in str(command)
             for command in private_validate.get("next_commands", [])
         )
+        and isinstance(private_validate_review, dict)
+        and private_validate_review.get("status") == "ready"
+        and private_validate_review.get("portfolio_pattern")
+        and private_validate_review.get("recommended_focus")
+        and str(private_validate_review.get("report_markdown") or "").endswith(
+            "real-run-report.md"
+        )
+        and "codex-observe serve"
+        in str(private_validate_review.get("dashboard_command") or "")
+        and "session_id" not in json.dumps(private_validate_review)
         and isinstance(private_validate_visual, dict)
         and private_validate_visual.get("profile") == "real"
         and private_validate_visual.get("status") == "not_run"
@@ -2872,9 +2883,9 @@ def release_audit_report(
     add(
         "private validation handoff",
         private_validate_ok,
-        "schema, bounded sample, ignored artifacts, report export, privacy metadata, dashboard next command, and visual QA handoff status verified"
+        "schema, bounded sample, ignored artifacts, report export, privacy metadata, private review summary, dashboard next command, and visual QA handoff status verified"
         if private_validate_ok
-        else "private validation schema, bounded sample, artifacts, report export, privacy metadata, dashboard next command, visual QA handoff status, or privacy-safe top-level payload missing",
+        else "private validation schema, bounded sample, artifacts, report export, privacy metadata, private review summary, dashboard next command, visual QA handoff status, or privacy-safe top-level payload missing",
     )
 
     try:
@@ -4174,6 +4185,48 @@ def private_artifact_label(path: Path) -> str:
         return path.name
 
 
+def private_validate_review_summary(
+    sessions_payload: dict[str, object] | None,
+    artifact_labels: dict[str, str],
+    next_commands: list[str],
+) -> dict[str, object]:
+    summary: dict[str, object] = {
+        "status": "empty",
+        "sessions_artifact": artifact_labels.get("sessions_json"),
+        "report_markdown": artifact_labels.get("report_md"),
+        "report_json": artifact_labels.get("report_json"),
+        "dashboard_command": next_commands[2] if len(next_commands) > 2 else None,
+    }
+    if not isinstance(sessions_payload, dict):
+        return summary
+
+    recommended = sessions_payload.get("recommended_session")
+    if not isinstance(recommended, dict):
+        summary["next_step"] = (
+            "No reportable sessions found; inspect doctor and ingest artifacts."
+        )
+        return summary
+
+    portfolio = sessions_payload.get("portfolio_summary")
+    if isinstance(portfolio, dict):
+        top_driver = portfolio.get("top_driver")
+        if isinstance(top_driver, dict):
+            summary["portfolio_pattern"] = top_driver.get("label")
+            summary["portfolio_action"] = top_driver.get("action")
+
+    recommendation = sessions_payload.get("recommendation_detail")
+    if isinstance(recommendation, dict):
+        target = recommendation.get("success_target_preview")
+        if isinstance(target, dict):
+            summary["recommended_focus"] = target.get("action")
+            summary["success_metric"] = target.get("metric")
+            summary["success_target"] = target.get("target")
+
+    summary["status"] = "ready"
+    summary["next_step"] = "Open the dashboard or read the generated private report."
+    return summary
+
+
 def reset_private_database(database: Path) -> None:
     candidates = [
         database,
@@ -4274,6 +4327,7 @@ def private_validate_payload(
     status = "ok"
     error = ""
     report_written = False
+    sessions_payload: dict[str, object] | None = None
     try:
         reset_private_database(artifacts["database"])
         result = ingest(sessions, db_path, newest_files=newest_files)
@@ -4321,6 +4375,9 @@ def private_validate_payload(
         f"codex-observe serve --db {_command_arg(artifacts['database'])}",
         visual_command,
     ]
+    review_summary = private_validate_review_summary(
+        sessions_payload, artifact_labels, next_commands
+    )
     payload: dict[str, object] = {
         "schema_version": PRIVATE_VALIDATE_SCHEMA_VERSION,
         "status": status,
@@ -4339,6 +4396,7 @@ def private_validate_payload(
             ),
         },
         "next_commands": next_commands,
+        "review_summary": review_summary,
         "visual_qa": {
             "profile": "real",
             "command": visual_command,
@@ -4377,6 +4435,28 @@ def private_validate_lines(payload: dict[str, object]) -> list[str]:
             artifact = artifacts.get(label)
             if artifact:
                 lines.append(f"- {label}: {artifact}")
+    review_summary = payload.get("review_summary")
+    if isinstance(review_summary, dict):
+        lines.append("Private review summary:")
+        if review_summary.get("portfolio_pattern"):
+            lines.append(f"- portfolio pattern: {review_summary['portfolio_pattern']}")
+        if review_summary.get("portfolio_action"):
+            lines.append(f"- portfolio action: {review_summary['portfolio_action']}")
+        if review_summary.get("recommended_focus"):
+            lines.append(f"- recommended focus: {review_summary['recommended_focus']}")
+        if review_summary.get("success_metric") and review_summary.get(
+            "success_target"
+        ):
+            lines.append(
+                "- success target: "
+                f"{review_summary['success_metric']} -> {review_summary['success_target']}"
+            )
+        if review_summary.get("report_markdown"):
+            lines.append(f"- report: {review_summary['report_markdown']}")
+        if review_summary.get("dashboard_command"):
+            lines.append(f"- dashboard: {review_summary['dashboard_command']}")
+        if review_summary.get("next_step"):
+            lines.append(f"- next step: {review_summary['next_step']}")
     if payload.get("error"):
         lines.append(f"Error: {payload['error']}")
     visual_qa = payload.get("visual_qa")

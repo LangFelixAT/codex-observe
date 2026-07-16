@@ -5,6 +5,7 @@ All notable changes to Codex Observe will be documented here.
 The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
+- Added a compact private review summary to `codex-observe private-validate` so real-session validation immediately names the dominant portfolio pattern, recommended focus, report artifact, and dashboard command.
 - Added dominant-driver evidence to the sessions portfolio briefing so broad high-risk histories show the recurring workflow pattern across runs.
 - Added a sessions portfolio briefing in CLI JSON/text and the dashboard Overview so all-high-risk real histories are treated as workflow patterns, not isolated runs.
 - Surfaced selected-run duration in the dashboard sidebar and Overview metric grid with visual QA evidence.
