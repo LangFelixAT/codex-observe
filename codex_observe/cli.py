@@ -2888,9 +2888,9 @@ def release_audit_report(
     add(
         "private validation handoff",
         private_validate_ok,
-        "schema, bounded sample, ignored artifacts, report export, privacy metadata, private review summary, full-history follow-up, dashboard next command, and visual QA handoff status verified"
+        "schema, bounded sample, ignored artifacts, report export, privacy metadata, private review summary, scope guidance, full-history follow-up, dashboard next command, and visual QA handoff status verified"
         if private_validate_ok
-        else "private validation schema, bounded sample, artifacts, report export, privacy metadata, private review summary, full-history follow-up, dashboard next command, visual QA handoff status, or privacy-safe top-level payload missing",
+        else "private validation schema, bounded sample, artifacts, report export, privacy metadata, private review summary, scope guidance, full-history follow-up, dashboard next command, visual QA handoff status, or privacy-safe top-level payload missing",
     )
 
     try:
@@ -4194,6 +4194,7 @@ def private_validate_review_summary(
     sessions_payload: dict[str, object] | None,
     artifact_labels: dict[str, str],
     next_commands: list[str],
+    newest_files: int | None,
 ) -> dict[str, object]:
     dashboard_command = next(
         (command for command in next_commands if "codex-observe serve" in command), None
@@ -4201,8 +4202,18 @@ def private_validate_review_summary(
     full_history_command = next(
         (command for command in next_commands if "--all" in command), None
     )
+    scope_note = (
+        "Full-history validation: all matching JSONL files were considered."
+        if newest_files is None
+        else (
+            f"Sampled validation: newest {newest_files} JSONL files; "
+            "run the full-history command before treating this as complete history."
+        )
+    )
     summary: dict[str, object] = {
         "status": "empty",
+        "scan_scope": "all" if newest_files is None else "newest",
+        "scope_note": scope_note,
         "sessions_artifact": artifact_labels.get("sessions_json"),
         "report_markdown": artifact_labels.get("report_md"),
         "report_json": artifact_labels.get("report_json"),
@@ -4396,7 +4407,7 @@ def private_validate_payload(
         ]
     )
     review_summary = private_validate_review_summary(
-        sessions_payload, artifact_labels, next_commands
+        sessions_payload, artifact_labels, next_commands, newest_files
     )
     payload: dict[str, object] = {
         "schema_version": PRIVATE_VALIDATE_SCHEMA_VERSION,
@@ -4459,6 +4470,8 @@ def private_validate_lines(payload: dict[str, object]) -> list[str]:
     review_summary = payload.get("review_summary")
     if isinstance(review_summary, dict):
         lines.append("Private review summary:")
+        if review_summary.get("scope_note"):
+            lines.append(f"- scope: {review_summary['scope_note']}")
         if review_summary.get("portfolio_pattern"):
             lines.append(f"- portfolio pattern: {review_summary['portfolio_pattern']}")
         if review_summary.get("portfolio_action"):

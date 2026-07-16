@@ -133,6 +133,8 @@ def test_private_validate_writes_ignored_private_artifacts(tmp_path: Path) -> No
     assert any("--all --json" in item for item in payload["next_commands"])
     review_summary = payload["review_summary"]
     assert review_summary["status"] == "ready"
+    assert review_summary["scan_scope"] == "newest"
+    assert "Sampled validation: newest 25 JSONL files" in review_summary["scope_note"]
     assert review_summary["portfolio_pattern"] == "Largest thread concentration"
     assert review_summary["portfolio_action"].startswith("Set stop conditions")
     assert review_summary["recommended_focus"].startswith("Set a stop condition")
@@ -169,6 +171,8 @@ def test_private_validate_all_scans_full_history_without_repeat_prompt(
     assert payload["status"] == "ok"
     assert payload["scan_scope"] == "all"
     assert payload["newest_files"] is None
+    assert payload["review_summary"]["scan_scope"] == "all"
+    assert "Full-history validation" in payload["review_summary"]["scope_note"]
     assert payload["review_summary"]["full_history_command"] is None
     assert not any("--all" in item for item in payload["next_commands"])
     assert any("codex-observe serve" in item for item in payload["next_commands"])
@@ -342,6 +346,7 @@ def test_private_validate_serve_launches_dashboard_after_success(
     output = capsys.readouterr().out
     assert "Private validation status: ok" in output
     assert "Private review summary:" in output
+    assert "scope: Sampled validation: newest 25 JSONL files" in output
     assert "portfolio pattern: Largest thread concentration" in output
     assert "recommended focus: Set a stop condition" in output
     assert "success target: largest_thread_share_pct -> below 50.0%" in output
@@ -1190,7 +1195,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     )
     assert checks["private validation handoff"]["ok"] is True
     assert checks["private validation handoff"]["detail"] == (
-        "schema, bounded sample, ignored artifacts, report export, privacy metadata, private review summary, full-history follow-up, dashboard next command, and visual QA handoff status verified"
+        "schema, bounded sample, ignored artifacts, report export, privacy metadata, private review summary, scope guidance, full-history follow-up, dashboard next command, and visual QA handoff status verified"
     )
     assert checks["visual QA manifest evidence"]["ok"] is True
     assert checks["CI reviewer evidence bundle"]["ok"] is True

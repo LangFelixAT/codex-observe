@@ -5,6 +5,7 @@ All notable changes to Codex Observe will be documented here.
 The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
+- Added sampled/full-history scope guidance to codex-observe private-validate review summaries so users know whether the recommendation reflects a newest-file sample or complete local history.
 - Added `codex-observe private-validate --all` and a sampled-run full-history follow-up command so users can graduate from newest-file validation to complete real-history validation without guessing the command.
 - Added a compact private review summary to `codex-observe private-validate` so real-session validation immediately names the dominant portfolio pattern, recommended focus, report artifact, and dashboard command.
 - Added dominant-driver evidence to the sessions portfolio briefing so broad high-risk histories show the recurring workflow pattern across runs.
