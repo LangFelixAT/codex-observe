@@ -440,6 +440,11 @@ def diagnostics_df(
 
 
 PLAYBOOK_BY_DIAGNOSTIC = {
+    "Run spans multiple days": (
+        "Start a fresh Codex session at each durable checkpoint",
+        "Multi-day sessions accumulate stale context and repeated approval overhead. Close the loop with a short handoff, then start a new session for the next phase.",
+        "Targets long-running session accumulation.",
+    ),
     "Largest thread drives the run": (
         "Set a stop condition for the dominant thread",
         "Long-lived root or worker threads usually explain the next run's cost. Split work earlier or ask the agent to stop after a concrete checkpoint.",
@@ -510,6 +515,19 @@ def opportunity_df(summary: dict[str, Any], limit: int = 4) -> pd.DataFrame:
     def token_scale(value: Any) -> str:
         share = float(value or 0) / (total_tokens or 1) * 100
         return f"{fmt_short(value)} tokens ({share:.1f}% of run)"
+
+    duration_hours = float(summary.get("session_duration_hours") or 0)
+    if duration_hours >= 24:
+        days = duration_hours / 24
+        rows.append(
+            {
+                "Habit": "Start a fresh Codex session at each durable checkpoint",
+                "Driver": "Session duration",
+                "Scale": f"{days:.1f} days",
+                "Why": "Long-running sessions accumulate stale context; checkpointing and restarting makes the next run easier to control.",
+                "_sort": int(summary.get("total_tokens") or 0) * 1.1,
+            }
+        )
 
     largest_thread = int(summary.get("largest_thread_tokens") or 0)
     if largest_thread > 0:

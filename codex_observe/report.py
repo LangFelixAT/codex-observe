@@ -4,6 +4,7 @@ import json
 import shlex
 import sqlite3
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -788,7 +789,6 @@ def build_report(db_path: str, session_id: str | None = None) -> dict[str, Any]:
             tools[private_col] = ""
 
     diagnostics = diagnostics_df(threads, usage, events, tools, duplicated_blocks)
-    playbook = next_run_playbook_df(diagnostics)
     findings = findings_df(threads, usage, events)
     compactions = compactions_df(events, usage, threads)
 
@@ -812,6 +812,7 @@ def build_report(db_path: str, session_id: str | None = None) -> dict[str, Any]:
         largest_tool_output_chars = int(tools["output_chars"].fillna(0).max())
 
     total_tokens = int(conv["total_tokens"] or 0)
+    duration_hours = session_duration_hours(conv["first_seen"], conv["last_seen"])
     largest_thread_tokens = (
         int(largest_thread["final_total_tokens"].iloc[0])
         if not largest_thread.empty
@@ -829,8 +830,16 @@ def build_report(db_path: str, session_id: str | None = None) -> dict[str, Any]:
             "uncached_input_tokens": int(conv["total_uncached_input_tokens"] or 0),
             "largest_tool_output_chars": largest_tool_output_chars,
             "compactions": int(len(compactions)),
+            "session_duration_hours": duration_hours,
         }
     )
+
+    diagnostics = add_session_duration_diagnostic(
+        diagnostics,
+        duration_hours=duration_hours,
+        usage_snapshots=int(len(usage)),
+    )
+    playbook = next_run_playbook_df(diagnostics)
 
     report = {
         "schema_version": REPORT_SCHEMA_VERSION,
@@ -860,6 +869,10 @@ def build_report(db_path: str, session_id: str | None = None) -> dict[str, Any]:
             if not threads.empty
             else 0,
             "usage_snapshots": int(len(usage)),
+            "session_duration_hours": duration_hours,
+            "session_duration_days": round(duration_hours / 24, 1)
+            if duration_hours
+            else 0.0,
             "compactions": int(len(compactions)),
             "total_tokens": total_tokens,
             "input_tokens": total_input,
@@ -895,6 +908,60 @@ def build_report(db_path: str, session_id: str | None = None) -> dict[str, Any]:
     report["next_run_brief"] = report_next_run_brief(report)
     report["feedback_handoff"] = aggregate_feedback_handoff()
     return report
+
+
+def _parse_timestamp(value: Any) -> datetime | None:
+    if not value:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def session_duration_hours(first_seen: Any, last_seen: Any) -> float:
+    first = _parse_timestamp(first_seen)
+    last = _parse_timestamp(last_seen)
+    if first is None or last is None or last <= first:
+        return 0.0
+    return round((last - first).total_seconds() / 3600, 1)
+
+
+def add_session_duration_diagnostic(
+    diagnostics: pd.DataFrame,
+    *,
+    duration_hours: float,
+    usage_snapshots: int,
+) -> pd.DataFrame:
+    if duration_hours < 24:
+        return diagnostics
+    columns = ["Priority", "Diagnostic", "Action", "Evidence"]
+    duration_days = duration_hours / 24
+    row = pd.DataFrame(
+        [
+            {
+                "Priority": "High",
+                "Diagnostic": "Run spans multiple days",
+                "Action": "Create a short handoff and start a fresh Codex session at the next durable checkpoint.",
+                "Evidence": f"Session covered {duration_days:.1f} days across {fmt_short(usage_snapshots)} usage snapshots.",
+            }
+        ],
+        columns=columns,
+    )
+    if diagnostics.empty:
+        return row
+    existing = diagnostics[
+        diagnostics.get("Diagnostic") != "Run spans multiple days"
+    ].copy()
+    return pd.concat([row, existing], ignore_index=True)[columns]
 
 
 def _safe_int(value: Any) -> int:
@@ -1102,6 +1169,21 @@ def report_success_target(report: dict[str, Any]) -> dict[str, Any]:
     opportunities = report.get("opportunities", []) or []
     driver = str(opportunities[0].get("Driver") or "") if opportunities else ""
 
+    if driver == "Session duration":
+        current = float(summary.get("session_duration_hours") or 0)
+        target = 24.0
+        current_days = current / 24 if current else 0.0
+        return {
+            "metric": "session_duration_hours",
+            "direction": "lower_is_better",
+            "current_value": current,
+            "target_value": target,
+            "unit": "hours",
+            "current": f"{current_days:.1f} days",
+            "target": "below 24.0 hours",
+            "rationale": "The top opportunity is a long-running session; the next run should restart at durable checkpoints before stale context accumulates.",
+            "verification": "Export the next run as report JSON and compare session_duration_hours before adopting the workflow change.",
+        }
     if driver == "Largest thread":
         current = float(summary.get("largest_thread_share_pct") or 0)
         target = _pct_target(current, 50.0, 35.0)

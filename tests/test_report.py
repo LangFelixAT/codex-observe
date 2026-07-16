@@ -152,6 +152,63 @@ def test_build_report_returns_privacy_safe_diagnostics_and_playbook(
         assert private not in serialized
 
 
+def test_build_report_prioritizes_multi_day_session_checkpointing(
+    tmp_path: Path,
+) -> None:
+    db = demo_db(tmp_path)
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            """
+            UPDATE conversations
+            SET first_seen='2026-01-01T00:00:00Z',
+                last_seen='2026-01-04T12:00:00Z'
+            WHERE session_id='demo-session-cost-review'
+            """
+        )
+
+    report = build_report(str(db))
+
+    assert report["summary"]["session_duration_hours"] == 84.0
+    assert report["summary"]["session_duration_days"] == 3.5
+    assert report["diagnostics"][0] == {
+        "Priority": "High",
+        "Diagnostic": "Run spans multiple days",
+        "Action": "Create a short handoff and start a fresh Codex session at the next durable checkpoint.",
+        "Evidence": "Session covered 3.5 days across 6 usage snapshots.",
+    }
+    assert report["playbook"][0]["Habit"] == (
+        "Start a fresh Codex session at each durable checkpoint"
+    )
+    assert report["playbook"][0]["Impact"] == (
+        "Targets long-running session accumulation."
+    )
+    assert report["opportunities"][0] == {
+        "Rank": 1,
+        "Habit": "Start a fresh Codex session at each durable checkpoint",
+        "Driver": "Session duration",
+        "Scale": "3.5 days",
+        "Why": "Long-running sessions accumulate stale context; checkpointing and restarting makes the next run easier to control.",
+    }
+    assert report["triage"]["primary_driver"] == "Run spans multiple days"
+    assert report["triage"]["next_action"] == (
+        "Start a fresh Codex session at each durable checkpoint"
+    )
+    assert report["success_target"] == {
+        "metric": "session_duration_hours",
+        "direction": "lower_is_better",
+        "current_value": 84.0,
+        "target_value": 24.0,
+        "unit": "hours",
+        "current": "3.5 days",
+        "target": "below 24.0 hours",
+        "rationale": "The top opportunity is a long-running session; the next run should restart at durable checkpoints before stale context accumulates.",
+        "verification": "Export the next run as report JSON and compare session_duration_hours before adopting the workflow change.",
+    }
+    assert report["next_run_brief"]["target_metric"] == "session_duration_hours"
+    assert "Start a fresh Codex session" in report["next_run_brief"]["copy_prompt"]
+    assert "session_duration_hours" in report["next_run_checklist"][1]["success_check"]
+
+
 def test_report_markdown_and_json_are_shareable_without_private_content(
     tmp_path: Path,
 ) -> None:
