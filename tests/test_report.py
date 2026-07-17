@@ -69,6 +69,7 @@ def test_build_report_returns_privacy_safe_diagnostics_and_playbook(
     assert report["summary"]["largest_thread_share_pct"] == 57.7
     assert report["summary"]["repeated_prompt_share_pct"] == 17.4
     assert report["summary"]["uncached_input_share_pct"] == 39.5
+    assert report["summary"]["roots"] == 1
     assert report["summary"]["workers"] == 1
     assert report["triage"]["risk_level"] == "high"
     assert report["triage"]["primary_driver"] == "Largest thread drives the run"
@@ -314,6 +315,8 @@ def test_report_markdown_and_json_are_shareable_without_private_content(
         "codex-observe compare --before-report run-report.json --after-report next-run-report.json --out run-comparison.md"
         in markdown
     )
+    assert "Threads: 3 (1 roots, 1 workers, 0 explorers, 1 guardians)" in markdown
+    assert payload["summary"]["roots"] == 1
     assert "## Cost Profile" in markdown
     assert "## Opportunity Stack" in markdown
     assert "1. **Set a stop condition for the dominant thread**" in markdown

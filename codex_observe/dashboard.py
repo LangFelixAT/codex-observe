@@ -2592,6 +2592,7 @@ def main() -> None:
     cache_pct = (
         int(conv.total_cached_input_tokens or 0) / int(conv.total_input_tokens or 1)
     ) * 100
+    roots = int((threads["kind"] == "root").sum())
     workers = int((threads["kind"] == "worker").sum())
     guardians = int((threads["kind"] == "guardian").sum())
     explorers = int((threads["kind"] == "explorer").sum())
@@ -2614,6 +2615,7 @@ def main() -> None:
         [
             ("Threads", fmt_int(conv.thread_count)),
             ("Duration", format_session_duration(selected_duration_hours)),
+            ("Roots", fmt_int(roots)),
             ("Workers", fmt_int(workers)),
             ("Explorers", fmt_int(explorers)),
             ("Guardians", fmt_int(guardians)),

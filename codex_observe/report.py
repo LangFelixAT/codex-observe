@@ -1188,6 +1188,7 @@ def build_report(db_path: str, session_id: str | None = None) -> dict[str, Any]:
         },
         "summary": {
             "threads": int(conv["thread_count"] or 0),
+            "roots": int(kind_counts.get("root", 0)),
             "workers": int(kind_counts.get("worker", 0)),
             "explorers": int(kind_counts.get("explorer", 0)),
             "guardians": int(kind_counts.get("guardian", 0)),
@@ -2295,7 +2296,7 @@ def report_markdown(report: dict[str, Any]) -> str:
             "",
             "## Summary",
             "",
-            f"- Threads: {summary['threads']} ({summary['workers']} workers, {summary['explorers']} explorers, {summary['guardians']} guardians)",
+            f"- Threads: {summary['threads']} ({summary.get('roots', 0)} roots, {summary['workers']} workers, {summary['explorers']} explorers, {summary['guardians']} guardians)",
             f"- Tool calls: {summary['tool_calls']}",
             f"- Usage snapshots: {fmt_short(summary.get('usage_snapshots', 0))}",
             f"- Compactions: {summary['compactions']}",
