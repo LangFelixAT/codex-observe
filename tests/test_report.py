@@ -315,7 +315,7 @@ def test_report_markdown_and_json_are_shareable_without_private_content(
         "codex-observe compare --before-report run-report.json --after-report next-run-report.json --out run-comparison.md"
         in markdown
     )
-    assert "Threads: 3 (1 roots, 1 workers, 0 explorers, 1 guardians)" in markdown
+    assert "Threads: 3 (1 root, 1 worker, 0 explorers, 1 guardian)" in markdown
     assert payload["summary"]["roots"] == 1
     assert "## Cost Profile" in markdown
     assert "## Opportunity Stack" in markdown
@@ -694,11 +694,11 @@ def test_session_summaries_are_aggregate_only(tmp_path: Path) -> None:
         in lines
     )
     assert (
-        "demo-session-cost-review | 2026-01-01T12:23:00Z | high | 0.0d | 3 | 2 | 6 | 4.0k | 57.5k | 22.7k | 24.3%"
+        "demo-session-cost-review | 2026-01-01T12:23:00Z | high | 24m | 3 | 2 | 6 | 4.0k | 57.5k | 22.7k | 24.3%"
         in lines
     )
     assert (
-        "demo-session-focused-followup | 2026-01-01T12:35:00Z | low | 0.0d | 3 | 1 | 3 | 880 | 8.4k | 1.2k | 29.8%"
+        "demo-session-focused-followup | 2026-01-01T12:35:00Z | low | 12m | 3 | 1 | 3 | 880 | 8.4k | 1.2k | 29.8%"
         in lines
     )
     limited_lines = "\n".join(session_summary_lines(str(db), limit=1))

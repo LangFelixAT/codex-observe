@@ -5,6 +5,7 @@ All notable changes to Codex Observe will be documented here.
 The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
+- Made session-listing durations compact for short real runs and pluralized run-report role counts for cleaner terminal and Markdown output.
 - Added root thread counts to run report summaries and selected-run dashboard metrics so thread-role totals are explicit.
 - Added a Guardian share column to plain-text session listings so real histories expose approval overhead while scanning runs.
 - Added guardian input share to sessions recommendation details so JSON handoffs explain approval overhead alongside duration, thread, replay, uncached input, and tool-output drivers.

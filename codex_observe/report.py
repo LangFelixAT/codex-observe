@@ -804,7 +804,7 @@ def session_summary_lines(
                     str(row["session_id"]),
                     str(row.get("last_seen") or "unknown"),
                     str(row["triage_risk"]),
-                    f"{float(row.get('session_duration_hours') or 0) / 24:.1f}d",
+                    fmt_duration_hours(row.get("session_duration_hours")),
                     str(row["threads"]),
                     str(row["tool_calls"]),
                     fmt_short(row.get("usage_snapshots", 0)),
@@ -1305,6 +1305,26 @@ def _safe_int(value: Any) -> int:
         return int(value or 0)
     except (TypeError, ValueError):
         return 0
+
+
+def fmt_duration_hours(hours: Any) -> str:
+    try:
+        value = float(hours or 0)
+    except (TypeError, ValueError):
+        value = 0.0
+    if value <= 0:
+        return "0m"
+    if value < 1:
+        return f"{max(1, round(value * 60))}m"
+    if value < 24:
+        return f"{value:.1f}h"
+    return f"{value / 24:.1f}d"
+
+
+def fmt_count_label(count: Any, singular: str, plural: str | None = None) -> str:
+    value = _safe_int(count)
+    label = singular if value == 1 else (plural or f"{singular}s")
+    return f"{value} {label}"
 
 
 def _metric_delta(
@@ -2251,6 +2271,14 @@ def report_markdown(report: dict[str, Any]) -> str:
     summary = report["summary"]
     session = report["session"]
     success_target = report.get("success_target", {})
+    thread_roles = ", ".join(
+        [
+            fmt_count_label(summary.get("roots"), "root"),
+            fmt_count_label(summary.get("workers"), "worker"),
+            fmt_count_label(summary.get("explorers"), "explorer"),
+            fmt_count_label(summary.get("guardians"), "guardian"),
+        ]
+    )
     lines = [
         "# Codex Observe Run Report",
         "",
@@ -2296,7 +2324,7 @@ def report_markdown(report: dict[str, Any]) -> str:
             "",
             "## Summary",
             "",
-            f"- Threads: {summary['threads']} ({summary.get('roots', 0)} roots, {summary['workers']} workers, {summary['explorers']} explorers, {summary['guardians']} guardians)",
+            f"- Threads: {summary['threads']} ({thread_roles})",
             f"- Tool calls: {summary['tool_calls']}",
             f"- Usage snapshots: {fmt_short(summary.get('usage_snapshots', 0))}",
             f"- Compactions: {summary['compactions']}",
