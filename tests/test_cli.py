@@ -788,7 +788,7 @@ def test_visual_manifest_evidence_failures_validate_saved_sidebar_metric_and_suc
 
     assert "visual QA manifest desktop missing risk labels: Low risk" in failures
     assert (
-        "visual QA manifest desktop missing sidebar session details: 24 min duration, 6 snapshots"
+        "visual QA manifest desktop missing sidebar session details: 24 min duration, 6 snapshots, Focus: Thread"
         in failures
     )
     assert "visual QA manifest missing desktop sidebar Risk filter evidence" in failures

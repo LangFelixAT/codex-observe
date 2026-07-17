@@ -121,6 +121,8 @@ def test_order_conversations_for_review_uses_risk_aware_session_summaries() -> N
             "usage_snapshots": 6,
             "session_duration_hours": 84.0,
             "session_duration_days": 3.5,
+            "focus_label": "Duration",
+            "focus_driver": "session_duration_hours",
         },
         {
             "session_id": "newer-low",
@@ -128,6 +130,8 @@ def test_order_conversations_for_review_uses_risk_aware_session_summaries() -> N
             "usage_snapshots": 3,
             "session_duration_hours": 0.2,
             "session_duration_days": 0.0,
+            "focus_label": "Monitor",
+            "focus_driver": "none",
         },
     ]
 
@@ -138,6 +142,8 @@ def test_order_conversations_for_review_uses_risk_aware_session_summaries() -> N
     assert ordered["usage_snapshots"].tolist() == [6, 3]
     assert ordered["session_duration_hours"].tolist() == [84.0, 0.2]
     assert ordered["session_duration_days"].tolist() == [3.5, 0.0]
+    assert ordered["focus_label"].tolist() == ["Duration", "Monitor"]
+    assert ordered["focus_driver"].tolist() == ["session_duration_hours", "none"]
     assert "_review_order" not in ordered.columns
 
 
@@ -198,19 +204,25 @@ def test_filter_conversations_by_search_matches_sidebar_fields() -> None:
                 "preview": "Investigate repeated prompt blocks",
                 "last_seen": "2026-01-02T12:00:00Z",
                 "triage_risk": "high",
+                "focus_label": "Replay",
+                "focus_driver": "repeated_prompt_share_pct",
             },
             {
                 "session_id": "run-beta-low",
                 "preview": "Clean follow-up",
                 "last_seen": "2026-01-03T12:00:00Z",
                 "triage_risk": "low",
+                "focus_label": "Monitor",
+                "focus_driver": "none",
             },
         ]
     )
 
     filtered = filter_conversations_by_search(conversations, "alpha repeated")
+    focus_filtered = filter_conversations_by_search(conversations, "replay")
 
     assert filtered["session_id"].tolist() == ["run-alpha-high"]
+    assert focus_filtered["session_id"].tolist() == ["run-alpha-high"]
 
 
 def test_filter_conversations_by_search_uses_literal_multi_term_matching() -> None:
@@ -242,14 +254,15 @@ def test_conversation_button_label_includes_risk_and_selection_marker() -> None:
             "session_id": "session-high",
             "preview": "Investigate a costly run with repeated context",
             "triage_risk": "high",
+            "focus_label": "Replay",
         }
     )
 
     assert conversation_button_label(row, selected=True) == (
-        "> !! High risk | Investigate a costly run with repeated context"
+        "> !! High risk | Replay | Investigate a costly run with repeated context"
     )
     assert conversation_button_label(row, selected=False) == (
-        "!! High risk | Investigate a costly run with repeated context"
+        "!! High risk | Replay | Investigate a costly run with repeated context"
     )
 
 

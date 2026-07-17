@@ -1949,6 +1949,14 @@ def order_conversations_for_review(
         str(summary.get("session_id")): float(summary.get("session_duration_days") or 0)
         for summary in summaries
     }
+    focus_label_by_session = {
+        str(summary.get("session_id")): str(summary.get("focus_label") or "Monitor")
+        for summary in summaries
+    }
+    focus_driver_by_session = {
+        str(summary.get("session_id")): str(summary.get("focus_driver") or "none")
+        for summary in summaries
+    }
     if not order_by_session:
         return conversations
     ordered = conversations.copy()
@@ -1967,6 +1975,14 @@ def order_conversations_for_review(
     ]
     ordered["session_duration_days"] = [
         duration_days_by_session.get(str(session_id), 0.0)
+        for session_id in ordered["session_id"]
+    ]
+    ordered["focus_label"] = [
+        focus_label_by_session.get(str(session_id), "Monitor")
+        for session_id in ordered["session_id"]
+    ]
+    ordered["focus_driver"] = [
+        focus_driver_by_session.get(str(session_id), "none")
         for session_id in ordered["session_id"]
     ]
     ordered["_review_order"] = [
@@ -2020,7 +2036,14 @@ def filter_conversations_by_search(
         return conversations
     searchable_columns = [
         column
-        for column in ["session_id", "preview", "last_seen", "triage_risk"]
+        for column in [
+            "session_id",
+            "preview",
+            "last_seen",
+            "triage_risk",
+            "focus_label",
+            "focus_driver",
+        ]
         if column in conversations.columns
     ]
     if not searchable_columns:
@@ -2068,8 +2091,10 @@ def conversation_button_label(row: pd.Series, selected: bool) -> str:
     preview = useful_text_preview(row.get("preview") or row["session_id"], 72)
     risk = str(row.get("triage_risk") or "unknown").strip().lower()
     risk_label = f"{risk.capitalize()} risk"
+    focus = str(row.get("focus_label") or "").strip()
+    focus_part = f" | {focus}" if focus else ""
     prefix = "> " if selected else ""
-    return f"{prefix}{risk_marker(risk)} {risk_label} | {preview}"
+    return f"{prefix}{risk_marker(risk)} {risk_label}{focus_part} | {preview}"
 
 
 def data_inventory_html(
@@ -2543,6 +2568,9 @@ def main() -> None:
                 )
                 if t:
                     bits.append(t)
+                focus = str(row.get("focus_label") or "").strip()
+                if focus:
+                    bits.append(f"Focus: {focus}")
                 bits.append(
                     f"{format_session_duration(row.get('session_duration_hours'))} duration"
                 )
@@ -2614,6 +2642,7 @@ def main() -> None:
     render_metric_grid(
         [
             ("Threads", fmt_int(conv.thread_count)),
+            ("Focus", str(conv.get("focus_label") or "Monitor")),
             ("Duration", format_session_duration(selected_duration_hours)),
             ("Roots", fmt_int(roots)),
             ("Workers", fmt_int(workers)),
