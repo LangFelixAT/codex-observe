@@ -5,6 +5,7 @@ All notable changes to Codex Observe will be documented here.
 The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
+- Added secondary watch items to next-run briefs so reports and dashboards carry the next ranked real drivers into the copy-pasteable run plan.
 - Added volume-calibrated guardian input share to report triage reasons so large approval-context replay is visible in the risk summary without overclassifying small focused runs.
 - Added guardian input share to report Quick Read headlines so large approval-context replay appears in the first summary line of real run reports.
 - Kept guardian approval overhead in the default next-run playbook so real multi-driver reports include the approval-context habit alongside duration, dominant-thread, context-jump, tool-output, and replay habits.

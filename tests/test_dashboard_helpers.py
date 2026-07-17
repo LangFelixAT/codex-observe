@@ -32,6 +32,7 @@ from codex_observe.dashboard import (
     filter_conversations_by_search,
     format_session_duration,
     metric_with_share,
+    next_run_brief_html,
     next_run_checklist_html,
     operator_briefing_html,
     order_conversations_for_review,
@@ -1651,3 +1652,25 @@ def test_playbook_html_escapes_content_and_renders_steps() -> None:
 
 def test_playbook_html_returns_empty_string_for_no_rows() -> None:
     assert playbook_html(pd.DataFrame()) == ""
+
+
+def test_next_run_brief_html_renders_secondary_watch_items() -> None:
+    rendered = next_run_brief_html(
+        {
+            "habit": "Split dominant work",
+            "watch": "Largest thread drives the run",
+            "also_watch": [
+                "Guardian overhead - 1.0B <tokens>",
+                "Uncached input - 56.0M",
+            ],
+            "target_metric": "largest_thread_share_pct",
+            "current": "55.5%",
+            "target": "below 50.0%",
+            "guardrail": "Checkpoint before approval replay.",
+            "copy_prompt": "Next Codex run plan:\n- Also watch: Guardian overhead - 1.0B <tokens>",
+        }
+    )
+
+    assert "Also watch" in rendered
+    assert "Guardian overhead - 1.0B &lt;tokens&gt;; Uncached input - 56.0M" in rendered
+    assert "Guardian overhead - 1.0B <tokens>" not in rendered

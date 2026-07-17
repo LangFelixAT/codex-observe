@@ -945,6 +945,24 @@ def report_next_run_checklist(report: dict[str, Any]) -> list[dict[str, str]]:
     ]
 
 
+def report_next_run_also_watch(report: dict[str, Any], limit: int = 3) -> list[str]:
+    opportunities = report.get("opportunities", []) or []
+    if not isinstance(opportunities, list):
+        return []
+    items: list[str] = []
+    for row in opportunities[1:]:
+        if not isinstance(row, dict):
+            continue
+        driver = str(row.get("Driver") or "").strip()
+        scale = str(row.get("Scale") or "").strip()
+        if not driver or not scale:
+            continue
+        items.append(f"{driver} - {scale}")
+        if len(items) >= limit:
+            break
+    return items
+
+
 def report_next_run_brief(report: dict[str, Any]) -> dict[str, Any]:
     success_target = report.get("success_target", {}) or {}
     next_action = report.get("next_action_detail", {}) or {}
@@ -976,20 +994,27 @@ def report_next_run_brief(report: dict[str, Any]) -> dict[str, Any]:
         and isinstance(checklist[1], dict)
     ):
         guardrail = str(checklist[1].get("action") or guardrail)
-    prompt = "\n".join(
+    also_watch = report_next_run_also_watch(report)
+    prompt_lines = [
+        "Next Codex run plan:",
+        f"- Try: {habit}",
+        f"- Watch: {driver}",
+    ]
+    if also_watch:
+        prompt_lines.append(f"- Also watch: {'; '.join(also_watch)}")
+    prompt_lines.extend(
         [
-            "Next Codex run plan:",
-            f"- Try: {habit}",
-            f"- Watch: {driver}",
             f"- Target: move {metric} from {current} toward {target}",
             f"- Guardrail: {guardrail}",
             f"- Afterward: {verification}",
         ]
     )
+    prompt = "\n".join(prompt_lines)
     return {
         "title": "Next Codex run plan",
         "habit": habit,
         "watch": driver,
+        "also_watch": also_watch,
         "target_metric": metric,
         "current": current,
         "target": target,

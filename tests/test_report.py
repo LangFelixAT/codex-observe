@@ -127,12 +127,17 @@ def test_build_report_returns_privacy_safe_diagnostics_and_playbook(
         "title": "Next Codex run plan",
         "habit": "Set a stop condition for the dominant thread",
         "watch": "Largest thread drives the run",
+        "also_watch": [
+            "Uncached input - 22.7k tokens (39.5% of run)",
+            "Guardian overhead - 14.0k input tokens (24.3% of run)",
+            "Repeated prompt blocks - 10.0k tokens (17.4% of run)",
+        ],
         "target_metric": "largest_thread_share_pct",
         "current": "57.7%",
         "target": "below 50.0%",
         "guardrail": "Pause or split the run when one thread starts to dominate the work.",
         "verification": "Export the next run as report JSON and compare largest_thread_share_pct before adopting the workflow change.",
-        "copy_prompt": "Next Codex run plan:\n- Try: Set a stop condition for the dominant thread\n- Watch: Largest thread drives the run\n- Target: move largest_thread_share_pct from 57.7% toward below 50.0%\n- Guardrail: Pause or split the run when one thread starts to dominate the work.\n- Afterward: Export the next run as report JSON and compare largest_thread_share_pct before adopting the workflow change.",
+        "copy_prompt": "Next Codex run plan:\n- Try: Set a stop condition for the dominant thread\n- Watch: Largest thread drives the run\n- Also watch: Uncached input - 22.7k tokens (39.5% of run); Guardian overhead - 14.0k input tokens (24.3% of run); Repeated prompt blocks - 10.0k tokens (17.4% of run)\n- Target: move largest_thread_share_pct from 57.7% toward below 50.0%\n- Guardrail: Pause or split the run when one thread starts to dominate the work.\n- Afterward: Export the next run as report JSON and compare largest_thread_share_pct before adopting the workflow change.",
     }
     assert report["next_commands"] == [
         f"codex-observe sessions --db {db} --json",
@@ -237,6 +242,7 @@ def test_build_report_prioritizes_multi_day_session_checkpointing(
     assert report["next_run_brief"]["guardrail"] == (
         "Write a short handoff and start a fresh session before the run crosses one day."
     )
+    assert report["next_run_brief"]["also_watch"][0].startswith("Largest thread -")
     assert "Start a fresh Codex session" in report["next_run_brief"]["copy_prompt"]
     assert "before the run crosses one day" in report["next_run_brief"]["copy_prompt"]
     assert report["next_run_checklist"][1]["action"] == (
@@ -282,6 +288,7 @@ def test_report_markdown_and_json_are_shareable_without_private_content(
     assert "## Next Run Brief" in markdown
     assert "Next Codex run plan:" in markdown
     assert "- Try: Set a stop condition for the dominant thread" in markdown
+    assert "- Also watch: Uncached input - 22.7k tokens" in markdown
     assert (
         "- Target: move largest_thread_share_pct from 57.7% toward below 50.0%"
         in markdown
@@ -329,6 +336,7 @@ def test_report_markdown_and_json_are_shareable_without_private_content(
         == "Set a stop condition for the dominant thread"
     )
     assert payload["next_run_brief"]["target_metric"] == "largest_thread_share_pct"
+    assert payload["next_run_brief"]["also_watch"][1].startswith("Guardian overhead -")
     assert "Next Codex run plan" in payload["next_run_brief"]["copy_prompt"]
     assert payload["review_path"][2]["label"] == "Export the next run"
     assert payload["review_path"][3]["success_check"] == (

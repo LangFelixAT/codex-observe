@@ -1380,6 +1380,13 @@ def next_run_brief_html(brief: object) -> str:
     habit = str(brief.get("habit") or "Apply the top recommended workflow habit.")
     watch = str(brief.get("watch") or "top aggregate driver")
     metric = str(brief.get("target_metric") or "target metric")
+    raw_also_watch = brief.get("also_watch")
+    if isinstance(raw_also_watch, list):
+        also_watch = "; ".join(
+            str(item) for item in raw_also_watch if str(item).strip()
+        )
+    else:
+        also_watch = str(raw_also_watch or "").strip()
     current = str(brief.get("current") or "current value")
     target = str(brief.get("target") or "target value")
     guardrail = str(
@@ -1400,9 +1407,15 @@ def next_run_brief_html(brief: object) -> str:
     items = [
         ("Try", habit),
         ("Watch", watch),
-        ("Target", f"{metric}: {current} -> {target}"),
-        ("Guardrail", guardrail),
     ]
+    if also_watch:
+        items.append(("Also watch", also_watch))
+    items.extend(
+        [
+            ("Target", f"{metric}: {current} -> {target}"),
+            ("Guardrail", guardrail),
+        ]
+    )
     item_html = []
     for label, value in items:
         item_html.append(
