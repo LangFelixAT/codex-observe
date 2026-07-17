@@ -23,6 +23,7 @@ from codex_observe.report import (
     report_json,
     report_markdown,
     report_review_path,
+    report_success_target,
     session_portfolio_drivers,
     session_portfolio_summary,
     session_summaries,
@@ -500,6 +501,51 @@ def test_session_success_target_preview_skips_satisfied_uncached_target() -> Non
     assert preview["target_value"] < preview["current_value"]
 
 
+def test_guardian_overhead_can_drive_success_targets() -> None:
+    preview = session_success_target_preview(
+        {
+            "total_tokens": 100_000,
+            "guardian_input_tokens": 45_000,
+            "guardian_input_share_pct": 45.0,
+            "largest_thread_share_pct": 20.0,
+            "repeated_prompt_share_pct": 0.0,
+            "uncached_input_share_pct": 5.0,
+            "largest_tool_output_chars": 100,
+        }
+    )
+
+    assert preview == {
+        "action": "Limit approval context before guardian checks",
+        "current": "45.0%",
+        "current_value": 45.0,
+        "direction": "lower_is_better",
+        "driver": "Guardian overhead",
+        "metric": "guardian_input_share_pct",
+        "target": "below 40.0%",
+        "target_value": 40.0,
+        "unit": "percent_of_run",
+    }
+
+    target = report_success_target(
+        {
+            "summary": {"guardian_input_share_pct": 45.0},
+            "opportunities": [{"Driver": "Guardian overhead"}],
+        }
+    )
+
+    assert target == {
+        "metric": "guardian_input_share_pct",
+        "direction": "lower_is_better",
+        "current_value": 45.0,
+        "target_value": 40.0,
+        "unit": "percent_of_run",
+        "current": "45.0%",
+        "target": "below 40.0%",
+        "rationale": "The top opportunity is approval context replay; the next run should keep guardian checks narrow and checkpoint before approvals repeat.",
+        "verification": "Export the next run as report JSON and compare guardian_input_share_pct before adopting the workflow change.",
+    }
+
+
 def test_session_summaries_are_aggregate_only(tmp_path: Path) -> None:
     db = demo_db(tmp_path)
 
@@ -520,10 +566,12 @@ def test_session_summaries_are_aggregate_only(tmp_path: Path) -> None:
             "total_tokens": 57510,
             "uncached_input_tokens": 22700,
             "cached_input_tokens": 32000,
+            "guardian_input_tokens": 14000,
             "triage_risk": "high",
             "largest_thread_share_pct": 57.7,
             "repeated_prompt_share_pct": 17.4,
             "uncached_input_share_pct": 39.5,
+            "guardian_input_share_pct": 24.3,
             "largest_tool_output_chars": 3960,
         },
         {
@@ -538,10 +586,12 @@ def test_session_summaries_are_aggregate_only(tmp_path: Path) -> None:
             "total_tokens": 8400,
             "uncached_input_tokens": 1200,
             "cached_input_tokens": 6300,
+            "guardian_input_tokens": 2500,
             "triage_risk": "low",
             "largest_thread_share_pct": 34.5,
             "repeated_prompt_share_pct": 0.0,
             "uncached_input_share_pct": 14.3,
+            "guardian_input_share_pct": 29.8,
             "largest_tool_output_chars": 880,
         },
     ]
@@ -569,7 +619,7 @@ def test_session_summaries_are_aggregate_only(tmp_path: Path) -> None:
     assert "Why: highest aggregate triage risk; latest run breaks ties" in lines
     assert "Risk: high" in lines
     assert (
-        "Top drivers: largest thread share: 57.7%; repeated prompt share: 17.4%; uncached input share: 39.5%; largest tool output: 4.0k chars"
+        "Top drivers: largest thread share: 57.7%; repeated prompt share: 17.4%; uncached input share: 39.5%; guardian input share: 24.3%; largest tool output: 4.0k chars"
         in lines
     )
     assert "Next-run target: largest_thread_share_pct 57.7% -> below 50.0%" in lines

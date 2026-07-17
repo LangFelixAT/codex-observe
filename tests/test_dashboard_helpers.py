@@ -1335,6 +1335,28 @@ def test_opportunity_df_ranks_aggregate_cost_drivers() -> None:
     }
 
 
+def test_opportunity_df_surfaces_guardian_overhead() -> None:
+    opportunities = opportunity_df(
+        {
+            "total_tokens": 100_000,
+            "largest_thread_tokens": 10_000,
+            "guardian_input_tokens": 45_000,
+            "repeated_prompt_tokens": 1_000,
+            "uncached_input_tokens": 5_000,
+            "largest_tool_output_chars": 100,
+            "compactions": 0,
+        }
+    )
+
+    assert opportunities.iloc[0].to_dict() == {
+        "Rank": 1,
+        "Habit": "Limit approval context before guardian checks",
+        "Driver": "Guardian overhead",
+        "Scale": "45.0k input tokens (45.0% of run)",
+        "Why": "Guardian approval threads can replay large context for small decisions; keep approvals narrow and checkpoint before they repeat.",
+    }
+
+
 def test_opportunity_html_escapes_card_content() -> None:
     rendered = opportunity_html(
         pd.DataFrame(

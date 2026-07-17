@@ -516,6 +516,10 @@ def opportunity_df(summary: dict[str, Any], limit: int = 4) -> pd.DataFrame:
         share = float(value or 0) / (total_tokens or 1) * 100
         return f"{fmt_short(value)} tokens ({share:.1f}% of run)"
 
+    def input_token_scale(value: Any) -> str:
+        share = float(value or 0) / (total_tokens or 1) * 100
+        return f"{fmt_short(value)} input tokens ({share:.1f}% of run)"
+
     duration_hours = float(summary.get("session_duration_hours") or 0)
     if duration_hours >= 24:
         days = duration_hours / 24
@@ -550,6 +554,18 @@ def opportunity_df(summary: dict[str, Any], limit: int = 4) -> pd.DataFrame:
                 "Scale": token_scale(repeated),
                 "Why": "These tokens are replayed context that can often move into a shared file or shorter reference.",
                 "_sort": repeated,
+            }
+        )
+
+    guardian_input = int(summary.get("guardian_input_tokens") or 0)
+    if guardian_input > 0:
+        rows.append(
+            {
+                "Habit": "Limit approval context before guardian checks",
+                "Driver": "Guardian overhead",
+                "Scale": input_token_scale(guardian_input),
+                "Why": "Guardian approval threads can replay large context for small decisions; keep approvals narrow and checkpoint before they repeat.",
+                "_sort": guardian_input,
             }
         )
 

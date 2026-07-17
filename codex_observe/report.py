@@ -204,6 +204,14 @@ def session_summaries(db_path: str) -> list[dict[str, Any]]:
               FROM threads
               GROUP BY session_id
             ),
+            guardian_rollups AS (
+              SELECT
+                session_id,
+                SUM(final_input_tokens) AS guardian_input_tokens
+              FROM threads
+              WHERE agent_role='guardian' OR source_kind='guardian'
+              GROUP BY session_id
+            ),
             usage_rollups AS (
               SELECT
                 t.session_id,
@@ -247,10 +255,12 @@ def session_summaries(db_path: str) -> list[dict[str, Any]]:
               COALESCE(tr.tool_calls, 0) AS tool_calls,
               COALESCE(ur.usage_snapshots, 0) AS usage_snapshots,
               COALESCE(tr.largest_thread_tokens, 0) AS largest_thread_tokens,
+              COALESCE(gr.guardian_input_tokens, 0) AS guardian_input_tokens,
               COALESCE(tor.largest_tool_output_chars, 0) AS largest_tool_output_chars,
               COALESCE(pr.repeated_prompt_tokens, 0) AS repeated_prompt_tokens
             FROM conversations c
             LEFT JOIN thread_rollups tr ON tr.session_id = c.session_id
+            LEFT JOIN guardian_rollups gr ON gr.session_id = c.session_id
             LEFT JOIN usage_rollups ur ON ur.session_id = c.session_id
             LEFT JOIN tool_rollups tor ON tor.session_id = c.session_id
             LEFT JOIN prompt_rollups pr ON pr.session_id = c.session_id
@@ -263,10 +273,12 @@ def session_summaries(db_path: str) -> list[dict[str, Any]]:
         largest_thread_tokens = int(row["largest_thread_tokens"] or 0)
         repeated_prompt_tokens = int(row["repeated_prompt_tokens"] or 0)
         uncached_input_tokens = int(row["total_uncached_input_tokens"] or 0)
+        guardian_input_tokens = int(row["guardian_input_tokens"] or 0)
         largest_tool_output_chars = int(row["largest_tool_output_chars"] or 0)
         largest_thread_share_pct = _pct_of_total(largest_thread_tokens, total_tokens)
         repeated_prompt_share_pct = _pct_of_total(repeated_prompt_tokens, total_tokens)
         uncached_input_share_pct = _pct_of_total(uncached_input_tokens, total_tokens)
+        guardian_input_share_pct = _pct_of_total(guardian_input_tokens, total_tokens)
         duration_hours = session_duration_hours(row["first_seen"], row["last_seen"])
         triage = report_triage(
             {
@@ -276,6 +288,7 @@ def session_summaries(db_path: str) -> list[dict[str, Any]]:
                     "largest_thread_share_pct": largest_thread_share_pct,
                     "repeated_prompt_share_pct": repeated_prompt_share_pct,
                     "uncached_input_share_pct": uncached_input_share_pct,
+                    "guardian_input_share_pct": guardian_input_share_pct,
                     "largest_tool_output_chars": largest_tool_output_chars,
                     "compactions": 0,
                 },
@@ -298,10 +311,12 @@ def session_summaries(db_path: str) -> list[dict[str, Any]]:
                 "total_tokens": total_tokens,
                 "uncached_input_tokens": uncached_input_tokens,
                 "cached_input_tokens": int(row["total_cached_input_tokens"] or 0),
+                "guardian_input_tokens": guardian_input_tokens,
                 "triage_risk": triage["risk_level"],
                 "largest_thread_share_pct": largest_thread_share_pct,
                 "repeated_prompt_share_pct": repeated_prompt_share_pct,
                 "uncached_input_share_pct": uncached_input_share_pct,
+                "guardian_input_share_pct": guardian_input_share_pct,
                 "largest_tool_output_chars": largest_tool_output_chars,
             }
         )
@@ -372,6 +387,13 @@ def _portfolio_driver_catalog() -> list[dict[str, Any]]:
             "threshold": 35.0,
             "unit": "percent",
             "action": "Filter or summarize fresh context before it enters the run.",
+        },
+        {
+            "driver": "guardian_input_share_pct",
+            "label": "High guardian input share",
+            "threshold": 25.0,
+            "unit": "percent",
+            "action": "Limit approval context before guardian checks.",
         },
         {
             "driver": "repeated_prompt_share_pct",
@@ -563,6 +585,7 @@ def session_success_target_preview(recommended: dict[str, Any]) -> dict[str, Any
     largest_thread = float(recommended.get("largest_thread_share_pct") or 0)
     repeated = float(recommended.get("repeated_prompt_share_pct") or 0)
     uncached = float(recommended.get("uncached_input_share_pct") or 0)
+    guardian = float(recommended.get("guardian_input_share_pct") or 0)
     tool_chars = _safe_int(recommended.get("largest_tool_output_chars"))
     total_tokens = _safe_int(recommended.get("total_tokens"))
     largest_thread_tokens = int(total_tokens * largest_thread / 100)
@@ -570,10 +593,14 @@ def session_success_target_preview(recommended: dict[str, Any]) -> dict[str, Any
     uncached_tokens = _safe_int(recommended.get("uncached_input_tokens")) or int(
         total_tokens * uncached / 100
     )
+    guardian_tokens = _safe_int(recommended.get("guardian_input_tokens")) or int(
+        total_tokens * guardian / 100
+    )
     actionable_drivers = [
         ("Largest thread", largest_thread > 50.0, largest_thread_tokens),
         ("Repeated prompt blocks", repeated > 15.0, repeated_tokens),
         ("Uncached input", uncached > 35.0, uncached_tokens),
+        ("Guardian overhead", guardian > 25.0, guardian_tokens),
         ("Largest tool output", tool_chars > 5_000, tool_chars / 4),
     ]
     driver = next(
@@ -629,6 +656,20 @@ def session_success_target_preview(recommended: dict[str, Any]) -> dict[str, Any
             "driver": driver,
             "action": "Filter or summarize fresh context before the next run",
         }
+    if driver == "Guardian overhead":
+        current = float(recommended.get("guardian_input_share_pct") or 0)
+        target = _pct_target(current, 40.0, 25.0)
+        return {
+            "metric": "guardian_input_share_pct",
+            "direction": "lower_is_better",
+            "current_value": current,
+            "target_value": target,
+            "unit": "percent_of_run",
+            "current": f"{current:.1f}%",
+            "target": f"below {target:.1f}%",
+            "driver": driver,
+            "action": "Limit approval context before guardian checks",
+        }
     if driver == "Largest tool output":
         current = _safe_int(recommended.get("largest_tool_output_chars"))
         target = 5_000 if current >= 5_000 else 2_000
@@ -663,6 +704,7 @@ def session_recommended_action_lines(recommended: dict[str, Any]) -> list[str]:
         ("largest thread share", recommended.get("largest_thread_share_pct")),
         ("repeated prompt share", recommended.get("repeated_prompt_share_pct")),
         ("uncached input share", recommended.get("uncached_input_share_pct")),
+        ("guardian input share", recommended.get("guardian_input_share_pct")),
     ]
     driver_parts = []
     for label, value in share_drivers:
@@ -861,6 +903,8 @@ def report_next_run_guardrail(success_target: dict[str, Any]) -> str:
         return "Move repeated instructions into a stable reference before launching another worker or approval thread."
     if metric == "uncached_input_share_pct":
         return "Summarize or filter fresh context before adding it to the next prompt."
+    if metric == "guardian_input_share_pct":
+        return "Keep approval prompts narrow; checkpoint before repeated guardian checks replay the run context."
     if metric == "compactions":
         return "Create a handoff before context has to be compacted."
     return "Pause, split, or summarize before the same driver dominates the run."
@@ -1052,6 +1096,22 @@ def build_report(db_path: str, session_id: str | None = None) -> dict[str, Any]:
     if not tools.empty and "output_chars" in tools.columns:
         largest_tool_output_chars = int(tools["output_chars"].fillna(0).max())
 
+    guardian_threads = (
+        threads[threads["kind"] == "guardian"] if not threads.empty else threads
+    )
+    guardian_input_tokens = 0
+    guardian_output_reasoning_tokens = 0
+    if not guardian_threads.empty:
+        guardian_input_tokens = int(
+            guardian_threads["final_input_tokens"].fillna(0).sum()
+        )
+        guardian_output_reasoning_tokens = int(
+            (
+                guardian_threads["final_output_tokens"].fillna(0)
+                + guardian_threads["final_reasoning_tokens"].fillna(0)
+            ).sum()
+        )
+
     total_tokens = int(conv["total_tokens"] or 0)
     duration_hours = session_duration_hours(conv["first_seen"], conv["last_seen"])
     largest_thread_tokens = (
@@ -1065,6 +1125,7 @@ def build_report(db_path: str, session_id: str | None = None) -> dict[str, Any]:
             "total_tokens": total_tokens,
             "largest_thread_tokens": largest_thread_tokens,
             "repeated_prompt_tokens": repeated_prompt_tokens,
+            "guardian_input_tokens": guardian_input_tokens,
             "uncached_input_tokens": int(conv["total_uncached_input_tokens"] or 0),
             "largest_tool_output_chars": largest_tool_output_chars,
             "compactions": int(len(compactions)),
@@ -1116,6 +1177,11 @@ def build_report(db_path: str, session_id: str | None = None) -> dict[str, Any]:
             "input_tokens": total_input,
             "uncached_input_tokens": int(conv["total_uncached_input_tokens"] or 0),
             "cached_input_tokens": cached,
+            "guardian_input_tokens": guardian_input_tokens,
+            "guardian_output_reasoning_tokens": guardian_output_reasoning_tokens,
+            "guardian_input_share_pct": _pct_of_total(
+                guardian_input_tokens, total_tokens
+            ),
             "cache_pct": round(cache_pct, 1),
             "largest_thread_tokens": largest_thread_tokens,
             "largest_thread_share_pct": _pct_of_total(
@@ -1467,6 +1533,20 @@ def report_success_target(report: dict[str, Any]) -> dict[str, Any]:
             "target": f"below {target:.1f}%",
             "rationale": "The top opportunity is fresh context cost; the next run should filter or summarize inputs earlier.",
             "verification": "Export the next run as report JSON and compare uncached_input_share_pct before adopting the workflow change.",
+        }
+    if driver == "Guardian overhead":
+        current = float(summary.get("guardian_input_share_pct") or 0)
+        target = _pct_target(current, 40.0, 25.0)
+        return {
+            "metric": "guardian_input_share_pct",
+            "direction": "lower_is_better",
+            "current_value": current,
+            "target_value": target,
+            "unit": "percent_of_run",
+            "current": f"{current:.1f}%",
+            "target": f"below {target:.1f}%",
+            "rationale": "The top opportunity is approval context replay; the next run should keep guardian checks narrow and checkpoint before approvals repeat.",
+            "verification": "Export the next run as report JSON and compare guardian_input_share_pct before adopting the workflow change.",
         }
     if driver == "Largest tool output":
         current = _safe_int(summary.get("largest_tool_output_chars"))
@@ -2172,6 +2252,7 @@ def report_markdown(report: dict[str, Any]) -> str:
             f"- Compactions: {summary['compactions']}",
             f"- Total tokens: {fmt_short(summary['total_tokens'])}",
             f"- Input tokens: {fmt_short(summary['input_tokens'])} ({fmt_short(summary['uncached_input_tokens'])} uncached, {summary['cache_pct']:.1f}% cache hit)",
+            f"- Guardian input tokens: {fmt_short(summary.get('guardian_input_tokens', 0))}",
             f"- Largest thread: {fmt_short(summary['largest_thread_tokens'])} tokens ({summary['largest_thread_kind'] or 'unknown'})",
             f"- Repeated prompt tokens: {fmt_short(summary.get('repeated_prompt_tokens', 0))}",
             f"- Largest tool output: {fmt_short(summary.get('largest_tool_output_chars', 0))} chars",
@@ -2181,6 +2262,7 @@ def report_markdown(report: dict[str, Any]) -> str:
             f"- Largest thread share: {summary.get('largest_thread_share_pct', 0):.1f}% of total tokens",
             f"- Repeated prompt share: {summary.get('repeated_prompt_share_pct', 0):.1f}% of total tokens",
             f"- Uncached input share: {summary.get('uncached_input_share_pct', 0):.1f}% of total tokens",
+            f"- Guardian input share: {summary.get('guardian_input_share_pct', 0):.1f}% of total tokens",
             "",
             "## Opportunity Stack",
             "",

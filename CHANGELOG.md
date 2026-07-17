@@ -5,6 +5,7 @@ All notable changes to Codex Observe will be documented here.
 The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
+- Promoted guardian approval overhead into session summaries, portfolio patterns, ranked opportunity stacks, and next-run success targets so real histories surface large approval-context replay as an actionable workflow cost.
 - Made next-run brief guardrails specific to the selected success metric, so multi-day real sessions now recommend checkpointing before one day instead of generic driver-dominance wording.
 - Made the sessions portfolio briefing ignore single-thread tautologies for largest-thread concentration, so real histories do not treat every one-thread run as a cross-session dominant-thread pattern.
 - Bounded percentage-of-total metrics at 100% in reports, sessions summaries, and dashboard calculations so real-history replay-token outliers do not produce impossible percentage displays.
