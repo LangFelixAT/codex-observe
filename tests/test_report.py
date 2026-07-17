@@ -24,6 +24,7 @@ from codex_observe.report import (
     report_json,
     report_markdown,
     report_review_path,
+    report_triage,
     report_success_target,
     session_portfolio_drivers,
     session_portfolio_summary,
@@ -81,6 +82,9 @@ def test_build_report_returns_privacy_safe_diagnostics_and_playbook(
         in report["triage"]["reasons"]
     )
     assert "Uncached input used 39.5% of total tokens." in report["triage"]["reasons"]
+    assert (
+        "Guardian input used 24.3% of total tokens." not in report["triage"]["reasons"]
+    )
     assert report["headline"] == {
         "headline": "57.5k total tokens across 6 usage snapshots; largest thread 33.2k (57.7%); repeated prompts 10.0k (17.4%); guardian input 14.0k (24.3%); largest tool output 4.0k chars.",
         "top_diagnostic": "Largest thread drives the run",
@@ -521,6 +525,62 @@ def test_session_success_target_preview_skips_satisfied_uncached_target() -> Non
         "unit": "percent_of_run",
     }
     assert preview["target_value"] < preview["current_value"]
+
+
+def test_report_triage_flags_high_guardian_input_share() -> None:
+    triage = report_triage(
+        {
+            "summary": {
+                "largest_thread_share_pct": 20.0,
+                "repeated_prompt_share_pct": 0.0,
+                "uncached_input_share_pct": 5.0,
+                "guardian_input_share_pct": 44.5,
+                "guardian_input_tokens": 45_000,
+                "largest_tool_output_chars": 100,
+                "total_tokens": 10_000,
+                "compactions": 0,
+            },
+            "headline": {
+                "top_diagnostic": "Guardian overhead",
+                "recommendation": "Limit approval context before guardian checks",
+            },
+        }
+    )
+
+    assert triage == {
+        "risk_level": "high",
+        "primary_driver": "Guardian overhead",
+        "next_action": "Limit approval context before guardian checks",
+        "reasons": ["Guardian input used 44.5% of total tokens."],
+    }
+
+
+def test_report_triage_ignores_small_guardian_input_share() -> None:
+    triage = report_triage(
+        {
+            "summary": {
+                "largest_thread_share_pct": 20.0,
+                "repeated_prompt_share_pct": 0.0,
+                "uncached_input_share_pct": 5.0,
+                "guardian_input_share_pct": 44.5,
+                "guardian_input_tokens": 4_450,
+                "largest_tool_output_chars": 100,
+                "total_tokens": 10_000,
+                "compactions": 0,
+            },
+            "headline": {
+                "top_diagnostic": "Guardian overhead",
+                "recommendation": "Limit approval context before guardian checks",
+            },
+        }
+    )
+
+    assert triage == {
+        "risk_level": "low",
+        "primary_driver": "Guardian overhead",
+        "next_action": "Limit approval context before guardian checks",
+        "reasons": ["No high-risk cost driver crossed review thresholds."],
+    }
 
 
 def test_guardian_overhead_can_drive_success_targets() -> None:

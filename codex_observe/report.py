@@ -288,6 +288,7 @@ def session_summaries(db_path: str) -> list[dict[str, Any]]:
                     "largest_thread_share_pct": largest_thread_share_pct,
                     "repeated_prompt_share_pct": repeated_prompt_share_pct,
                     "uncached_input_share_pct": uncached_input_share_pct,
+                    "guardian_input_tokens": guardian_input_tokens,
                     "guardian_input_share_pct": guardian_input_share_pct,
                     "largest_tool_output_chars": largest_tool_output_chars,
                     "compactions": 0,
@@ -1371,6 +1372,8 @@ def report_triage(report: dict[str, Any]) -> dict[str, Any]:
     largest_share = float(summary.get("largest_thread_share_pct", 0) or 0)
     repeated_share = float(summary.get("repeated_prompt_share_pct", 0) or 0)
     uncached_share = float(summary.get("uncached_input_share_pct", 0) or 0)
+    guardian_share = float(summary.get("guardian_input_share_pct", 0) or 0)
+    guardian_tokens = _safe_int(summary.get("guardian_input_tokens"))
     tool_chars = _safe_int(summary.get("largest_tool_output_chars"))
     total_tokens = _safe_int(summary.get("total_tokens"))
     compactions = _safe_int(summary.get("compactions"))
@@ -1400,6 +1403,14 @@ def report_triage(report: dict[str, Any]) -> dict[str, Any]:
     elif uncached_share >= 20:
         moderate_reasons.append(
             f"Uncached input used {uncached_share:.1f}% of total tokens."
+        )
+    if guardian_share >= 40 and guardian_tokens >= 25_000:
+        high_reasons.append(
+            f"Guardian input used {guardian_share:.1f}% of total tokens."
+        )
+    elif guardian_share >= 25 and guardian_tokens >= 25_000:
+        moderate_reasons.append(
+            f"Guardian input used {guardian_share:.1f}% of total tokens."
         )
     if tool_chars >= 5_000:
         high_reasons.append(f"Largest tool output was {fmt_short(tool_chars)} chars.")
