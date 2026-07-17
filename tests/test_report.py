@@ -687,15 +687,15 @@ def test_session_summaries_are_aggregate_only(tmp_path: Path) -> None:
     ]
     assert "Risk distribution: high 1, medium 0, low 1, unknown 0" in lines
     assert (
-        "Session ID | Last seen | Risk | Duration | Threads | Tools | Snapshots | Tool out | Tokens | Uncached"
+        "Session ID | Last seen | Risk | Duration | Threads | Tools | Snapshots | Tool out | Tokens | Uncached | Guardian"
         in lines
     )
     assert (
-        "demo-session-cost-review | 2026-01-01T12:23:00Z | high | 0.0d | 3 | 2 | 6 | 4.0k | 57.5k | 22.7k"
+        "demo-session-cost-review | 2026-01-01T12:23:00Z | high | 0.0d | 3 | 2 | 6 | 4.0k | 57.5k | 22.7k | 24.3%"
         in lines
     )
     assert (
-        "demo-session-focused-followup | 2026-01-01T12:35:00Z | low | 0.0d | 3 | 1 | 3 | 880 | 8.4k | 1.2k"
+        "demo-session-focused-followup | 2026-01-01T12:35:00Z | low | 0.0d | 3 | 1 | 3 | 880 | 8.4k | 1.2k | 29.8%"
         in lines
     )
     limited_lines = "\n".join(session_summary_lines(str(db), limit=1))

@@ -793,7 +793,7 @@ def session_summary_lines(
         )
         return lines
     lines.append(
-        "Session ID | Last seen | Risk | Duration | Threads | Tools | Snapshots | Tool out | Tokens | Uncached"
+        "Session ID | Last seen | Risk | Duration | Threads | Tools | Snapshots | Tool out | Tokens | Uncached | Guardian"
     )
     display_limit = len(filtered) if limit is None else max(1, int(limit))
     displayed = filtered[:display_limit]
@@ -811,6 +811,7 @@ def session_summary_lines(
                     fmt_short(row.get("largest_tool_output_chars", 0)),
                     fmt_short(row["total_tokens"]),
                     fmt_short(row["uncached_input_tokens"]),
+                    f"{float(row.get('guardian_input_share_pct') or 0):.1f}%",
                 ]
             )
         )

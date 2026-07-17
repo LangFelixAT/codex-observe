@@ -5,6 +5,7 @@ All notable changes to Codex Observe will be documented here.
 The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
+- Added a Guardian share column to plain-text session listings so real histories expose approval overhead while scanning runs.
 - Added guardian input share to sessions recommendation details so JSON handoffs explain approval overhead alongside duration, thread, replay, uncached input, and tool-output drivers.
 - Added secondary watch items to next-run briefs so reports and dashboards carry the next ranked real drivers into the copy-pasteable run plan.
 - Added volume-calibrated guardian input share to report triage reasons so large approval-context replay is visible in the risk summary without overclassifying small focused runs.
