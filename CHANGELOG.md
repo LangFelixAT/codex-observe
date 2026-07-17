@@ -5,6 +5,7 @@ All notable changes to Codex Observe will be documented here.
 The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
+- Added guardian input share to report Quick Read headlines so large approval-context replay appears in the first summary line of real run reports.
 - Kept guardian approval overhead in the default next-run playbook so real multi-driver reports include the approval-context habit alongside duration, dominant-thread, context-jump, tool-output, and replay habits.
 - Promoted guardian approval overhead into session summaries, portfolio patterns, ranked opportunity stacks, and next-run success targets so real histories surface large approval-context replay as an actionable workflow cost.
 - Made next-run brief guardrails specific to the selected success metric, so multi-day real sessions now recommend checkpointing before one day instead of generic driver-dominance wording.

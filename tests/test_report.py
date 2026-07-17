@@ -20,6 +20,7 @@ from codex_observe.report import (
     default_report_session,
     load_report_json,
     report_follow_up_commands,
+    report_headline,
     report_json,
     report_markdown,
     report_review_path,
@@ -81,7 +82,7 @@ def test_build_report_returns_privacy_safe_diagnostics_and_playbook(
     )
     assert "Uncached input used 39.5% of total tokens." in report["triage"]["reasons"]
     assert report["headline"] == {
-        "headline": "57.5k total tokens across 6 usage snapshots; largest thread 33.2k (57.7%); repeated prompts 10.0k (17.4%); largest tool output 4.0k chars.",
+        "headline": "57.5k total tokens across 6 usage snapshots; largest thread 33.2k (57.7%); repeated prompts 10.0k (17.4%); guardian input 14.0k (24.3%); largest tool output 4.0k chars.",
         "top_diagnostic": "Largest thread drives the run",
         "recommendation": "Set a stop condition for the dominant thread",
     }
@@ -153,6 +154,27 @@ def test_build_report_returns_privacy_safe_diagnostics_and_playbook(
     assert "no command captured" not in serialized
     for private in PRIVATE_DEMO_STRINGS:
         assert private not in serialized
+
+
+def test_report_headline_omits_guardian_when_absent() -> None:
+    report = {
+        "summary": {
+            "total_tokens": 1000,
+            "usage_snapshots": 2,
+            "largest_thread_tokens": 700,
+            "largest_thread_share_pct": 70.0,
+            "repeated_prompt_tokens": 0,
+            "repeated_prompt_share_pct": 0.0,
+            "largest_tool_output_chars": 120,
+        },
+        "diagnostics": [],
+        "playbook": [],
+    }
+
+    assert report_headline(report)["headline"] == (
+        "1.0k total tokens across 2 usage snapshots; largest thread 700 (70.0%); "
+        "repeated prompts 0 (0.0%); largest tool output 120 chars."
+    )
 
 
 def test_build_report_prioritizes_multi_day_session_checkpointing(

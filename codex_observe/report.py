@@ -1336,6 +1336,18 @@ def report_headline(report: dict[str, Any]) -> dict[str, str]:
     repeated = fmt_short(summary.get("repeated_prompt_tokens", 0))
     repeated_share = float(summary.get("repeated_prompt_share_pct", 0) or 0)
     tool_chars = fmt_short(summary.get("largest_tool_output_chars", 0))
+    guardian_input = fmt_short(summary.get("guardian_input_tokens", 0))
+    guardian_share = float(summary.get("guardian_input_share_pct", 0) or 0)
+    headline_parts = [
+        f"{total} total tokens across {snapshots} usage snapshots",
+        f"largest thread {largest} ({largest_share:.1f}%)",
+        f"repeated prompts {repeated} ({repeated_share:.1f}%)",
+    ]
+    if guardian_share > 0:
+        headline_parts.append(
+            f"guardian input {guardian_input} ({guardian_share:.1f}%)"
+        )
+    headline_parts.append(f"largest tool output {tool_chars} chars")
     top_diagnostic = (
         str(diagnostics[0].get("Diagnostic"))
         if diagnostics and diagnostics[0].get("Diagnostic")
@@ -1347,7 +1359,7 @@ def report_headline(report: dict[str, Any]) -> dict[str, str]:
         else "Inspect the largest thread before changing workflow."
     )
     return {
-        "headline": f"{total} total tokens across {snapshots} usage snapshots; largest thread {largest} ({largest_share:.1f}%); repeated prompts {repeated} ({repeated_share:.1f}%); largest tool output {tool_chars} chars.",
+        "headline": "; ".join(headline_parts) + ".",
         "top_diagnostic": top_diagnostic,
         "recommendation": recommendation,
     }
