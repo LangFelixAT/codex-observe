@@ -471,14 +471,14 @@ PLAYBOOK_BY_DIAGNOSTIC = {
         "Targets late-run context churn.",
     ),
     "Guardian overhead": (
-        "Keep approval requests minimal",
+        "Limit approval context before guardian checks",
         "Approval threads should contain the decision, risk, and smallest useful evidence set rather than the full working context.",
         "Targets approval-context overhead.",
     ),
 }
 
 
-def next_run_playbook_df(diagnostics: pd.DataFrame, limit: int = 5) -> pd.DataFrame:
+def next_run_playbook_df(diagnostics: pd.DataFrame, limit: int = 7) -> pd.DataFrame:
     columns = ["Step", "Habit", "Impact", "Why", "Source"]
     if diagnostics.empty:
         return pd.DataFrame(columns=columns)

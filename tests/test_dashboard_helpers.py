@@ -1593,6 +1593,31 @@ def test_next_run_playbook_df_turns_diagnostics_into_habits() -> None:
     assert "Root +18.0k input tokens" in playbook.iloc[0]["Source"]
 
 
+def test_next_run_playbook_df_keeps_full_signal_catalog_at_default_limit() -> None:
+    diagnostics = pd.DataFrame(
+        [
+            {"Diagnostic": "Run spans multiple days", "Evidence": "7.0 days"},
+            {"Diagnostic": "Largest thread drives the run", "Evidence": "root 55%"},
+            {"Diagnostic": "Largest context jump", "Evidence": "+249k input"},
+            {"Diagnostic": "Largest tool output", "Evidence": "40k chars"},
+            {"Diagnostic": "Repeated prompt blocks", "Evidence": "3.4M tokens"},
+            {"Diagnostic": "Context compaction occurred", "Evidence": "226 events"},
+            {"Diagnostic": "Guardian overhead", "Evidence": "1.0B input tokens"},
+        ]
+    )
+
+    playbook = next_run_playbook_df(diagnostics)
+
+    assert playbook["Step"].tolist() == [1, 2, 3, 4, 5, 6, 7]
+    assert playbook.iloc[-1].to_dict() == {
+        "Step": 7,
+        "Habit": "Limit approval context before guardian checks",
+        "Impact": "Targets approval-context overhead.",
+        "Why": "Approval threads should contain the decision, risk, and smallest useful evidence set rather than the full working context.",
+        "Source": "Guardian overhead: 1.0B input tokens",
+    }
+
+
 def test_next_run_playbook_df_returns_schema_for_empty_diagnostics() -> None:
     playbook = next_run_playbook_df(pd.DataFrame())
 
