@@ -2293,6 +2293,11 @@ def release_audit_report(
             for session in sessions
             if isinstance(session, dict)
         )
+        sessions_have_focus = bool(sessions) and all(
+            session.get("focus_driver") and session.get("focus_label")
+            for session in sessions
+            if isinstance(session, dict)
+        )
         sessions_has_schema = (
             sessions_payload.get("schema_version") == SESSIONS_SCHEMA_VERSION
         )
@@ -2390,6 +2395,7 @@ def release_audit_report(
             and "Top drivers:" in session_lines_text
             and "Next-run target:" in session_lines_text
             and "Habit to try:" in session_lines_text
+            and "Focus" in session_lines_text
             and "Tool out" in session_lines_text
             and "Guardian" in session_lines_text
             and "Snapshots" in session_lines_text
@@ -2408,9 +2414,11 @@ def release_audit_report(
             and all("largest_tool_output_chars" in row for row in sessions)
             and all("usage_snapshots" in row for row in sessions)
             and all("session_duration_hours" in row for row in sessions)
+            and all("focus_driver" in row and "focus_label" in row for row in sessions)
         )
         session_listing_ok = (
             sessions_have_risk
+            and sessions_have_focus
             and sessions_has_schema
             and sessions_has_status
             and sessions_has_risk_distribution
@@ -2425,9 +2433,9 @@ def release_audit_report(
         add(
             "session listing",
             session_listing_ok,
-            f"{len(sessions)} sessions; triage risk, risk distribution, status, schema, limit and risk-filter metadata, usage snapshots, duration metadata, text recommended action, session table duration, tool-output, and guardian columns, duration and tool-output drivers, structured driver summary, success-target preview, recommendation detail, review path, text validation next commands, and structured validation next commands verified"
+            f"{len(sessions)} sessions; triage risk, risk distribution, status, schema, limit and risk-filter metadata, usage snapshots, duration metadata, text recommended action, session table focus, duration, tool-output, and guardian columns, duration and tool-output drivers, structured driver summary, success-target preview, recommendation detail, review path, text validation next commands, and structured validation next commands verified"
             if session_listing_ok
-            else "session listing missing aggregate triage risk, risk_distribution, status, schema_version, limit and risk-filter metadata, usage snapshots, duration metadata, text recommended action, recommended_session, recommendation_detail, review_path, text validation next commands, session table duration, tool-output, and guardian columns, duration or tool-output driver, structured driver summary, success-target preview, validation next_commands, or next_commands",
+            else "session listing missing aggregate triage risk, risk_distribution, status, schema_version, limit and risk-filter metadata, usage snapshots, duration metadata, text recommended action, recommended_session, recommendation_detail, review_path, text validation next commands, session table focus, duration, tool-output, and guardian columns, duration or tool-output driver, structured driver summary, success-target preview, validation next_commands, or next_commands",
         )
     except FileNotFoundError as exc:
         sessions = []
@@ -3472,7 +3480,7 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
             "title": "List aggregate-only sessions and the recommended high-risk run",
             "evidence": [
                 "recommended_session chooses the highest-risk run",
-                "plain-text sessions output includes Snapshots, Tool out, and Guardian columns plus a recommended-action block with top aggregate drivers, including guardian share and largest tool output",
+                "plain-text sessions output includes Focus, Snapshots, Tool out, and Guardian columns plus a recommended-action block with top aggregate drivers, including guardian share and largest tool output",
                 "recommendation_detail explains the risk, recency tie-breakers, structured aggregate drivers, and ordered driver_summary display labels",
                 "plain-text sessions output includes terminal Next commands for baseline report export, next-run validation, and comparison",
                 "review_path turns the recommendation into report, next-run validation, compare, and safe-feedback steps",

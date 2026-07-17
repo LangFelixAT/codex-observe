@@ -1176,7 +1176,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     assert report.with_name("run-comparison.json").exists()
     assert (
         checks["session listing"]["detail"]
-        == "2 sessions; triage risk, risk distribution, status, schema, limit and risk-filter metadata, usage snapshots, duration metadata, text recommended action, session table duration, tool-output, and guardian columns, duration and tool-output drivers, structured driver summary, success-target preview, recommendation detail, review path, text validation next commands, and structured validation next commands verified"
+        == "2 sessions; triage risk, risk distribution, status, schema, limit and risk-filter metadata, usage snapshots, duration metadata, text recommended action, session table focus, duration, tool-output, and guardian columns, duration and tool-output drivers, structured driver summary, success-target preview, recommendation detail, review path, text validation next commands, and structured validation next commands verified"
     )
     assert checks["database doctor"]["detail"] == (
         "ok; schema, text next commands, next commands, and review path verified"
@@ -2052,7 +2052,9 @@ def test_public_tour_payload_is_private_log_free_and_points_to_visual_verificati
     assert any("success target" in item for item in evidence)
     assert any("recommended-action block" in item for item in evidence)
     assert any("largest tool output" in item for item in evidence)
-    assert any("Snapshots, Tool out, and Guardian columns" in item for item in evidence)
+    assert any(
+        "Focus, Snapshots, Tool out, and Guardian columns" in item for item in evidence
+    )
     assert any("structured aggregate drivers" in item for item in evidence)
     assert any("driver_summary" in item for item in evidence)
     assert any("review_path" in item for item in evidence)

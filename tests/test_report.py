@@ -666,6 +666,8 @@ def test_session_summaries_are_aggregate_only(tmp_path: Path) -> None:
             "uncached_input_share_pct": 39.5,
             "guardian_input_share_pct": 24.3,
             "largest_tool_output_chars": 3960,
+            "focus_driver": "largest_thread_share_pct",
+            "focus_label": "Thread",
         },
         {
             "session_id": "demo-session-focused-followup",
@@ -686,19 +688,21 @@ def test_session_summaries_are_aggregate_only(tmp_path: Path) -> None:
             "uncached_input_share_pct": 14.3,
             "guardian_input_share_pct": 29.8,
             "largest_tool_output_chars": 880,
+            "focus_driver": "none",
+            "focus_label": "Monitor",
         },
     ]
     assert "Risk distribution: high 1, medium 0, low 1, unknown 0" in lines
     assert (
-        "Session ID | Last seen | Risk | Duration | Threads | Tools | Snapshots | Tool out | Tokens | Uncached | Guardian"
+        "Session ID | Last seen | Risk | Focus | Duration | Threads | Tools | Snapshots | Tool out | Tokens | Uncached | Guardian"
         in lines
     )
     assert (
-        "demo-session-cost-review | 2026-01-01T12:23:00Z | high | 24m | 3 | 2 | 6 | 4.0k | 57.5k | 22.7k | 24.3%"
+        "demo-session-cost-review | 2026-01-01T12:23:00Z | high | Thread | 24m | 3 | 2 | 6 | 4.0k | 57.5k | 22.7k | 24.3%"
         in lines
     )
     assert (
-        "demo-session-focused-followup | 2026-01-01T12:35:00Z | low | 12m | 3 | 1 | 3 | 880 | 8.4k | 1.2k | 29.8%"
+        "demo-session-focused-followup | 2026-01-01T12:35:00Z | low | Monitor | 12m | 3 | 1 | 3 | 880 | 8.4k | 1.2k | 29.8%"
         in lines
     )
     limited_lines = "\n".join(session_summary_lines(str(db), limit=1))
@@ -769,8 +773,11 @@ def test_session_listing_prioritizes_multi_day_target_preview(
 
     assert recommended["session_duration_hours"] == 84.0
     assert recommended["session_duration_days"] == 3.5
-    assert "Session ID | Last seen | Risk | Duration | Threads" in lines
-    assert "demo-session-cost-review | 2026-01-04T12:00:00Z | high | 3.5d" in lines
+    assert "Session ID | Last seen | Risk | Focus | Duration | Threads" in lines
+    assert (
+        "demo-session-cost-review | 2026-01-04T12:00:00Z | high | Duration | 3.5d"
+        in lines
+    )
     assert (
         "Top drivers: session duration: 3.5 days; largest thread share: 57.7%" in lines
     )

@@ -188,6 +188,44 @@ def sort_session_summaries(summaries: list[dict[str, Any]]) -> list[dict[str, An
     )
 
 
+def session_focus(summary: dict[str, Any]) -> dict[str, str]:
+    duration_hours = float(summary.get("session_duration_hours") or 0)
+    thread_count = _safe_int(summary.get("threads"))
+    largest_thread_share = float(summary.get("largest_thread_share_pct") or 0)
+    repeated_share = float(summary.get("repeated_prompt_share_pct") or 0)
+    uncached_share = float(summary.get("uncached_input_share_pct") or 0)
+    guardian_share = float(summary.get("guardian_input_share_pct") or 0)
+    guardian_tokens = _safe_int(summary.get("guardian_input_tokens"))
+    tool_chars = _safe_int(summary.get("largest_tool_output_chars"))
+    total_tokens = _safe_int(summary.get("total_tokens"))
+
+    if duration_hours >= 24:
+        return {"driver": "session_duration_hours", "label": "Duration"}
+    if thread_count >= 2 and largest_thread_share >= 50:
+        return {"driver": "largest_thread_share_pct", "label": "Thread"}
+    if guardian_share >= 25 and guardian_tokens >= 25_000:
+        return {"driver": "guardian_input_share_pct", "label": "Guardian"}
+    if repeated_share >= 15:
+        return {"driver": "repeated_prompt_share_pct", "label": "Replay"}
+    if uncached_share >= 35:
+        return {"driver": "uncached_input_share_pct", "label": "Uncached"}
+    if tool_chars >= 5_000:
+        return {"driver": "largest_tool_output_chars", "label": "Tool out"}
+    if total_tokens >= 100_000:
+        return {"driver": "total_tokens", "label": "Tokens"}
+    if thread_count >= 2 and largest_thread_share >= 35:
+        return {"driver": "largest_thread_share_pct", "label": "Thread"}
+    if repeated_share >= 8:
+        return {"driver": "repeated_prompt_share_pct", "label": "Replay"}
+    if uncached_share >= 20:
+        return {"driver": "uncached_input_share_pct", "label": "Uncached"}
+    if tool_chars >= 2_000:
+        return {"driver": "largest_tool_output_chars", "label": "Tool out"}
+    if total_tokens >= 25_000:
+        return {"driver": "total_tokens", "label": "Tokens"}
+    return {"driver": "none", "label": "Monitor"}
+
+
 def session_summaries(db_path: str) -> list[dict[str, Any]]:
     db = Path(db_path).expanduser()
     if not db.exists():
@@ -299,28 +337,30 @@ def session_summaries(db_path: str) -> list[dict[str, Any]]:
                 },
             }
         )
-        summaries.append(
-            {
-                "session_id": row["session_id"],
-                "first_seen": row["first_seen"],
-                "last_seen": row["last_seen"],
-                "threads": int(row["thread_count"] or 0),
-                "tool_calls": int(row["tool_calls"] or 0),
-                "usage_snapshots": int(row["usage_snapshots"] or 0),
-                "session_duration_hours": round(duration_hours, 1),
-                "session_duration_days": round(duration_hours / 24, 1),
-                "total_tokens": total_tokens,
-                "uncached_input_tokens": uncached_input_tokens,
-                "cached_input_tokens": int(row["total_cached_input_tokens"] or 0),
-                "guardian_input_tokens": guardian_input_tokens,
-                "triage_risk": triage["risk_level"],
-                "largest_thread_share_pct": largest_thread_share_pct,
-                "repeated_prompt_share_pct": repeated_prompt_share_pct,
-                "uncached_input_share_pct": uncached_input_share_pct,
-                "guardian_input_share_pct": guardian_input_share_pct,
-                "largest_tool_output_chars": largest_tool_output_chars,
-            }
-        )
+        summary = {
+            "session_id": row["session_id"],
+            "first_seen": row["first_seen"],
+            "last_seen": row["last_seen"],
+            "threads": int(row["thread_count"] or 0),
+            "tool_calls": int(row["tool_calls"] or 0),
+            "usage_snapshots": int(row["usage_snapshots"] or 0),
+            "session_duration_hours": round(duration_hours, 1),
+            "session_duration_days": round(duration_hours / 24, 1),
+            "total_tokens": total_tokens,
+            "uncached_input_tokens": uncached_input_tokens,
+            "cached_input_tokens": int(row["total_cached_input_tokens"] or 0),
+            "guardian_input_tokens": guardian_input_tokens,
+            "triage_risk": triage["risk_level"],
+            "largest_thread_share_pct": largest_thread_share_pct,
+            "repeated_prompt_share_pct": repeated_prompt_share_pct,
+            "uncached_input_share_pct": uncached_input_share_pct,
+            "guardian_input_share_pct": guardian_input_share_pct,
+            "largest_tool_output_chars": largest_tool_output_chars,
+        }
+        focus = session_focus(summary)
+        summary["focus_driver"] = focus["driver"]
+        summary["focus_label"] = focus["label"]
+        summaries.append(summary)
     return sort_session_summaries(summaries)
 
 
@@ -793,7 +833,7 @@ def session_summary_lines(
         )
         return lines
     lines.append(
-        "Session ID | Last seen | Risk | Duration | Threads | Tools | Snapshots | Tool out | Tokens | Uncached | Guardian"
+        "Session ID | Last seen | Risk | Focus | Duration | Threads | Tools | Snapshots | Tool out | Tokens | Uncached | Guardian"
     )
     display_limit = len(filtered) if limit is None else max(1, int(limit))
     displayed = filtered[:display_limit]
@@ -804,6 +844,7 @@ def session_summary_lines(
                     str(row["session_id"]),
                     str(row.get("last_seen") or "unknown"),
                     str(row["triage_risk"]),
+                    str(row.get("focus_label") or "Monitor"),
                     fmt_duration_hours(row.get("session_duration_hours")),
                     str(row["threads"]),
                     str(row["tool_calls"]),
