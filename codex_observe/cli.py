@@ -2347,6 +2347,7 @@ def release_audit_report(
             and recommendation_detail.get("ranked_by") == ["triage_risk", "last_seen"]
             and isinstance(recommendation_detail.get("drivers"), dict)
             and "largest_tool_output_chars" in recommendation_detail["drivers"]
+            and "guardian_input_share_pct" in recommendation_detail["drivers"]
             and "session_duration_hours" in recommendation_detail["drivers"]
             and isinstance(recommendation_detail.get("driver_summary"), list)
             and isinstance(recommendation_detail.get("success_target_preview"), dict)
@@ -2354,7 +2355,11 @@ def release_audit_report(
             == "largest_thread_share_pct"
             and recommendation_detail["success_target_preview"].get("target")
             == "below 50.0%"
-            and {"largest_tool_output_chars", "session_duration_hours"}.issubset(
+            and {
+                "guardian_input_share_pct",
+                "largest_tool_output_chars",
+                "session_duration_hours",
+            }.issubset(
                 {
                     row.get("driver")
                     for row in recommendation_detail["driver_summary"]
@@ -3292,6 +3297,12 @@ def session_driver_summary(recommended: dict[str, object]) -> list[dict[str, obj
             "display": f"{float(recommended.get('uncached_input_share_pct') or 0):.1f}%",
         },
         {
+            "driver": "guardian_input_share_pct",
+            "label": "Guardian input share",
+            "value": recommended.get("guardian_input_share_pct"),
+            "display": f"{float(recommended.get('guardian_input_share_pct') or 0):.1f}%",
+        },
+        {
             "driver": "largest_tool_output_chars",
             "label": "Largest tool output",
             "value": recommended.get("largest_tool_output_chars"),
@@ -3312,6 +3323,7 @@ def session_recommendation_detail(recommended: dict[str, object]) -> dict[str, o
             "largest_thread_share_pct": recommended.get("largest_thread_share_pct"),
             "repeated_prompt_share_pct": recommended.get("repeated_prompt_share_pct"),
             "uncached_input_share_pct": recommended.get("uncached_input_share_pct"),
+            "guardian_input_share_pct": recommended.get("guardian_input_share_pct"),
             "largest_tool_output_chars": recommended.get("largest_tool_output_chars"),
             "session_duration_hours": recommended.get("session_duration_hours"),
         },

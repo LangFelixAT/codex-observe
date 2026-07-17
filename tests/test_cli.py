@@ -1920,6 +1920,7 @@ def test_session_recommendation_detail_includes_structured_tool_output_driver() 
             "largest_thread_share_pct": 57.7,
             "repeated_prompt_share_pct": 17.4,
             "uncached_input_share_pct": 39.5,
+            "guardian_input_share_pct": 24.3,
             "largest_tool_output_chars": 3960,
         }
     )
@@ -1928,6 +1929,7 @@ def test_session_recommendation_detail_includes_structured_tool_output_driver() 
         "largest_thread_share_pct": 57.7,
         "repeated_prompt_share_pct": 17.4,
         "uncached_input_share_pct": 39.5,
+        "guardian_input_share_pct": 24.3,
         "largest_tool_output_chars": 3960,
         "session_duration_hours": None,
     }
@@ -1972,6 +1974,12 @@ def test_session_recommendation_detail_includes_structured_tool_output_driver() 
             "label": "Uncached input share",
             "value": 39.5,
             "display": "39.5%",
+        },
+        {
+            "driver": "guardian_input_share_pct",
+            "label": "Guardian input share",
+            "value": 24.3,
+            "display": "24.3%",
         },
         {
             "driver": "largest_tool_output_chars",
