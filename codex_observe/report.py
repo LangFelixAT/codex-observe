@@ -1536,7 +1536,24 @@ def report_triage(report: dict[str, Any]) -> dict[str, Any]:
 def report_next_action_detail(report: dict[str, Any]) -> dict[str, Any]:
     playbook = report.get("playbook", []) or []
     diagnostics = report.get("diagnostics", []) or []
+    opportunities = report.get("opportunities", []) or []
     triage = report.get("triage", {}) or {}
+    first_playbook_habit = ""
+    if playbook and isinstance(playbook[0], dict):
+        first_playbook_habit = str(playbook[0].get("Habit") or "")
+    if opportunities and isinstance(opportunities[0], dict):
+        first_opportunity = opportunities[0]
+        opportunity_habit = str(first_opportunity.get("Habit") or "")
+        if opportunity_habit and opportunity_habit != first_playbook_habit:
+            driver = str(first_opportunity.get("Driver") or "Top opportunity")
+            scale = str(first_opportunity.get("Scale") or "unknown scale")
+            return {
+                "action": "apply_next_run_habit",
+                "target_type": "opportunity",
+                "target": opportunity_habit,
+                "impact": f"Targets {driver.lower()}.",
+                "source": f"{driver}: {scale}",
+            }
     if playbook:
         first = playbook[0]
         return {

@@ -583,13 +583,16 @@ def opportunity_df(summary: dict[str, Any], limit: int = 4) -> pd.DataFrame:
 
     tool_chars = int(summary.get("largest_tool_output_chars") or 0)
     if tool_chars > 0:
+        tool_sort = tool_chars / 4
+        if tool_chars >= 50_000:
+            tool_sort = max(tool_sort, total_tokens * min(tool_chars / 100_000, 1.0))
         rows.append(
             {
                 "Habit": "Narrow bulky commands before sharing output",
                 "Driver": "Largest tool output",
                 "Scale": f"{fmt_short(tool_chars)} chars returned by one tool",
                 "Why": "Large outputs often become expensive when they are pasted back into later turns.",
-                "_sort": tool_chars / 4,
+                "_sort": tool_sort,
             }
         )
 

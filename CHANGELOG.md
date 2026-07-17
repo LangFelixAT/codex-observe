@@ -5,6 +5,7 @@ All notable changes to Codex Observe will be documented here.
 The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
+- Prioritized very large tool outputs in the shared opportunity stack and terminal next-action summary so real-session reports align with the dashboard Focus signal when bulky command output is the top workflow issue.
 - Surfaced session Focus in the dashboard sidebar, selected-run metric grid, sidebar search, and visual QA evidence.
 - Added per-session Focus labels to session listings and JSON so large high-risk histories show the dominant reason to inspect each run.
 - Made session-listing durations compact for short real runs and pluralized run-report role counts for cleaner terminal and Markdown output.

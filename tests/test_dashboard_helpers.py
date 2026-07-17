@@ -1349,6 +1349,33 @@ def test_opportunity_df_ranks_aggregate_cost_drivers() -> None:
     }
 
 
+def test_opportunity_df_prioritizes_large_tool_output_from_real_runs() -> None:
+    opportunities = opportunity_df(
+        {
+            "total_tokens": 50_024_565,
+            "largest_thread_tokens": 14_323_204,
+            "guardian_input_tokens": 6_824_444,
+            "repeated_prompt_tokens": 376_374,
+            "uncached_input_tokens": 1_908_764,
+            "largest_tool_output_chars": 233_532,
+            "compactions": 0,
+        }
+    )
+
+    assert opportunities["Driver"].tolist()[:3] == [
+        "Largest tool output",
+        "Largest thread",
+        "Guardian overhead",
+    ]
+    assert opportunities.iloc[0].to_dict() == {
+        "Rank": 1,
+        "Habit": "Narrow bulky commands before sharing output",
+        "Driver": "Largest tool output",
+        "Scale": "233.5k chars returned by one tool",
+        "Why": "Large outputs often become expensive when they are pasted back into later turns.",
+    }
+
+
 def test_opportunity_df_surfaces_guardian_overhead() -> None:
     opportunities = opportunity_df(
         {

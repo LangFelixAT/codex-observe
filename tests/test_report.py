@@ -23,6 +23,7 @@ from codex_observe.report import (
     report_headline,
     report_json,
     report_markdown,
+    report_next_action_detail,
     report_review_path,
     report_triage,
     report_success_target,
@@ -536,6 +537,39 @@ def test_session_success_target_preview_skips_satisfied_uncached_target() -> Non
         "unit": "percent_of_run",
     }
     assert preview["target_value"] < preview["current_value"]
+
+
+def test_report_next_action_prefers_differing_top_opportunity() -> None:
+    detail = report_next_action_detail(
+        {
+            "playbook": [
+                {
+                    "Habit": "Gate large context before it enters the chat",
+                    "Impact": "Targets sudden input-token growth.",
+                    "Source": "Largest context jump: +194.2k input tokens.",
+                }
+            ],
+            "opportunities": [
+                {
+                    "Habit": "Narrow bulky commands before sharing output",
+                    "Driver": "Largest tool output",
+                    "Scale": "233.5k chars returned by one tool",
+                }
+            ],
+            "triage": {
+                "primary_driver": "Largest context jump",
+                "next_action": "Gate large context before it enters the chat",
+            },
+        }
+    )
+
+    assert detail == {
+        "action": "apply_next_run_habit",
+        "target_type": "opportunity",
+        "target": "Narrow bulky commands before sharing output",
+        "impact": "Targets largest tool output.",
+        "source": "Largest tool output: 233.5k chars returned by one tool",
+    }
 
 
 def test_report_triage_flags_high_guardian_input_share() -> None:

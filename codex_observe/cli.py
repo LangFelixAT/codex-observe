@@ -4654,7 +4654,12 @@ def report_written_lines(
     triage = report.get("triage", {})
     risk = str(triage.get("risk_level") or "unknown")
     driver = str(triage.get("primary_driver") or "No high-signal diagnostic")
-    action = str(triage.get("next_action") or "Inspect the report.")
+    next_action = report.get("next_action_detail", {})
+    action = str(
+        next_action.get("target")
+        if isinstance(next_action, dict) and next_action.get("target")
+        else triage.get("next_action") or "Inspect the report."
+    )
     opportunity_line = ""
     opportunities = report.get("opportunities", [])
     if isinstance(opportunities, list) and opportunities:

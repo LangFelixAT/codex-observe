@@ -2129,9 +2129,12 @@ def test_report_and_comparison_written_lines_include_actionable_drivers(
             "triage": {
                 "risk_level": "high",
                 "primary_driver": "Largest thread dominates",
-                "next_action": "Set a stop condition",
+                "next_action": "Fallback triage action",
             },
             "opportunities": [{"Driver": "Largest thread", "Scale": "33.2k tokens"}],
+            "next_action_detail": {
+                "target": "Set a stop condition",
+            },
             "success_target": {
                 "metric": "largest_thread_share_pct",
                 "current": "57.7%",
