@@ -35,6 +35,12 @@ def test_package_metadata_is_release_ready() -> None:
     assert "Programming Language :: Python :: 3.12" in classifiers
 
 
+def test_ruff_lint_policy_is_explicit() -> None:
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+
+    assert pyproject["tool"]["ruff"]["lint"]["select"] == ["E4", "E7", "E9", "F"]
+
+
 def test_release_documents_exist_and_are_plain_utf8() -> None:
     for relative_path in [
         "LICENSE",

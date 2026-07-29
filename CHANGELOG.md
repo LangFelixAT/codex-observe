@@ -5,6 +5,7 @@ All notable changes to Codex Observe will be documented here.
 The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
+- Made the Ruff lint policy explicit so clean CI installs remain stable across Ruff 0.16's expanded default rule set.
 - Clarified private validation summaries by separating portfolio-wide patterns from the recommended-run focus when sampled real histories point at different habits.
 - Prioritized very large tool outputs in the shared opportunity stack and terminal next-action summary so real-session reports align with the dashboard Focus signal when bulky command output is the top workflow issue.
 - Surfaced session Focus in the dashboard sidebar, selected-run metric grid, sidebar search, and visual QA evidence.

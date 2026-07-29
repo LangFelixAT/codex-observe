@@ -45,6 +45,9 @@ dev = [
   "ruff",
 ]
 
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
+
 [project.urls]
 Repository = "https://github.com/LangFelixAT/codex-observe"
 Issues = "https://github.com/LangFelixAT/codex-observe/issues"
