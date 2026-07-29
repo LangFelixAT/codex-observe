@@ -62,18 +62,24 @@ EXPECTED_VISUAL_DOWNLOAD_CONTROLS = {
     "Download comparison MD",
     "Download comparison JSON",
 }
+EXPECTED_VISUAL_COMPARISON_DIRECTION = {
+    "Comparison direction",
+    "2026-01-01T12:00+00:00 | High risk | 57.5k tokens",
+    "2026-01-01T12:24+00:00 | Low risk | 8.4k tokens",
+    "Ordered by start time.",
+}
 EXPECTED_VISUAL_COMPARISON_PREVIEW = {
     "Comparison quick read",
-    "regressed",
-    "Triage movement: regressed",
-    "Inspect new diagnostic first: Repeated prompt blocks.",
+    "improved",
+    "Triage movement: improved",
+    "Keep the change, then target persisted diagnostic: Largest thread drives the run.",
     "Next validation command",
     "codex-observe report --db <db> --session-id <next-session-id> --format json --out next-run-report.json",
 }
 EXPECTED_VISUAL_COMPARISON_DELTAS = {
-    "Total tokens": "regressed",
+    "Total tokens": "improved",
     "Usage snapshots": "changed",
-    "Largest thread tokens": "regressed",
+    "Largest thread tokens": "improved",
 }
 EXPECTED_VISUAL_COMPARISON_REVIEW_PATH = {
     "Comparison review path",
@@ -1992,6 +1998,27 @@ def visual_manifest_evidence_failures(root: Path) -> list[str]:
             if missing_feedback_handoff:
                 failures.append(
                     f"visual QA manifest {viewport_name} missing safe feedback handoff evidence: {', '.join(sorted(missing_feedback_handoff))}"
+                )
+
+        comparison_directions = viewport.get("comparison_directions")
+        if not isinstance(comparison_directions, list) or not comparison_directions:
+            failures.append(
+                f"visual QA manifest missing {viewport_name} comparison direction evidence"
+            )
+        else:
+            direction_text = "\n".join(
+                " ".join(str(value) for value in item.values())
+                for item in comparison_directions
+                if isinstance(item, dict)
+            )
+            missing_direction = EXPECTED_VISUAL_COMPARISON_DIRECTION - {
+                expected
+                for expected in EXPECTED_VISUAL_COMPARISON_DIRECTION
+                if expected in direction_text
+            }
+            if missing_direction:
+                failures.append(
+                    f"visual QA manifest {viewport_name} missing comparison direction evidence: {', '.join(sorted(missing_direction))}"
                 )
 
         comparison_previews = viewport.get("comparison_previews")

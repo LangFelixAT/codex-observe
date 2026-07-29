@@ -725,10 +725,18 @@ def write_valid_visual_manifest(root: Path) -> None:
                     "body": "Safe feedback handoff docs/PUBLIC_TOUR_FEEDBACK.md .github/ISSUE_TEMPLATE/public_tour_feedback.yml synthetic or reviewed-redacted aggregate evidence codex-observe report JSON or Markdown private prompts Do not collect",
                 }
             ],
+            "comparison_directions": [
+                {
+                    "label": "Comparison direction",
+                    "before": "2026-01-01T12:00+00:00 | High risk | 57.5k tokens",
+                    "after": "2026-01-01T12:24+00:00 | Low risk | 8.4k tokens",
+                    "basis": "Ordered by start time.",
+                }
+            ],
             "comparison_previews": [
                 {
-                    "label": "Comparison quick read: regressed",
-                    "body": "Comparison quick read: regressed Verdict: regressed; largest change: Total tokens +49.1k (regressed). Triage movement: regressed Next step: Inspect new diagnostic first: Repeated prompt blocks. Next validation command codex-observe report --db <db> --session-id <next-session-id> --format json --out next-run-report.json",
+                    "label": "Comparison quick read: improved",
+                    "body": "Comparison quick read: improved Verdict: improved; largest change: Total tokens -49.1k (improved). Triage movement: improved Next step: Keep the change, then target persisted diagnostic: Largest thread drives the run. Next validation command codex-observe report --db <db> --session-id <next-session-id> --format json --out next-run-report.json",
                 }
             ],
             "comparison_review_paths": [
@@ -740,18 +748,18 @@ def write_valid_visual_manifest(root: Path) -> None:
             "comparison_deltas": [
                 {
                     "label": "Total tokens",
-                    "before_after": "8.4k -> 57.5k",
-                    "delta": "regressed: 49.1k (584.6%)",
+                    "before_after": "57.5k -> 8.4k",
+                    "delta": "improved: -49.1k (-85.4%)",
                 },
                 {
                     "label": "Usage snapshots",
-                    "before_after": "3 -> 6",
-                    "delta": "changed: 3 (100.0%)",
+                    "before_after": "6 -> 3",
+                    "delta": "changed: -3 (-50.0%)",
                 },
                 {
                     "label": "Largest thread tokens",
-                    "before_after": "2.9k -> 33.2k",
-                    "delta": "regressed: 30.3k (1044.8%)",
+                    "before_after": "33.2k -> 2.9k",
+                    "delta": "improved: -30.3k (-91.3%)",
                 },
             ],
         }
@@ -877,8 +885,9 @@ def test_visual_manifest_evidence_failures_validate_saved_sidebar_metric_and_suc
     )
     payload["viewports"]["desktop"]["download_controls"] = ["Download report MD"]
     payload["viewports"]["desktop"]["feedback_handoffs"] = []
+    payload["viewports"]["desktop"].pop("comparison_directions")
     payload["viewports"]["desktop"]["comparison_deltas"] = [
-        {"label": "Total tokens", "delta": "improved: -49.1k (-85.4%)"}
+        {"label": "Total tokens", "delta": "regressed: 49.1k (584.6%)"}
     ]
     manifest_path.write_text(json.dumps(payload), encoding="utf-8")
 
@@ -920,7 +929,10 @@ def test_visual_manifest_evidence_failures_validate_saved_sidebar_metric_and_suc
         in failures
     )
     assert (
-        "visual QA manifest desktop comparison delta Total tokens missing direction: regressed"
+        "visual QA manifest missing desktop comparison direction evidence" in failures
+    )
+    assert (
+        "visual QA manifest desktop comparison delta Total tokens missing direction: improved"
         in failures
     )
     assert (

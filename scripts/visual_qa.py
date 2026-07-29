@@ -131,18 +131,24 @@ EXPECTED_DOWNLOAD_CONTROLS = [
     "Download comparison MD",
     "Download comparison JSON",
 ]
+EXPECTED_COMPARISON_DIRECTION = {
+    "label": "Comparison direction",
+    "before": "2026-01-01T12:00+00:00 | High risk | 57.5k tokens",
+    "after": "2026-01-01T12:24+00:00 | Low risk | 8.4k tokens",
+    "basis": "Ordered by start time.",
+}
 EXPECTED_COMPARISON_PREVIEW = {
     "label": "Comparison quick read",
-    "verdict": "regressed",
-    "triage_movement": "regressed",
-    "next_step": "Inspect new diagnostic first: Repeated prompt blocks.",
+    "verdict": "improved",
+    "triage_movement": "improved",
+    "next_step": "Keep the change, then target persisted diagnostic: Largest thread drives the run.",
     "follow_up": "Next validation command",
     "follow_up_command": "codex-observe report --db <db> --session-id <next-session-id> --format json --out next-run-report.json",
 }
 EXPECTED_COMPARISON_DELTAS = [
-    {"label": "Total tokens", "direction": "regressed"},
+    {"label": "Total tokens", "direction": "improved"},
     {"label": "Usage snapshots", "direction": "changed"},
-    {"label": "Largest thread tokens", "direction": "regressed"},
+    {"label": "Largest thread tokens", "direction": "improved"},
 ]
 EXPECTED_COMPARISON_REVIEW_PATH = [
     "Comparison review path",
@@ -422,6 +428,47 @@ def collect_report_scope_warnings(page) -> list[str]:
 () => Array.from(document.querySelectorAll('.co-report-scope')).map((card) => (card.innerText || '').replace(/\s+/g, ' ').trim()).filter(Boolean)
         """
     )
+
+
+def collect_comparison_directions(page) -> list[dict[str, str]]:
+    return page.evaluate(
+        r"""
+() => Array.from(document.querySelectorAll('.co-comparison-direction')).map((card) => {
+  const runs = Array.from(card.querySelectorAll('.co-comparison-direction-run'));
+  return {
+    label: (card.querySelector('h3')?.innerText || '').replace(/\s+/g, ' ').trim(),
+    before: (runs[0]?.querySelector('span')?.innerText || '').replace(/\s+/g, ' ').trim(),
+    after: (runs[1]?.querySelector('span')?.innerText || '').replace(/\s+/g, ' ').trim(),
+    basis: (card.querySelector('p')?.innerText || '').replace(/\s+/g, ' ').trim(),
+  };
+}).filter((item) => item.label || item.before || item.after)
+        """
+    )
+
+
+def comparison_direction_failures(
+    directions: list[dict[str, str]],
+    viewport_name: str,
+    profile: str = PROFILE_DEMO,
+) -> list[str]:
+    if not directions:
+        return (
+            []
+            if profile == PROFILE_REAL
+            else [f"{viewport_name}: comparison direction card not rendered"]
+        )
+    observed = directions[0]
+    if profile == PROFILE_REAL:
+        return [
+            f"{viewport_name}: comparison direction missing {key}"
+            for key in ["label", "before", "after", "basis"]
+            if not str(observed.get(key) or "")
+        ]
+    return [
+        f"{viewport_name}: comparison direction {key} expected {expected}, got {observed.get(key) or 'missing'}"
+        for key, expected in EXPECTED_COMPARISON_DIRECTION.items()
+        if str(observed.get(key) or "") != expected
+    ]
 
 
 def collect_comparison_previews(page) -> list[dict[str, str]]:
@@ -1121,6 +1168,7 @@ def validate_dashboard_page(
     feedback_handoffs = collect_feedback_handoffs(page)
     download_controls = collect_download_controls(page)
     report_scope_warnings = collect_report_scope_warnings(page)
+    comparison_directions = collect_comparison_directions(page)
     comparison_previews = collect_comparison_previews(page)
     comparison_review_paths = collect_comparison_review_paths(page)
     comparison_scope_warnings = collect_comparison_scope_warnings(page)
@@ -1143,6 +1191,9 @@ def validate_dashboard_page(
     failures.extend(feedback_handoff_failures(feedback_handoffs, viewport_name))
     failures.extend(
         download_control_failures(download_controls, viewport_name, profile)
+    )
+    failures.extend(
+        comparison_direction_failures(comparison_directions, viewport_name, profile)
     )
     failures.extend(
         comparison_preview_failures(comparison_previews, viewport_name, profile)
@@ -1256,6 +1307,7 @@ name => {
         "feedback_handoffs": feedback_handoffs,
         "download_controls": download_controls,
         "report_scope_warnings": report_scope_warnings,
+        "comparison_directions": comparison_directions,
         "comparison_previews": comparison_previews,
         "comparison_review_paths": comparison_review_paths,
         "comparison_scope_warnings": comparison_scope_warnings,
@@ -1846,6 +1898,18 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
         report_scope_warnings = raw.get("report_scope_warnings")
         if not isinstance(report_scope_warnings, list):
             failures.append(f"manifest {name} missing report scope warning evidence")
+        comparison_directions = raw.get("comparison_directions")
+        if not isinstance(comparison_directions, list):
+            failures.append(f"manifest {name} missing comparison direction evidence")
+        else:
+            direction_failures = comparison_direction_failures(
+                comparison_directions, name, profile
+            )
+            failures.extend(
+                failure.replace(f"{name}: ", f"manifest {name} ")
+                for failure in direction_failures
+            )
+
         comparison_previews = raw.get("comparison_previews")
         if not isinstance(comparison_previews, list):
             failures.append(f"manifest {name} missing comparison preview evidence")

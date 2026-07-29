@@ -20,6 +20,7 @@ from codex_observe.analysis import (
     next_run_playbook_df,
     numericize,
     opportunity_html,
+    parse_ts,
     playbook_html,
     prepare_threads,
     sidebar_time_label,
@@ -851,6 +852,53 @@ def dashboard_css() -> str:
   margin: 0.18rem 0;
 }
 
+.co-comparison-direction {
+  background: color-mix(in srgb, var(--co-accent) 6%, var(--co-panel));
+  border: 1px solid var(--co-border);
+  border-left: 5px solid var(--co-accent);
+  border-radius: 8px;
+  margin: 0.45rem 0 0.9rem 0;
+  padding: 0.9rem 1rem;
+}
+
+.co-comparison-direction h3 {
+  font-size: 1rem;
+  letter-spacing: 0;
+  line-height: 1.25;
+  margin: 0 0 0.65rem 0;
+}
+
+.co-comparison-direction p {
+  color: var(--co-muted);
+  font-size: 0.82rem;
+  margin: 0.55rem 0 0 0;
+}
+
+.co-comparison-direction-grid {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.co-comparison-direction-run {
+  background: var(--co-surface);
+  border: 1px solid var(--co-border);
+  border-radius: 8px;
+  padding: 0.6rem 0.7rem;
+}
+
+.co-comparison-direction-run strong {
+  color: var(--co-ink);
+  display: block;
+  font-size: 0.82rem;
+  margin-bottom: 0.2rem;
+}
+
+.co-comparison-direction-run span {
+  color: var(--co-muted);
+  font-size: 0.82rem;
+}
+
 .co-comparison-preview {
   background: var(--co-panel);
   border: 1px solid var(--co-border);
@@ -1268,7 +1316,7 @@ def review_path_html(success_target: dict[str, object], has_comparison: bool) ->
     current = html.escape(str(success_target.get("current") or "current value"))
     target = html.escape(str(success_target.get("target") or "target value"))
     comparison_action = (
-        "Pick the baseline run in Compare selected run and download the comparison JSON."
+        "Pick a comparison run in Compare runs; the dashboard orders it Before -> After by session time."
         if has_comparison
         else "Collect another run, then compare it against this report JSON."
     )
@@ -1832,6 +1880,66 @@ def comparison_ingest_scope_warning_html(comparison: dict[str, object]) -> str:
         '<div class="co-comparison-scope">'
         f"<strong>Ingest scope:</strong> {html.escape(warning)}"
         "</div>"
+    )
+
+
+def chronological_comparison_order(
+    selected_row: object, candidate_row: object
+) -> dict[str, str]:
+    rows = [selected_row, candidate_row]
+    ids = [str(row.get("session_id") or "") for row in rows]
+    start_times = [parse_ts(row.get("first_seen")) for row in rows]
+    available_times = [
+        start_time or parse_ts(row.get("last_seen"))
+        for row, start_time in zip(rows, start_times, strict=True)
+    ]
+    if all(available_times) and available_times[0] != available_times[1]:
+        before_index, after_index = sorted(
+            range(2), key=lambda index: available_times[index]
+        )
+        basis = (
+            "Ordered by start time."
+            if all(start_times)
+            else "Ordered by the available session timestamp."
+        )
+    else:
+        before_index, after_index = sorted(range(2), key=lambda index: ids[index])
+        basis = "Stable fallback because session timestamps are tied or unavailable."
+    return {
+        "before_id": ids[before_index],
+        "after_id": ids[after_index],
+        "basis": basis,
+    }
+
+
+def comparison_run_summary(row: object) -> str:
+    timestamp = parse_ts(row.get("first_seen")) or parse_ts(row.get("last_seen"))
+    when = timestamp.isoformat(timespec="minutes") if timestamp else "unknown time"
+    risk = str(row.get("triage_risk") or "unknown").capitalize()
+    tokens = fmt_short(row.get("total_tokens") or 0)
+    return f"{when} | {risk} risk | {tokens} tokens"
+
+
+def comparison_direction_html(before_row: object, after_row: object, basis: str) -> str:
+    before = html.escape(comparison_run_summary(before_row))
+    after = html.escape(comparison_run_summary(after_row))
+    return "\n".join(
+        [
+            '<section class="co-comparison-direction">',
+            "  <h3>Comparison direction</h3>",
+            '  <div class="co-comparison-direction-grid">',
+            '    <div class="co-comparison-direction-run">',
+            "      <strong>Before</strong>",
+            f"      <span>{before}</span>",
+            "    </div>",
+            '    <div class="co-comparison-direction-run">',
+            "      <strong>After</strong>",
+            f"      <span>{after}</span>",
+            "    </div>",
+            "  </div>",
+            f"  <p>{html.escape(basis)}</p>",
+            "</section>",
+        ]
     )
 
 
@@ -2798,7 +2906,7 @@ def main() -> None:
                 key=f"download_report_json_{session_id}",
             )
         if comparison_options:
-            st.subheader("Compare selected run")
+            st.subheader("Compare runs")
             comparison_labels = {}
             for _, row in conversations.iterrows():
                 candidate_id = str(row["session_id"])
@@ -2808,15 +2916,39 @@ def main() -> None:
                 comparison_labels[candidate_id] = (
                     f"{risk} risk | {last_seen} | {tokens} tokens | {candidate_id}"
                 )
-            baseline_session_id = st.selectbox(
-                "Baseline run",
+            candidate_session_id = st.selectbox(
+                "Compare with run",
                 comparison_options,
                 format_func=lambda value: comparison_labels.get(value, value),
-                key=f"comparison_baseline_{session_id}",
+                key=f"comparison_candidate_{session_id}",
                 width="stretch",
             )
-            baseline_report = build_report(str(db), baseline_session_id)
-            comparison = compare_reports(baseline_report, report)
+            candidate_row = conversations[
+                conversations.session_id == candidate_session_id
+            ].iloc[0]
+            candidate_report = build_report(str(db), candidate_session_id)
+            comparison_order = chronological_comparison_order(conv, candidate_row)
+            reports_by_id = {
+                str(session_id): report,
+                str(candidate_session_id): candidate_report,
+            }
+            rows_by_id = {
+                str(session_id): conv,
+                str(candidate_session_id): candidate_row,
+            }
+            before_id = comparison_order["before_id"]
+            after_id = comparison_order["after_id"]
+            st.markdown(
+                comparison_direction_html(
+                    rows_by_id[before_id],
+                    rows_by_id[after_id],
+                    comparison_order["basis"],
+                ),
+                unsafe_allow_html=True,
+            )
+            comparison = compare_reports(
+                reports_by_id[before_id], reports_by_id[after_id]
+            )
             st.markdown(comparison_preview_html(comparison), unsafe_allow_html=True)
             comparison_downloads = comparison_download_payloads(comparison)
             compare_left, compare_right = st.columns(2)
@@ -2827,7 +2959,7 @@ def main() -> None:
                     file_name=comparison_downloads["markdown"]["filename"],
                     mime=comparison_downloads["markdown"]["mime"],
                     width="stretch",
-                    key=f"download_comparison_md_{baseline_session_id}_{session_id}",
+                    key=f"download_comparison_md_{before_id}_{after_id}",
                 )
             with compare_right:
                 st.download_button(
@@ -2836,7 +2968,7 @@ def main() -> None:
                     file_name=comparison_downloads["json"]["filename"],
                     mime=comparison_downloads["json"]["mime"],
                     width="stretch",
-                    key=f"download_comparison_json_{baseline_session_id}_{session_id}",
+                    key=f"download_comparison_json_{before_id}_{after_id}",
                 )
         st.subheader("Next run success target")
         st.markdown(success_target_html(success_target), unsafe_allow_html=True)

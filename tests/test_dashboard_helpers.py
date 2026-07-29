@@ -15,7 +15,9 @@ from codex_observe.analysis import (
     thread_kind,
 )
 from codex_observe.dashboard import (
+    chronological_comparison_order,
     comparison_delta_cards_html,
+    comparison_direction_html,
     comparison_download_payloads,
     comparison_followup_html,
     comparison_ingest_scope_warning_html,
@@ -963,7 +965,8 @@ def test_review_path_html_guides_next_validation_and_escapes_content() -> None:
     assert "Next review path" in rendered
     assert "Save report JSON" in rendered
     assert "Compare workflow change" in rendered
-    assert "Pick the baseline run" in rendered
+    assert "Pick a comparison run" in rendered
+    assert "Before -&gt; After by session time" in rendered
     assert "Validate next run" in rendered
     assert "largest_thread_share_pct: 57.7% -&gt; below &amp;lt;50%" in rendered
     assert "PUBLIC_TOUR_FEEDBACK.md" in rendered
@@ -1081,6 +1084,86 @@ def test_comparison_download_payloads_match_cli_comparison_contract() -> None:
     assert payloads["json"]["mime"] == "application/json"
     assert '"schema_version": "codex-observe.comparison.v1"' in payloads["json"]["data"]
     assert '"mode": "aggregate-only"' in payloads["json"]["data"]
+
+
+def test_chronological_comparison_order_is_independent_of_selection() -> None:
+    older = {
+        "session_id": "older",
+        "first_seen": "2026-01-01T12:00:00Z",
+        "last_seen": "2026-01-01T12:23:00Z",
+    }
+    newer = {
+        "session_id": "newer",
+        "first_seen": "2026-01-01T12:24:00Z",
+        "last_seen": "2026-01-01T12:35:00Z",
+    }
+
+    assert chronological_comparison_order(older, newer) == {
+        "before_id": "older",
+        "after_id": "newer",
+        "basis": "Ordered by start time.",
+    }
+    assert chronological_comparison_order(newer, older) == {
+        "before_id": "older",
+        "after_id": "newer",
+        "basis": "Ordered by start time.",
+    }
+
+
+def test_chronological_comparison_order_uses_last_seen_then_stable_fallback() -> None:
+    older = {
+        "session_id": "z-older",
+        "first_seen": None,
+        "last_seen": "2026-01-01T12:23:00Z",
+    }
+    newer = {
+        "session_id": "a-newer",
+        "first_seen": None,
+        "last_seen": "2026-01-01T12:35:00Z",
+    }
+    tied = {
+        "session_id": "a-tied",
+        "first_seen": "2026-01-01T12:23:00Z",
+    }
+    selected = {
+        "session_id": "z-selected",
+        "first_seen": "2026-01-01T12:23:00Z",
+    }
+
+    assert chronological_comparison_order(newer, older) == {
+        "before_id": "z-older",
+        "after_id": "a-newer",
+        "basis": "Ordered by the available session timestamp.",
+    }
+    assert chronological_comparison_order(selected, tied) == {
+        "before_id": "a-tied",
+        "after_id": "z-selected",
+        "basis": "Stable fallback because session timestamps are tied or unavailable.",
+    }
+
+
+def test_comparison_direction_html_labels_aggregate_before_and_after_context() -> None:
+    rendered = comparison_direction_html(
+        {
+            "first_seen": "2026-01-01T12:00:00Z",
+            "triage_risk": "<high>",
+            "total_tokens": 57510,
+        },
+        {
+            "first_seen": "2026-01-01T12:24:00Z",
+            "triage_risk": "low",
+            "total_tokens": 8400,
+        },
+        "Ordered by <start time>.",
+    )
+
+    assert 'class="co-comparison-direction"' in rendered
+    assert "Before" in rendered
+    assert "After" in rendered
+    assert "2026-01-01T12:00+00:00 | &lt;high&gt; risk | 57.5k tokens" in rendered
+    assert "2026-01-01T12:24+00:00 | Low risk | 8.4k tokens" in rendered
+    assert "Ordered by &lt;start time&gt;." in rendered
+    assert "<high>" not in rendered
 
 
 def test_comparison_preview_html_summarizes_and_escapes_quick_read() -> None:

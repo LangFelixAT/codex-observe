@@ -41,6 +41,7 @@ next_run_brief_failures = visual_qa.next_run_brief_failures
 feedback_handoff_failures = visual_qa.feedback_handoff_failures
 download_control_failures = visual_qa.download_control_failures
 collect_report_scope_warnings = visual_qa.collect_report_scope_warnings
+comparison_direction_failures = visual_qa.comparison_direction_failures
 comparison_preview_failures = visual_qa.comparison_preview_failures
 comparison_review_path_failures = visual_qa.comparison_review_path_failures
 comparison_delta_failures = visual_qa.comparison_delta_failures
@@ -439,12 +440,48 @@ def test_collect_report_scope_warnings_reads_warning_cards() -> None:
     assert collect_report_scope_warnings(FakePage()) == ["Ingest scope: Sampled ingest"]
 
 
+def test_comparison_direction_failures_require_chronological_context() -> None:
+    assert (
+        comparison_direction_failures(
+            [
+                {
+                    "label": "Comparison direction",
+                    "before": "2026-01-01T12:00+00:00 | High risk | 57.5k tokens",
+                    "after": "2026-01-01T12:24+00:00 | Low risk | 8.4k tokens",
+                    "basis": "Ordered by start time.",
+                }
+            ],
+            "desktop",
+        )
+        == []
+    )
+
+    failures = comparison_direction_failures([], "narrow")
+
+    assert "narrow: comparison direction card not rendered" in failures
+
+
+def test_real_profile_comparison_direction_is_optional_but_complete_when_present() -> (
+    None
+):
+    assert comparison_direction_failures([], "desktop", profile="real") == []
+
+    failures = comparison_direction_failures(
+        [{"label": "Comparison direction", "before": "older"}],
+        "desktop",
+        profile="real",
+    )
+
+    assert "desktop: comparison direction missing after" in failures
+    assert "desktop: comparison direction missing basis" in failures
+
+
 def test_comparison_preview_failures_require_quick_read_contract() -> None:
     assert (
         comparison_preview_failures(
             [
                 {
-                    "body": "Comparison quick read: regressed Triage movement: regressed Next step: Inspect new diagnostic first: Repeated prompt blocks. Next validation command codex-observe report --db <db> --session-id <next-session-id> --format json --out next-run-report.json"
+                    "body": "Comparison quick read: improved Triage movement: improved Next step: Keep the change, then target persisted diagnostic: Largest thread drives the run. Next validation command codex-observe report --db <db> --session-id <next-session-id> --format json --out next-run-report.json"
                 }
             ],
             "desktop",
@@ -498,11 +535,11 @@ def test_comparison_delta_failures_require_metric_delta_cards() -> None:
     assert (
         comparison_delta_failures(
             [
-                {"label": "Total tokens", "delta": "regressed: 49.1k (584.6%)"},
-                {"label": "Usage snapshots", "delta": "changed: 3 (100.0%)"},
+                {"label": "Total tokens", "delta": "improved: -49.1k (-85.4%)"},
+                {"label": "Usage snapshots", "delta": "changed: -3 (-50.0%)"},
                 {
                     "label": "Largest thread tokens",
-                    "delta": "regressed: 30.3k (1044.8%)",
+                    "delta": "improved: -30.3k (-91.3%)",
                 },
             ],
             "desktop",
@@ -511,12 +548,12 @@ def test_comparison_delta_failures_require_metric_delta_cards() -> None:
     )
 
     failures = comparison_delta_failures(
-        [{"label": "Total tokens", "delta": "improved: -49.1k (-85.4%)"}],
+        [{"label": "Total tokens", "delta": "regressed: 49.1k (584.6%)"}],
         "narrow",
     )
 
     assert (
-        "narrow: comparison delta Total tokens missing direction: regressed" in failures
+        "narrow: comparison delta Total tokens missing direction: improved" in failures
     )
     assert "narrow: comparison delta not found: Usage snapshots" in failures
     assert "narrow: comparison delta not found: Largest thread tokens" in failures
@@ -851,10 +888,18 @@ def complete_viewport_results(tmp_path: Path) -> dict[str, dict[str, object]]:
                     "body": "Safe feedback handoff docs/PUBLIC_TOUR_FEEDBACK.md .github/ISSUE_TEMPLATE/public_tour_feedback.yml synthetic or reviewed-redacted aggregate evidence codex-observe report JSON or Markdown private prompts Do not collect",
                 }
             ],
+            "comparison_directions": [
+                {
+                    "label": "Comparison direction",
+                    "before": "2026-01-01T12:00+00:00 | High risk | 57.5k tokens",
+                    "after": "2026-01-01T12:24+00:00 | Low risk | 8.4k tokens",
+                    "basis": "Ordered by start time.",
+                }
+            ],
             "comparison_previews": [
                 {
-                    "label": "Comparison quick read: regressed",
-                    "body": "Comparison quick read: regressed Verdict: regressed; largest change: Total tokens +49.1k (regressed). Triage movement: regressed Next step: Inspect new diagnostic first: Repeated prompt blocks. Next validation command codex-observe report --db <db> --session-id <next-session-id> --format json --out next-run-report.json",
+                    "label": "Comparison quick read: improved",
+                    "body": "Comparison quick read: improved Verdict: improved; largest change: Total tokens -49.1k (improved). Triage movement: improved Next step: Keep the change, then target persisted diagnostic: Largest thread drives the run. Next validation command codex-observe report --db <db> --session-id <next-session-id> --format json --out next-run-report.json",
                 }
             ],
             "comparison_scope_warnings": [],
@@ -867,18 +912,18 @@ def complete_viewport_results(tmp_path: Path) -> dict[str, dict[str, object]]:
             "comparison_deltas": [
                 {
                     "label": "Total tokens",
-                    "before_after": "8.4k -> 57.5k",
-                    "delta": "regressed: 49.1k (584.6%)",
+                    "before_after": "57.5k -> 8.4k",
+                    "delta": "improved: -49.1k (-85.4%)",
                 },
                 {
                     "label": "Usage snapshots",
-                    "before_after": "3 -> 6",
-                    "delta": "changed: 3 (100.0%)",
+                    "before_after": "6 -> 3",
+                    "delta": "changed: -3 (-50.0%)",
                 },
                 {
                     "label": "Largest thread tokens",
-                    "before_after": "2.9k -> 33.2k",
-                    "delta": "regressed: 30.3k (1044.8%)",
+                    "before_after": "33.2k -> 2.9k",
+                    "delta": "improved: -30.3k (-91.3%)",
                 },
             ],
             "layout_review": {
@@ -1050,8 +1095,14 @@ def test_visual_manifest_records_review_evidence(tmp_path: Path) -> None:
         "Do not collect"
         in loaded["viewports"]["desktop"]["feedback_handoffs"][0]["body"]
     )
+    assert loaded["viewports"]["desktop"]["comparison_directions"][0] == {
+        "label": "Comparison direction",
+        "before": "2026-01-01T12:00+00:00 | High risk | 57.5k tokens",
+        "after": "2026-01-01T12:24+00:00 | Low risk | 8.4k tokens",
+        "basis": "Ordered by start time.",
+    }
     assert loaded["viewports"]["desktop"]["comparison_previews"][0]["label"] == (
-        "Comparison quick read: regressed"
+        "Comparison quick read: improved"
     )
     assert loaded["viewports"]["desktop"]["comparison_scope_warnings"] == []
     assert loaded["viewports"]["desktop"]["comparison_review_paths"][0]["label"] == (
@@ -1063,8 +1114,8 @@ def test_visual_manifest_records_review_evidence(tmp_path: Path) -> None:
     )
     assert loaded["viewports"]["desktop"]["comparison_deltas"][0] == {
         "label": "Total tokens",
-        "before_after": "8.4k -> 57.5k",
-        "delta": "regressed: 49.1k (584.6%)",
+        "before_after": "57.5k -> 8.4k",
+        "delta": "improved: -49.1k (-85.4%)",
     }
     assert loaded["viewports"]["desktop"]["layout_review"]["document_width"] == 1440
     assert (
@@ -1106,6 +1157,7 @@ def test_visual_manifest_failures_rejects_incomplete_evidence(tmp_path: Path) ->
                 "next_run_checklists": [],
                 "next_run_briefs": [],
                 "feedback_handoffs": [],
+                "comparison_directions": [],
                 "comparison_previews": [],
                 "comparison_review_paths": [],
                 "comparison_deltas": [],
@@ -1264,6 +1316,7 @@ def test_real_profile_manifest_accepts_private_aggregate_variance(
                 "body": "Next run brief Next Codex run plan Split the dominant thread largest_thread_share_pct: 56.1% -> below 50.0% Copy prompt",
             }
         ]
+        raw["comparison_directions"] = []
         raw["comparison_previews"] = []
         raw["comparison_review_paths"] = []
         raw["comparison_deltas"] = []
