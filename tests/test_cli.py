@@ -36,6 +36,7 @@ def test_tracking_doc_failures_accepts_a_structured_current_snapshot(
                 "Commit and push the implementation branch",
                 *(f"#{number}" for number in range(1, 9)),
                 "#10",
+                "#11",
             ]
         ),
         encoding="utf-8",

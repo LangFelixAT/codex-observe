@@ -804,8 +804,9 @@ def tracking_doc_failures(root: Path | None = None) -> list[str]:
     for issue_number in range(1, 9):
         if f"#{issue_number}" not in body:
             failures.append(f"docs/TRACKING.md missing issue #{issue_number}")
-    if "#10" not in body:
-        failures.append("docs/TRACKING.md missing issue #10")
+    for issue_number in [10, 11]:
+        if f"#{issue_number}" not in body:
+            failures.append(f"docs/TRACKING.md missing issue #{issue_number}")
     return failures
 
 
