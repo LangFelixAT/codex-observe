@@ -4,7 +4,7 @@ This file records the current issue-tracking state and the expected workflow for
 
 ## Current GitHub issue state
 
-Checked: 2026-07-13 with:
+Checked: 2026-07-29 with:
 
 ```powershell
 gh issue list --limit 20 --state all --json number,title,state,labels,updatedAt,url
@@ -14,6 +14,7 @@ All current GitHub issues are closed:
 
 | Issue | State | Title |
 | --- | --- | --- |
+| #10 | Closed | Align dashboard guidance scopes and recommendation source |
 | #8 | Closed | Document supported log shapes and local validation workflow |
 | #7 | Closed | Browser-verify the Streamlit dashboard against real data |
 | #6 | Closed | Add dashboard helper tests for classification and derived metrics |
