@@ -5,6 +5,7 @@ All notable changes to Codex Observe will be documented here.
 The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
+- Put the product answer first across help, tour, path discovery, session selection, and the dashboard; recommendation tie-breaks are explicit and visual QA now proves the operator briefing precedes metrics within the initial desktop and narrow viewports.
 - Aligned dashboard operator guidance, proof targets, review paths, checklists, and next-run briefs on one authoritative report while keeping the selected-run risk signal explicitly scoped.
 - Made the Ruff lint policy explicit so clean CI installs remain stable across Ruff 0.16's expanded default rule set.
 - Clarified private validation summaries by separating portfolio-wide patterns from the recommended-run focus when sampled real histories point at different habits.

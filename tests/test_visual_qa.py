@@ -688,6 +688,41 @@ def test_feedback_handoff_failures_require_safe_feedback_contract() -> None:
     assert "desktop: safe feedback handoff missing: private prompts" in failures
 
 
+def test_answer_first_layout_failures_require_briefing_before_metrics_in_viewport() -> (
+    None
+):
+    assert (
+        visual_qa.answer_first_layout_failures(
+            {
+                "briefing_before_metrics": True,
+                "briefing_in_initial_viewport": True,
+                "briefing_top": 120,
+                "briefing_bottom": 420,
+                "metric_grid_top": 450,
+                "viewport_height": 1000,
+            },
+            "desktop",
+        )
+        == []
+    )
+
+    failures = visual_qa.answer_first_layout_failures(
+        {
+            "briefing_before_metrics": False,
+            "briefing_in_initial_viewport": False,
+        },
+        "narrow",
+    )
+
+    assert "narrow: operator briefing does not precede metric grid" in failures
+    assert any(
+        failure.startswith(
+            "narrow: operator briefing is not fully visible in initial viewport"
+        )
+        for failure in failures
+    )
+
+
 def test_operator_briefing_failures_require_briefing_contract() -> None:
     assert (
         operator_briefing_failures(
@@ -774,6 +809,14 @@ def complete_viewport_results(tmp_path: Path) -> dict[str, dict[str, object]]:
                 "Download comparison MD",
                 "Download comparison JSON",
             ],
+            "answer_first_layout": {
+                "briefing_before_metrics": True,
+                "briefing_in_initial_viewport": True,
+                "briefing_top": 120,
+                "briefing_bottom": 420,
+                "metric_grid_top": 450,
+                "viewport_height": viewport["height"],
+            },
             "operator_briefings": [
                 {
                     "label": "Operator briefing",
@@ -960,6 +1003,14 @@ def test_visual_manifest_records_review_evidence(tmp_path: Path) -> None:
         "Download comparison MD",
         "Download comparison JSON",
     ]
+    assert loaded["viewports"]["desktop"]["answer_first_layout"] == {
+        "briefing_before_metrics": True,
+        "briefing_in_initial_viewport": True,
+        "briefing_top": 120,
+        "briefing_bottom": 420,
+        "metric_grid_top": 450,
+        "viewport_height": 1000,
+    }
     assert loaded["viewports"]["desktop"]["operator_briefings"][0] == {
         "label": "Operator briefing",
         "heading": "High risk run",
@@ -1083,6 +1134,7 @@ def test_visual_manifest_failures_rejects_incomplete_evidence(tmp_path: Path) ->
     assert "manifest desktop metric card not rendered: Largest thread" in failures
     assert "manifest desktop metric card not rendered: Uncached input" in failures
     assert "manifest desktop success target card not rendered" in failures
+    assert "manifest desktop missing answer-first layout evidence" in failures
     assert "manifest desktop operator briefing card not rendered" in failures
     assert "manifest desktop next review path card not rendered" in failures
     assert "manifest desktop next run checklist card not rendered" in failures

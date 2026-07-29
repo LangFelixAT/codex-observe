@@ -368,8 +368,46 @@ def dashboard_css() -> str:
 }
 
 @media (max-width: 760px) {
+  .co-hero {
+    margin-bottom: 0.65rem;
+    padding-bottom: 0.6rem;
+    padding-top: 0.7rem;
+  }
+
+  .co-title {
+    font-size: 1.55rem;
+  }
+
+  .co-subtitle {
+    font-size: 0.88rem;
+    line-height: 1.3;
+    margin-top: 0.2rem;
+  }
+
   .co-briefing {
+    gap: 0.5rem;
     grid-template-columns: 1fr;
+    margin-bottom: 0.65rem;
+    padding: 0.7rem;
+  }
+
+  .co-briefing h3 {
+    margin-bottom: 0.2rem;
+  }
+
+  .co-briefing p {
+    font-size: 0.82rem;
+    line-height: 1.25;
+    margin: 0.12rem 0;
+    overflow-wrap: anywhere;
+  }
+
+  .co-briefing-grid {
+    gap: 0.4rem;
+  }
+
+  .co-briefing-fact {
+    padding: 0.5rem 0.6rem;
   }
 }
 .co-risk-distribution {
@@ -2576,6 +2614,15 @@ def main() -> None:
         session_id = st.session_state["selected_session_id"]
 
     conv = conversations[conversations.session_id == session_id].iloc[0]
+    report = build_report(str(db), session_id)
+    triage = dict(report.get("triage") or {})
+    opportunities = pd.DataFrame(report.get("opportunities") or [])
+    success_target = dict(report.get("success_target") or {})
+    st.markdown(
+        operator_briefing_html(triage, success_target, opportunities),
+        unsafe_allow_html=True,
+    )
+
     threads = read_sql(
         db,
         "SELECT * FROM threads WHERE session_id=? ORDER BY created_at, first_seen",
@@ -2675,10 +2722,6 @@ def main() -> None:
 
     diagnostics = diagnostics_df(threads, usage, events, tools, duplicated_blocks)
     playbook = next_run_playbook_df(diagnostics)
-    report = build_report(str(db), session_id)
-    triage = dict(report.get("triage") or {})
-    opportunities = pd.DataFrame(report.get("opportunities") or [])
-    success_target = dict(report.get("success_target") or {})
     tab_overview, tab_agent, tab_timeline, tab_tools, tab_dup, tab_raw = st.tabs(
         [
             "Overview",
@@ -2691,10 +2734,6 @@ def main() -> None:
     )
 
     with tab_overview:
-        st.markdown(
-            operator_briefing_html(triage, success_target, opportunities),
-            unsafe_allow_html=True,
-        )
         st.markdown(
             portfolio_briefing_html(session_portfolio_summary(summaries)),
             unsafe_allow_html=True,

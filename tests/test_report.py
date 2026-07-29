@@ -29,6 +29,7 @@ from codex_observe.report import (
     report_success_target,
     session_portfolio_drivers,
     session_portfolio_summary,
+    session_recommended_action_lines,
     session_summaries,
     session_success_target_preview,
     session_summary_lines,
@@ -351,6 +352,33 @@ def test_report_markdown_and_json_are_shareable_without_private_content(
     for private in PRIVATE_DEMO_STRINGS:
         assert private not in markdown
         assert private not in json.dumps(payload)
+
+
+def test_session_recommended_action_explains_same_risk_band_tie() -> None:
+    recommended = {
+        "session_id": "latest-high",
+        "triage_risk": "high",
+        "last_seen": "2026-01-02T00:00:00Z",
+        "largest_thread_share_pct": 60.0,
+        "total_tokens": 100_000,
+    }
+    candidates = [
+        recommended,
+        {
+            "session_id": "older-high",
+            "triage_risk": "high",
+            "last_seen": "2026-01-01T00:00:00Z",
+        },
+        {"session_id": "low", "triage_risk": "low"},
+    ]
+
+    lines = session_recommended_action_lines(recommended, candidates)
+
+    assert (
+        "- Why selected: 2 sessions share high risk; latest run breaks the tie" in lines
+    )
+    assert "- Primary driver: Largest thread" in lines
+    assert "- Evidence: largest_thread_share_pct is 60.0%" in lines
 
 
 def test_report_command_handoffs_quote_shell_sensitive_database_paths(
@@ -746,11 +774,16 @@ def test_session_summaries_are_aggregate_only(tmp_path: Path) -> None:
     assert "Showing 1 of 2 sessions." in limited_lines
     assert "Export report for session: demo-session-cost-review" in limited_lines
     assert "Recommended action:" in lines
+    assert lines.index("Recommended action:") < lines.index(
+        "Session ID | Last seen | Risk | Focus"
+    )
     assert "Export report for session: demo-session-cost-review" in lines
-    assert "Why: highest aggregate triage risk; latest run breaks ties" in lines
+    assert "Why selected: only high risk run in the current scope" in lines
     assert "Risk: high" in lines
+    assert "Primary driver: Largest thread" in lines
+    assert "Evidence: largest_thread_share_pct is 57.7%" in lines
     assert (
-        "Top drivers: largest thread share: 57.7%; repeated prompt share: 17.4%; uncached input share: 39.5%; guardian input share: 24.3%; largest tool output: 4.0k chars"
+        "Other signals: largest thread share: 57.7%; repeated prompt share: 17.4%; uncached input share: 39.5%; guardian input share: 24.3%; largest tool output: 4.0k chars"
         in lines
     )
     assert "Next-run target: largest_thread_share_pct 57.7% -> below 50.0%" in lines
@@ -813,7 +846,8 @@ def test_session_listing_prioritizes_multi_day_target_preview(
         in lines
     )
     assert (
-        "Top drivers: session duration: 3.5 days; largest thread share: 57.7%" in lines
+        "Other signals: session duration: 3.5 days; largest thread share: 57.7%"
+        in lines
     )
     assert (
         "Next-run target: session_duration_hours 3.5 days -> below 24.0 hours" in lines

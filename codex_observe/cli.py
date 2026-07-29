@@ -34,6 +34,7 @@ from .report import (
     session_portfolio_summary,
     session_report_hint,
     session_risk_distribution,
+    session_selection_reason,
     session_summaries,
     session_success_target_preview,
     session_summary_lines,
@@ -1746,6 +1747,21 @@ def visual_manifest_evidence_failures(root: Path) -> list[str]:
                     f"visual QA manifest {viewport_name} layout review contains clipped text"
                 )
 
+        answer_first_layout = viewport.get("answer_first_layout")
+        if not isinstance(answer_first_layout, dict):
+            failures.append(
+                f"visual QA manifest missing {viewport_name} answer-first layout evidence"
+            )
+        else:
+            if answer_first_layout.get("briefing_before_metrics") is not True:
+                failures.append(
+                    f"visual QA manifest {viewport_name} operator briefing does not precede metric grid"
+                )
+            if answer_first_layout.get("briefing_in_initial_viewport") is not True:
+                failures.append(
+                    f"visual QA manifest {viewport_name} operator briefing is not fully visible in initial viewport"
+                )
+
         labels = viewport.get("sidebar_risk_labels")
         if not isinstance(labels, list):
             failures.append(
@@ -2357,6 +2373,9 @@ def release_audit_report(
             isinstance(recommendation_detail, dict)
             and recommendation_detail.get("target") == recommended_session_id
             and recommendation_detail.get("ranked_by") == ["triage_risk", "last_seen"]
+            and recommendation_detail.get("selection_reason")
+            == "only high risk run in the current scope"
+            and recommendation_detail.get("risk_band_size") == 1
             and isinstance(recommendation_detail.get("drivers"), dict)
             and "largest_tool_output_chars" in recommendation_detail["drivers"]
             and "guardian_input_share_pct" in recommendation_detail["drivers"]
@@ -2399,9 +2418,15 @@ def release_audit_report(
         sessions_text_has_recommended_action = (
             "Recommended action:" in session_lines_text
             and "Export report for session:" in session_lines_text
-            and "Top drivers:" in session_lines_text
+            and "Why selected: only high risk run in the current scope"
+            in session_lines_text
+            and "Primary driver:" in session_lines_text
+            and "Evidence:" in session_lines_text
+            and "Other signals:" in session_lines_text
             and "Next-run target:" in session_lines_text
             and "Habit to try:" in session_lines_text
+            and session_lines_text.index("Recommended action:")
+            < session_lines_text.index("Session ID | Last seen | Risk | Focus")
             and "Focus" in session_lines_text
             and "Tool out" in session_lines_text
             and "Guardian" in session_lines_text
@@ -2830,7 +2855,7 @@ def release_audit_report(
         and any("codex-observe doctor" in str(command) for command in paths_commands)
         and isinstance(paths_review_path, list)
         and any(
-            "Run guided private validation" == str(step.get("label"))
+            "Review real sessions" == str(step.get("label"))
             for step in paths_review_path
             if isinstance(step, dict)
         )
@@ -3182,7 +3207,7 @@ def release_audit_report(
             f"{VISUAL_MANIFEST.as_posix()}; "
             f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['desktop']).as_posix()}; "
             f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['narrow']).as_posix()}; "
-            "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, sidebar Risk filter, sidebar session search, sidebar session details, risk distribution, metric cards, dashboard quick reads, report and comparison downloads, report scope-warning evidence, comparison preview, comparison scope-warning evidence, comparison review path, deltas, operator briefing, next review path, next-run checklist, next-run brief, safe feedback handoff, and success target verified"
+            "visual manifest schema and contract, screenshots, empty states, layout review, answer-first ordering, risk labels, sidebar Risk filter, sidebar session search, sidebar session details, risk distribution, metric cards, dashboard quick reads, report and comparison downloads, report scope-warning evidence, comparison preview, comparison scope-warning evidence, comparison review path, deltas, operator briefing, next review path, next-run checklist, next-run brief, safe feedback handoff, and success target verified"
             if not visual_manifest_failures
             else "; ".join(visual_manifest_failures[:3]),
         )
@@ -3327,14 +3352,23 @@ def session_driver_summary(recommended: dict[str, object]) -> list[dict[str, obj
     ]
 
 
-def session_recommendation_detail(recommended: dict[str, object]) -> dict[str, object]:
+def session_recommendation_detail(
+    recommended: dict[str, object], candidates: list[dict[str, object]] | None = None
+) -> dict[str, object]:
+    risk = str(recommended.get("triage_risk") or "unknown")
+    rows = candidates or [recommended]
+    risk_band_size = sum(
+        1 for row in rows if str(row.get("triage_risk") or "unknown") == risk
+    )
     return {
         "action": "export_recommended_session_report",
         "target_type": "session",
         "target": recommended.get("session_id"),
         "reason": "Highest aggregate triage risk, with latest run used as the tie-breaker.",
+        "selection_reason": session_selection_reason(recommended, candidates),
         "ranked_by": ["triage_risk", "last_seen"],
         "risk": recommended.get("triage_risk"),
+        "risk_band_size": risk_band_size,
         "drivers": {
             "largest_thread_share_pct": recommended.get("largest_thread_share_pct"),
             "repeated_prompt_share_pct": recommended.get("repeated_prompt_share_pct"),
@@ -3423,7 +3457,9 @@ def sessions_json_payload(
         recommended = filtered[0]
         recommended_session_id = str(recommended["session_id"])
         payload["recommended_session"] = recommended
-        payload["recommendation_detail"] = session_recommendation_detail(recommended)
+        payload["recommendation_detail"] = session_recommendation_detail(
+            recommended, filtered
+        )
         payload["review_path"] = sessions_review_path(db_path, recommended_session_id)
         payload["next"] = session_report_hint(db_path, recommended_session_id)
         payload["next_commands"] = sessions_next_commands(
@@ -3703,6 +3739,15 @@ def public_tour_lines(db_path: str = DEFAULT_DEMO_DB) -> list[str]:
         "Codex Observe public tour",
         "Privacy: this path uses synthetic data and aggregate-only exports.",
         "",
+        "Start here:",
+        f"1. Open the synthetic dashboard: codex-observe demo --serve --db {db_path} --host 127.0.0.1 --port 8501",
+        "2. Read the answer in the first dashboard viewport:",
+        "- Primary risk signal: what made the run expensive",
+        "- Best next habit: what to change on the next run",
+        "- Proof target: how to verify the change helped",
+        "3. Apply one habit, export the next run, and compare it with the baseline.",
+        "",
+        "Optional reviewer workflow:",
         "Review path:",
     ]
     for item in public_tour_review_path(db_path):
@@ -4123,6 +4168,10 @@ def paths_payload(db_path: str | None = None, sessions_path: str | None = None) 
     db_arg = _command_arg(db)
     private_validate_command = (
         f"codex-observe private-validate {sessions_arg} --out .artifacts/private "
+        "--newest-files 25 --serve"
+    )
+    private_validate_json_command = (
+        f"codex-observe private-validate {sessions_arg} --out .artifacts/private "
         "--newest-files 25 --json"
     )
     return {
@@ -4142,6 +4191,7 @@ def paths_payload(db_path: str | None = None, sessions_path: str | None = None) 
         },
         "next_commands": [
             private_validate_command,
+            private_validate_json_command,
             f"codex-observe ingest {sessions_arg} --newest-files 25 --db {db_arg} --json",
             f"codex-observe doctor --db {db_arg}",
             f"codex-observe sessions --db {db_arg}",
@@ -4149,8 +4199,13 @@ def paths_payload(db_path: str | None = None, sessions_path: str | None = None) 
         ],
         "review_path": [
             {
-                "label": "Run guided private validation",
+                "label": "Review real sessions",
                 "command": private_validate_command,
+                "success_check": "The bounded sample is validated and the dashboard opens on the recommended run.",
+            },
+            {
+                "label": "Use automation output",
+                "command": private_validate_json_command,
                 "success_check": "JSON status is ok and visual_qa.command points at ignored private browser evidence.",
             },
             {
@@ -5364,13 +5419,10 @@ def main(argv: list[str] | None = None) -> int:
         description="Offline observability for Codex JSONL session logs",
         epilog=textwrap.dedent(
             """            Start here:
-              codex-observe tour
-              codex-observe demo --serve --host 127.0.0.1 --port 8501
-              codex-observe doctor --db .artifacts/demo/codex_observe_demo.sqlite --json
-              codex-observe sessions --db .artifacts/demo/codex_observe_demo.sqlite --json
-              codex-observe scan-and-serve ~/.codex/sessions
-              codex-observe report --db ~/.codex-observe/codex_observe.sqlite --out run-report.md
+              Try synthetic data: codex-observe demo --serve --host 127.0.0.1 --port 8501
+              Review real sessions: codex-observe private-validate ~/.codex/sessions --serve --host 127.0.0.1 --port 8501
 
+            Use `codex-observe tour` for the optional reviewer workflow and `<command> --help` for lower-level commands.
             Privacy: paths, doctor, sessions, report, compare, and audit use aggregate-only outputs; dashboard screenshots and copied rows may still reveal private local content.
             """
         ),

@@ -740,7 +740,24 @@ def session_success_target_preview(recommended: dict[str, Any]) -> dict[str, Any
     }
 
 
-def session_recommended_action_lines(recommended: dict[str, Any]) -> list[str]:
+def session_selection_reason(
+    recommended: dict[str, Any], candidates: list[dict[str, Any]] | None = None
+) -> str:
+    risk = str(recommended.get("triage_risk") or "unknown")
+    rows = candidates or [recommended]
+    same_risk_count = sum(
+        1 for row in rows if str(row.get("triage_risk") or "unknown") == risk
+    )
+    if same_risk_count > 1:
+        return (
+            f"{same_risk_count} sessions share {risk} risk; latest run breaks the tie"
+        )
+    return f"only {risk} risk run in the current scope"
+
+
+def session_recommended_action_lines(
+    recommended: dict[str, Any], candidates: list[dict[str, Any]] | None = None
+) -> list[str]:
     share_drivers = [
         ("largest thread share", recommended.get("largest_thread_share_pct")),
         ("repeated prompt share", recommended.get("repeated_prompt_share_pct")),
@@ -767,9 +784,11 @@ def session_recommended_action_lines(recommended: dict[str, Any]) -> list[str]:
     return [
         "Recommended action:",
         f"- Export report for session: {recommended['session_id']}",
-        "- Why: highest aggregate triage risk; latest run breaks ties",
+        f"- Why selected: {session_selection_reason(recommended, candidates)}",
         f"- Risk: {recommended['triage_risk']}",
-        f"- Top drivers: {'; '.join(driver_parts) if driver_parts else 'none recorded'}",
+        f"- Primary driver: {target['driver']}",
+        f"- Evidence: {target['metric']} is {target['current']}",
+        f"- Other signals: {'; '.join(driver_parts) if driver_parts else 'none recorded'}",
         f"- Next-run target: {target['metric']} {target['current']} -> {target['target']}",
         f"- Habit to try: {target['action']}",
     ]
@@ -832,6 +851,9 @@ def session_summary_lines(
             ]
         )
         return lines
+    recommended = filtered[0]
+    recommended_session_id = str(recommended["session_id"])
+    lines.extend(session_recommended_action_lines(recommended, filtered))
     lines.append(
         "Session ID | Last seen | Risk | Focus | Duration | Threads | Tools | Snapshots | Tool out | Tokens | Uncached | Guardian"
     )
@@ -863,9 +885,6 @@ def session_summary_lines(
             )
         else:
             lines.append(f"Showing {len(displayed)} of {len(summaries)} sessions.")
-    recommended = filtered[0]
-    recommended_session_id = str(recommended["session_id"])
-    lines.extend(session_recommended_action_lines(recommended))
     lines.extend(session_review_path_lines(db_path, recommended_session_id))
     next_commands = session_validation_commands(db_path, recommended_session_id)
     lines.append("Next commands:")

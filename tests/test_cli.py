@@ -44,6 +44,22 @@ def test_tracking_doc_failures_accepts_a_structured_current_snapshot(
     assert cli.tracking_doc_failures(tmp_path) == []
 
 
+def test_cli_help_presents_two_primary_paths(capsys) -> None:
+    try:
+        cli.main(["--help"])
+    except SystemExit as exc:
+        assert exc.code == 0
+    else:
+        raise AssertionError("--help should exit after printing usage")
+
+    output = capsys.readouterr().out
+    start = output.split("Start here:", 1)[1].split("Privacy:", 1)[0]
+    assert "Try synthetic data: codex-observe demo --serve" in start
+    assert "Review real sessions: codex-observe private-validate" in start
+    assert "codex-observe doctor" not in start
+    assert "codex-observe sessions" not in start
+
+
 def test_self_check_payload_is_privacy_safe() -> None:
     payload = cli.self_check_payload()
 
@@ -637,6 +653,14 @@ def write_valid_visual_manifest(root: Path) -> None:
                 "overflowing_elements": [],
                 "clipped_text_elements": [],
             },
+            "answer_first_layout": {
+                "briefing_before_metrics": True,
+                "briefing_in_initial_viewport": True,
+                "briefing_top": 120,
+                "briefing_bottom": 420,
+                "metric_grid_top": 450,
+                "viewport_height": viewport["height"],
+            },
             "sidebar_risk_labels": sorted(cli.EXPECTED_VISUAL_RISK_LABELS),
             "sidebar_risk_filter": sorted(cli.EXPECTED_VISUAL_RISK_FILTER),
             "sidebar_session_search": sorted(
@@ -833,6 +857,10 @@ def test_visual_manifest_evidence_failures_validate_saved_sidebar_metric_and_suc
     assert cli.visual_manifest_evidence_failures(tmp_path) == []
 
     payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    payload["viewports"]["desktop"].pop("answer_first_layout")
+    payload["viewports"]["narrow"]["answer_first_layout"][
+        "briefing_in_initial_viewport"
+    ] = False
     payload["viewports"]["desktop"]["sidebar_risk_labels"] = ["High risk"]
     payload["viewports"]["desktop"].pop("sidebar_risk_filter")
     payload["viewports"]["desktop"].pop("sidebar_session_search")
@@ -854,6 +882,11 @@ def test_visual_manifest_evidence_failures_validate_saved_sidebar_metric_and_suc
 
     failures = cli.visual_manifest_evidence_failures(tmp_path)
 
+    assert "visual QA manifest missing desktop answer-first layout evidence" in failures
+    assert (
+        "visual QA manifest narrow operator briefing is not fully visible in initial viewport"
+        in failures
+    )
     assert "visual QA manifest desktop missing risk labels: Low risk" in failures
     assert (
         "visual QA manifest desktop missing sidebar session details: 24 min duration, 6 snapshots, Focus: Thread"
@@ -1295,7 +1328,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
         == "manifest, terminal and reviewer README action plan, key findings, review checklist, feedback handoff, feedback runbook, feedback issue template, reproduce-local commands, validation commands, limitations doc, aggregate reports, and audit artifact verified"
     )
     assert (
-        "visual manifest schema and contract, screenshots, empty states, layout review, risk labels, sidebar Risk filter, sidebar session search, sidebar session details, risk distribution, metric cards, dashboard quick reads, report and comparison downloads, report scope-warning evidence, comparison preview, comparison scope-warning evidence, comparison review path, deltas, operator briefing, next review path, next-run checklist, next-run brief, safe feedback handoff, and success target verified"
+        "visual manifest schema and contract, screenshots, empty states, layout review, answer-first ordering, risk labels, sidebar Risk filter, sidebar session search, sidebar session details, risk distribution, metric cards, dashboard quick reads, report and comparison downloads, report scope-warning evidence, comparison preview, comparison scope-warning evidence, comparison review path, deltas, operator briefing, next review path, next-run checklist, next-run brief, safe feedback handoff, and success target verified"
         in checks["visual QA manifest evidence"]["detail"]
     )
     report_payload = json.loads(report.with_suffix(".json").read_text(encoding="utf-8"))
@@ -1508,6 +1541,10 @@ def test_sessions_json_payload_limits_rows_without_changing_recommendation(
     assert payload["sessions"][0]["session_id"] == "demo-session-cost-review"
     assert payload["recommended_session"]["session_id"] == "demo-session-cost-review"
     assert payload["recommendation_detail"]["target"] == "demo-session-cost-review"
+    assert payload["recommendation_detail"]["selection_reason"] == (
+        "only high risk run in the current scope"
+    )
+    assert payload["recommendation_detail"]["risk_band_size"] == 1
     assert payload["next_commands"] == [
         f"codex-observe report --db {db} --session-id demo-session-cost-review --out run-report.md",
         f"codex-observe report --db {db} --session-id demo-session-cost-review --format json --out run-report.json",
@@ -2094,6 +2131,21 @@ def test_public_tour_payload_is_private_log_free_and_points_to_visual_verificati
     assert "codex-observe sessions --db demo.sqlite --json" in payload["next_commands"]
     assert "codex-observe audit --json" in payload["next_commands"]
     text_lines = cli.public_tour_lines("demo.sqlite")
+    assert text_lines[:4] == [
+        "Codex Observe public tour",
+        "Privacy: this path uses synthetic data and aggregate-only exports.",
+        "",
+        "Start here:",
+    ]
+    assert text_lines.index(
+        "- Primary risk signal: what made the run expensive"
+    ) < text_lines.index("Optional reviewer workflow:")
+    assert text_lines.index(
+        "- Best next habit: what to change on the next run"
+    ) < text_lines.index("Optional reviewer workflow:")
+    assert text_lines.index(
+        "- Proof target: how to verify the change helped"
+    ) < text_lines.index("Optional reviewer workflow:")
     assert "Feedback handoff:" in text_lines
     assert "- Runbook: docs/PUBLIC_TOUR_FEEDBACK.md" in text_lines
     assert (
@@ -2587,7 +2639,8 @@ def test_paths_command_prints_privacy_safe_private_validation_handoff(
     assert "Database exists: false" in captured.out
     assert "does not scan logs or print filenames" in captured.out
     assert "Review path:" in captured.out
-    assert "Run guided private validation" in captured.out
+    assert "Review real sessions" in captured.out
+    assert "Use automation output" in captured.out
     assert "Sample newest private logs manually" in captured.out
     assert "codex-observe private-validate" in captured.out
     assert (
@@ -2625,14 +2678,18 @@ def test_paths_command_json_is_schema_versioned_and_does_not_scan_logs(
         "share_warning": "Paths and aggregate artifacts can reveal local workflow clues; review before sharing.",
     }
     assert payload["next_commands"][0] == (
-        f"codex-observe private-validate {sessions} --out .artifacts/private --newest-files 25 --json"
+        f"codex-observe private-validate {sessions} --out .artifacts/private --newest-files 25 --serve"
     )
     assert payload["next_commands"][1] == (
+        f"codex-observe private-validate {sessions} --out .artifacts/private --newest-files 25 --json"
+    )
+    assert payload["next_commands"][2] == (
         f"codex-observe ingest {sessions} --newest-files 25 --db {db} --json"
     )
-    assert payload["review_path"][0]["label"] == "Run guided private validation"
+    assert payload["review_path"][0]["label"] == "Review real sessions"
     assert payload["review_path"][0]["command"] == payload["next_commands"][0]
-    assert payload["review_path"][1]["label"] == "Sample newest private logs manually"
+    assert payload["review_path"][1]["label"] == "Use automation output"
+    assert payload["review_path"][1]["command"] == payload["next_commands"][1]
 
 
 def test_paths_command_quotes_shell_sensitive_private_paths(
@@ -2657,11 +2714,14 @@ def test_paths_command_quotes_shell_sensitive_private_paths(
 
     assert result == 0
     assert payload["next_commands"][0] == (
-        f"codex-observe private-validate {sessions_arg} --out .artifacts/private --newest-files 25 --json"
+        f"codex-observe private-validate {sessions_arg} --out .artifacts/private --newest-files 25 --serve"
     )
     assert payload["review_path"][0]["command"] == payload["next_commands"][0]
     assert payload["next_commands"][1] == (
-        f"codex-observe ingest {sessions_arg} --newest-files 25 --db {db_arg} --json"
+        f"codex-observe private-validate {sessions_arg} --out .artifacts/private --newest-files 25 --json"
     )
     assert payload["review_path"][1]["command"] == payload["next_commands"][1]
-    assert payload["next_commands"][2] == f"codex-observe doctor --db {db_arg}"
+    assert payload["next_commands"][2] == (
+        f"codex-observe ingest {sessions_arg} --newest-files 25 --db {db_arg} --json"
+    )
+    assert payload["next_commands"][3] == f"codex-observe doctor --db {db_arg}"

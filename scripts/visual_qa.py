@@ -763,6 +763,48 @@ def collect_operator_briefings(page) -> list[dict[str, str]]:
     )
 
 
+def collect_answer_first_layout(page) -> dict[str, object]:
+    return page.evaluate(
+        r"""
+() => {
+  window.scrollTo(0, 0);
+  const briefing = document.querySelector('.co-briefing');
+  const metrics = document.querySelector('.co-metric-grid');
+  if (!briefing || !metrics) return {};
+  const briefingRect = briefing.getBoundingClientRect();
+  const metricRect = metrics.getBoundingClientRect();
+  return {
+    briefing_before_metrics: briefingRect.top < metricRect.top,
+    briefing_in_initial_viewport: briefingRect.top >= 0 && briefingRect.bottom <= window.innerHeight,
+    briefing_top: Math.round(briefingRect.top),
+    briefing_bottom: Math.round(briefingRect.bottom),
+    metric_grid_top: Math.round(metricRect.top),
+    viewport_height: window.innerHeight,
+  };
+}
+        """
+    )
+
+
+def answer_first_layout_failures(
+    layout: dict[str, object], viewport_name: str
+) -> list[str]:
+    if not layout:
+        return [f"{viewport_name}: missing answer-first layout evidence"]
+    failures = []
+    if layout.get("briefing_before_metrics") is not True:
+        failures.append(
+            f"{viewport_name}: operator briefing does not precede metric grid"
+        )
+    if layout.get("briefing_in_initial_viewport") is not True:
+        failures.append(
+            f"{viewport_name}: operator briefing is not fully visible in initial viewport "
+            f"(bottom {layout.get('briefing_bottom', 'unknown')}px, "
+            f"viewport {layout.get('viewport_height', 'unknown')}px)"
+        )
+    return failures
+
+
 def collect_review_paths(page) -> list[dict[str, str]]:
     return page.evaluate(
         r"""
@@ -1012,6 +1054,15 @@ def validate_dashboard_page(
         failures.append(f"{viewport_name}: Streamlit exception text found")
     if "Codex Observe" not in text:
         failures.append(f"{viewport_name}: dashboard title not found")
+    try:
+        page.wait_for_function(
+            "document.querySelector('.co-briefing') && document.querySelector('.co-metric-grid')",
+            timeout=45000 if profile == PROFILE_REAL else 10000,
+        )
+    except Exception:
+        pass
+    answer_first_layout = collect_answer_first_layout(page)
+    failures.extend(answer_first_layout_failures(answer_first_layout, viewport_name))
     page.get_by_role("tab", name="Overview", exact=True).click()
     page.wait_for_timeout(1500 if profile == PROFILE_REAL else 500)
     if profile == PROFILE_REAL:
@@ -1197,6 +1248,7 @@ name => {
         "sidebar_session_search": sidebar_session_search,
         "sidebar_session_details": sidebar_session_details,
         "success_targets": success_targets,
+        "answer_first_layout": answer_first_layout,
         "operator_briefings": operator_briefings,
         "review_paths": review_paths,
         "next_run_checklists": next_run_checklists,
@@ -1712,6 +1764,16 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
             failures.extend(
                 failure.replace(f"{name}: ", f"manifest {name} ")
                 for failure in control_failures
+            )
+
+        answer_first_layout = raw.get("answer_first_layout")
+        if not isinstance(answer_first_layout, dict):
+            failures.append(f"manifest {name} missing answer-first layout evidence")
+        else:
+            ordering_failures = answer_first_layout_failures(answer_first_layout, name)
+            failures.extend(
+                failure.replace(f"{name}: ", f"manifest {name} ")
+                for failure in ordering_failures
             )
 
         operator_briefings = raw.get("operator_briefings")
