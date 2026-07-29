@@ -864,7 +864,15 @@ def collect_action_first_layout(page) -> dict[str, object]:
   const copyBlock = Array.from(document.querySelectorAll('[data-testid="stCode"], .stCode')).find(
     (item) => (item.innerText || '').includes('Next Codex run plan:')
   );
-  if (!briefing || !tablist || !checklist || !brief || !copyBlock || !metrics) return {};
+  const missing = [
+    ['briefing', briefing],
+    ['tab navigation', tablist],
+    ['next run checklist', checklist],
+    ['next run brief', brief],
+    ['copyable prompt', copyBlock],
+    ['metric grid', metrics],
+  ].filter(([, element]) => !element).map(([label]) => label);
+  if (missing.length) return {missing};
   const rect = (element) => element.getBoundingClientRect();
   const briefingRect = rect(briefing);
   const tablistRect = rect(tablist);
@@ -905,6 +913,11 @@ def action_first_layout_failures(
 ) -> list[str]:
     if not layout:
         return [f"{viewport_name}: missing action-first layout evidence"]
+    missing = layout.get("missing")
+    if isinstance(missing, list) and missing:
+        return [
+            f"{viewport_name}: missing action-first elements: {', '.join(str(item) for item in missing)}"
+        ]
     failures = []
     checks = {
         "briefing_before_tabs": "operator briefing does not precede tab navigation",
@@ -1212,6 +1225,17 @@ def validate_dashboard_page(
         )
     except Exception:
         pass
+    try:
+        page.wait_for_function(
+            "document.querySelector('[role=\"tablist\"]') && "
+            "document.querySelector('.co-next-run-checklist') && "
+            "document.querySelector('.co-next-run-brief') && "
+            "document.querySelector('.co-metric-grid') && "
+            "Array.from(document.querySelectorAll('[data-testid=\"stCode\"], .stCode')).some((item) => (item.innerText || '').includes('Next Codex run plan:'))",
+            timeout=45000 if profile == PROFILE_REAL else 10000,
+        )
+    except Exception:
+        pass
     answer_first_layout = collect_answer_first_layout(page)
     failures.extend(answer_first_layout_failures(answer_first_layout, viewport_name))
     action_first_layout = collect_action_first_layout(page)
@@ -1347,7 +1371,7 @@ name => {
                 page.wait_for_function(
                     "expected => document.body.innerText.includes(expected)",
                     arg=expected_text,
-                    timeout=30000,
+                    timeout=60000,
                 )
             except Exception:
                 pass
