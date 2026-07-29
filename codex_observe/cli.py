@@ -3016,7 +3016,9 @@ def release_audit_report(
     )
 
     tour_payload = public_tour_payload(actual_db_path)
-    tour_lines_text = "\n".join(public_tour_lines(actual_db_path))
+    tour_quick_lines = public_tour_lines(actual_db_path)
+    tour_quick_text = "\n".join(tour_quick_lines)
+    tour_lines_text = "\n".join(public_tour_reviewer_lines(actual_db_path))
     tour_commands = tour_payload.get("next_commands")
     tour_steps = tour_payload.get("steps", [])
     tour_review_path = tour_payload.get("review_path", [])
@@ -3078,8 +3080,32 @@ def release_audit_report(
         and bool(step.get("success_checks"))
         for step in tour_steps
     )
+    tour_quick_ok = (
+        len([line for line in tour_quick_lines if line.strip()]) <= 25
+        and len(tour_quick_text.split()) <= 250
+        and f"codex-observe demo --serve --db {_command_arg(actual_db_path)}"
+        in tour_quick_text
+        and "Primary risk signal" in tour_quick_text
+        and "Best next habit" in tour_quick_text
+        and "Proof target" in tour_quick_text
+        and "<next-session-id>" in tour_quick_text
+        and "codex-observe compare --before-report" in tour_quick_text
+        and "codex-observe tour --reviewer" in tour_quick_text
+        and "codex-observe tour --json" in tour_quick_text
+        and all(
+            reviewer_only not in tour_quick_text
+            for reviewer_only in [
+                "codex-observe audit",
+                "evidence-bundle",
+                "visual_qa.py",
+                "ISSUE_TEMPLATE",
+                "release gate",
+            ]
+        )
+    )
     tour_ok = (
-        tour_payload.get("schema_version") == TOUR_SCHEMA_VERSION
+        tour_quick_ok
+        and tour_payload.get("schema_version") == TOUR_SCHEMA_VERSION
         and tour_payload.get("database") == actual_db_path
         and tour_payload.get("privacy", {}).get("private_log_required") is False
         and isinstance(tour_commands, list)
@@ -3125,9 +3151,9 @@ def release_audit_report(
     add(
         "public tour JSON",
         tour_ok,
-        "schema, privacy, database, evidence bundle, recommended-action evidence, terminal handoff evidence, terminal validation evidence, dashboard quick-read, sampled-scope, session validation-loop evidence, and comparison review-path evidence, top-level review path, terminal feedback handoff, text next commands, per-step success checks, and next commands verified"
+        "concise default, exhaustive reviewer text, schema, privacy, database, evidence bundle, recommended-action evidence, terminal handoff evidence, terminal validation evidence, dashboard quick-read, sampled-scope, session validation-loop evidence, and comparison review-path evidence, top-level review path, terminal feedback handoff, text next commands, per-step success checks, and next commands verified"
         if tour_ok
-        else "tour JSON schema_version, privacy, database, evidence bundle key findings, recommended-action evidence, terminal handoff evidence, terminal validation evidence, dashboard quick-read evidence, sampled-scope evidence, session validation-loop evidence, comparison review-path evidence, comparison metric delta evidence, report/comparison-download evidence, feedback evidence, top-level review_path, terminal feedback_handoff, text next commands, per-step success checks, or next_commands missing",
+        else "concise default tour, exhaustive reviewer text, tour JSON schema_version, privacy, database, evidence bundle key findings, recommended-action evidence, terminal handoff evidence, terminal validation evidence, dashboard quick-read evidence, sampled-scope evidence, session validation-loop evidence, comparison review-path evidence, comparison metric delta evidence, report/comparison-download evidence, feedback evidence, top-level review_path, terminal feedback_handoff, text next commands, per-step success checks, or next_commands missing",
     )
 
     ignore_failures = private_artifact_ignore_failures(root)
@@ -3736,6 +3762,29 @@ def public_tour_payload(db_path: str = DEFAULT_DEMO_DB) -> dict[str, object]:
 
 
 def public_tour_lines(db_path: str = DEFAULT_DEMO_DB) -> list[str]:
+    db_arg = _command_arg(db_path)
+    baseline = ".artifacts/demo/run-report.json"
+    next_run = "next-run-report.json"
+    return [
+        "Codex Observe tour",
+        "Privacy: this path uses synthetic data and aggregate-only exports.",
+        "",
+        f"1. Open the synthetic dashboard: codex-observe demo --serve --db {db_arg} --host 127.0.0.1 --port 8501",
+        "2. Read the answer in the first viewport:",
+        "- Primary risk signal: what made the run expensive",
+        "- Best next habit: what to change on the next run",
+        "- Proof target: how to verify the change helped",
+        "3. Test one habit:",
+        f"- Save the baseline: codex-observe report --db {db_arg} --session-id demo-session-cost-review --format json --out {baseline}",
+        f"- Export the next run: codex-observe report --db {db_arg} --session-id <next-session-id> --format json --out {next_run}",
+        f"- Compare: codex-observe compare --before-report {baseline} --after-report {next_run} --out run-comparison.md",
+        "",
+        "Reviewer workflow: codex-observe tour --reviewer",
+        "Automation contract: codex-observe tour --json",
+    ]
+
+
+def public_tour_reviewer_lines(db_path: str = DEFAULT_DEMO_DB) -> list[str]:
     lines = [
         "Codex Observe public tour",
         "Privacy: this path uses synthetic data and aggregate-only exports.",
@@ -5423,7 +5472,7 @@ def main(argv: list[str] | None = None) -> int:
               Try synthetic data: codex-observe demo --serve --host 127.0.0.1 --port 8501
               Review real sessions: codex-observe private-validate ~/.codex/sessions --serve --host 127.0.0.1 --port 8501
 
-            Use `codex-observe tour` for the optional reviewer workflow and `<command> --help` for lower-level commands.
+            Use `codex-observe tour` for the concise walkthrough or add `--reviewer` for the exhaustive review workflow and `<command> --help` for lower-level commands.
             Privacy: paths, doctor, sessions, report, compare, and audit use aggregate-only outputs; dashboard screenshots and copied rows may still reveal private local content.
             """
         ),
@@ -5436,16 +5485,24 @@ def main(argv: list[str] | None = None) -> int:
 
     p_tour = sub.add_parser(
         "tour",
-        help="Print the privacy-safe public evaluation path",
-        description="Print a synthetic-data tour that exercises the dashboard, aggregate reports, comparison, visual QA, release audit, and evidence bundle.",
+        help="Show a concise synthetic user journey",
+        description="Show a concise synthetic user journey; add --reviewer for the exhaustive evidence and release workflow.",
     )
     p_tour.add_argument(
         "--db",
         default=DEFAULT_DEMO_DB,
         help="Synthetic SQLite database path to show in commands",
     )
-    p_tour.add_argument(
-        "--json", action="store_true", help="Emit the tour as schema-versioned JSON"
+    tour_output = p_tour.add_mutually_exclusive_group()
+    tour_output.add_argument(
+        "--reviewer",
+        action="store_true",
+        help="Print the exhaustive reviewer, evidence, and release workflow",
+    )
+    tour_output.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit the exhaustive schema-versioned automation contract",
     )
 
     p_self = sub.add_parser(
@@ -5780,6 +5837,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "tour":
         if args.json:
             print(json.dumps(public_tour_payload(args.db), indent=2, sort_keys=True))
+        elif args.reviewer:
+            print("\n".join(public_tour_reviewer_lines(args.db)))
         else:
             print("\n".join(public_tour_lines(args.db)))
         return 0

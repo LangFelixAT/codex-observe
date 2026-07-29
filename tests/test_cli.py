@@ -1306,7 +1306,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     assert checks["tracking snapshot"]["ok"] is True
     assert (
         checks["public tour JSON"]["detail"]
-        == "schema, privacy, database, evidence bundle, recommended-action evidence, terminal handoff evidence, terminal validation evidence, dashboard quick-read, sampled-scope, session validation-loop evidence, and comparison review-path evidence, top-level review path, terminal feedback handoff, text next commands, per-step success checks, and next commands verified"
+        == "concise default, exhaustive reviewer text, schema, privacy, database, evidence bundle, recommended-action evidence, terminal handoff evidence, terminal validation evidence, dashboard quick-read, sampled-scope, session validation-loop evidence, and comparison review-path evidence, top-level review path, terminal feedback handoff, text next commands, per-step success checks, and next commands verified"
     )
     assert (
         checks["issue templates"]["detail"]
@@ -2096,6 +2096,50 @@ def test_session_recommendation_detail_includes_structured_tool_output_driver() 
     ]
 
 
+def test_public_tour_lines_are_concise_and_user_focused() -> None:
+    lines = cli.public_tour_lines("demo.sqlite")
+    nonblank = [line for line in lines if line.strip()]
+    text = "\n".join(lines)
+
+    assert len(nonblank) <= 25
+    assert len(text.split()) <= 250
+    assert "codex-observe demo --serve --db demo.sqlite" in text
+    assert "Primary risk signal" in text
+    assert "Best next habit" in text
+    assert "Proof target" in text
+    assert "<next-session-id>" in text
+    assert "codex-observe compare --before-report" in text
+    assert "codex-observe tour --reviewer" in text
+    assert "codex-observe tour --json" in text
+    for reviewer_only in [
+        "codex-observe audit",
+        "evidence-bundle",
+        "visual_qa.py",
+        "ISSUE_TEMPLATE",
+        "release gate",
+    ]:
+        assert reviewer_only not in text
+
+
+def test_tour_command_separates_default_reviewer_and_json_modes(capsys) -> None:
+    assert cli.main(["tour", "--db", "demo.sqlite"]) == 0
+    default_text = capsys.readouterr().out
+    assert "Reviewer workflow: codex-observe tour --reviewer" in default_text
+    assert "codex-observe audit" not in default_text
+
+    assert cli.main(["tour", "--db", "demo.sqlite", "--reviewer"]) == 0
+    reviewer_text = capsys.readouterr().out
+    assert "Feedback handoff:" in reviewer_text
+    assert "codex-observe evidence-bundle" in reviewer_text
+    assert "codex-observe audit --json" in reviewer_text
+
+    assert cli.main(["tour", "--db", "demo.sqlite", "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["schema_version"] == cli.TOUR_SCHEMA_VERSION
+    assert payload["review_path"]
+    assert "codex-observe audit --json" in payload["next_commands"]
+
+
 def test_public_tour_payload_is_private_log_free_and_points_to_visual_verification() -> (
     None
 ):
@@ -2131,37 +2175,39 @@ def test_public_tour_payload_is_private_log_free_and_points_to_visual_verificati
     assert "codex-observe sessions --db demo.sqlite" in payload["next_commands"]
     assert "codex-observe sessions --db demo.sqlite --json" in payload["next_commands"]
     assert "codex-observe audit --json" in payload["next_commands"]
-    text_lines = cli.public_tour_lines("demo.sqlite")
-    assert text_lines[:4] == [
+    reviewer_lines = cli.public_tour_reviewer_lines("demo.sqlite")
+    assert reviewer_lines[:4] == [
         "Codex Observe public tour",
         "Privacy: this path uses synthetic data and aggregate-only exports.",
         "",
         "Start here:",
     ]
-    assert text_lines.index(
+    assert reviewer_lines.index(
         "- Primary risk signal: what made the run expensive"
-    ) < text_lines.index("Optional reviewer workflow:")
-    assert text_lines.index(
+    ) < reviewer_lines.index("Optional reviewer workflow:")
+    assert reviewer_lines.index(
         "- Best next habit: what to change on the next run"
-    ) < text_lines.index("Optional reviewer workflow:")
-    assert text_lines.index(
+    ) < reviewer_lines.index("Optional reviewer workflow:")
+    assert reviewer_lines.index(
         "- Proof target: how to verify the change helped"
-    ) < text_lines.index("Optional reviewer workflow:")
-    assert "Feedback handoff:" in text_lines
-    assert "- Runbook: docs/PUBLIC_TOUR_FEEDBACK.md" in text_lines
+    ) < reviewer_lines.index("Optional reviewer workflow:")
+    assert "Feedback handoff:" in reviewer_lines
+    assert "- Runbook: docs/PUBLIC_TOUR_FEEDBACK.md" in reviewer_lines
     assert (
         "- Issue template: .github/ISSUE_TEMPLATE/public_tour_feedback.yml"
-        in text_lines
+        in reviewer_lines
     )
-    assert "- Safe feedback sources:" in text_lines
-    assert "  - reviewer evidence bundle" in text_lines
-    assert "- Do not collect:" in text_lines
-    assert "  - private prompts" in text_lines
-    assert text_lines.index("Feedback handoff:") < text_lines.index("Next commands:")
-    assert "Next commands:" in text_lines
+    assert "- Safe feedback sources:" in reviewer_lines
+    assert "  - reviewer evidence bundle" in reviewer_lines
+    assert "- Do not collect:" in reviewer_lines
+    assert "  - private prompts" in reviewer_lines
+    assert reviewer_lines.index("Feedback handoff:") < reviewer_lines.index(
+        "Next commands:"
+    )
+    assert "Next commands:" in reviewer_lines
     for command in payload["next_commands"]:
-        assert f"- {command}" in text_lines
-    assert text_lines.index("Next commands:") > text_lines.index(
+        assert f"- {command}" in reviewer_lines
+    assert reviewer_lines.index("Next commands:") > reviewer_lines.index(
         "9. File privacy-safe public-tour feedback:"
     )
     assert any("key findings" in item for item in evidence)

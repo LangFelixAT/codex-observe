@@ -28,5 +28,5 @@ Use this runbook when collecting feedback from someone trying the synthetic publ
 
 ## Closeout
 
-`codex-observe tour` ends by pointing reviewers to this runbook and `.github/ISSUE_TEMPLATE/public_tour_feedback.yml`. File feedback with `.github/ISSUE_TEMPLATE/public_tour_feedback.yml`. If feedback becomes implementation work, convert it into an implementation, parser, or visual-polish issue with acceptance criteria, tests, visual QA expectations, and privacy review notes. External attachment or publication of generated artifacts still requires explicit human approval.
+`codex-observe tour --reviewer` ends by pointing reviewers to this runbook and `.github/ISSUE_TEMPLATE/public_tour_feedback.yml`. File feedback with `.github/ISSUE_TEMPLATE/public_tour_feedback.yml`. If feedback becomes implementation work, convert it into an implementation, parser, or visual-polish issue with acceptance criteria, tests, visual QA expectations, and privacy review notes. External attachment or publication of generated artifacts still requires explicit human approval.
 

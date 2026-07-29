@@ -139,6 +139,7 @@ def test_current_state_handoff_covers_gates_evidence_and_real_log_checkpoint() -
         "docs/PUBLIC_TOUR_FEEDBACK.md",
         "docs/TRACKING.md",
         "codex-observe tour",
+        "codex-observe tour --reviewer",
         "codex-observe demo --serve --host 127.0.0.1 --port 8501",
         "codex-observe doctor --db .artifacts/demo/codex_observe_demo.sqlite --json",
         "structured `next_commands`",
@@ -287,6 +288,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
     assert "## Public Tour" in readme
     for tour_item in [
         "codex-observe tour",
+        "codex-observe tour --reviewer",
         "codex-observe demo --serve --host 127.0.0.1 --port 8501",
         "Overview operator briefing",
         "risk distribution card",
@@ -532,7 +534,7 @@ def test_public_tour_feedback_runbook_keeps_feedback_privacy_safe() -> None:
     for required in [
         "codex-observe tour",
         "codex-observe evidence-bundle --out .artifacts/public-evidence",
-        "`codex-observe tour` ends by pointing reviewers",
+        "`codex-observe tour --reviewer` ends by pointing reviewers",
         "README.md",
         "LIMITATIONS.md",
         "evidence-bundle.json",
