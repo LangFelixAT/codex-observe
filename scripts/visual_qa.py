@@ -753,7 +753,7 @@ def collect_operator_briefings(page) -> list[dict[str, str]]:
   return {
     label: (card.querySelector('.co-briefing-label')?.innerText || '').replace(/\s+/g, ' ').trim(),
     heading: (card.querySelector('h3')?.innerText || '').replace(/\s+/g, ' ').trim(),
-    action: (card.querySelector('h3 + p')?.innerText || '').replace(/\s+/g, ' ').trim(),
+    action: (card.querySelector('.co-briefing-risk-signal')?.innerText || '').replace(/\s+/g, ' ').trim(),
     best_habit: bestHabit[0] || '',
     scale: bestHabit[1] || '',
     proof_target: proofTarget[0] || '',
@@ -798,6 +798,9 @@ def operator_briefing_failures(
     expected_label = EXPECTED_OPERATOR_BRIEFING["label"].casefold()
     if label != expected_label:
         failures.append(f"{viewport_name}: operator briefing label missing")
+    action = str(observed.get("action") or "")
+    if not action.startswith("Primary risk signal: "):
+        failures.append(f"{viewport_name}: operator briefing risk signal missing")
     if profile == PROFILE_REAL:
         for key in ["heading", "best_habit", "scale", "proof_target"]:
             if not str(observed.get(key) or ""):
@@ -875,6 +878,36 @@ def next_run_brief_failures(
         for expected in expected_items
         if expected not in body
     ]
+
+
+def guidance_consistency_failures(
+    operator_briefings: list[dict[str, str]],
+    success_targets: list[dict[str, str]],
+    next_run_briefs: list[dict[str, str]],
+    viewport_name: str,
+) -> list[str]:
+    if not operator_briefings or not success_targets or not next_run_briefs:
+        return []
+    operator = operator_briefings[0]
+    target = success_targets[0]
+    brief_body = str(next_run_briefs[0].get("body") or "")
+    habit = str(operator.get("best_habit") or "")
+    proof_target = str(operator.get("proof_target") or "")
+    expected_target = (
+        f"{target.get('metric')}: {target.get('current')} -> {target.get('target')}"
+    )
+    failures = []
+    if habit and habit not in brief_body:
+        failures.append(
+            f"{viewport_name}: operator habit does not match next run brief"
+        )
+    if proof_target and proof_target not in brief_body:
+        failures.append(f"{viewport_name}: proof target does not match next run brief")
+    if proof_target and proof_target != expected_target:
+        failures.append(
+            f"{viewport_name}: operator proof target does not match success target card"
+        )
+    return failures
 
 
 def collect_feedback_handoffs(page) -> list[dict[str, str]]:
@@ -1051,6 +1084,11 @@ def validate_dashboard_page(
         next_run_checklist_failures(next_run_checklists, viewport_name, profile)
     )
     failures.extend(next_run_brief_failures(next_run_briefs, viewport_name, profile))
+    failures.extend(
+        guidance_consistency_failures(
+            operator_briefings, success_targets, next_run_briefs, viewport_name
+        )
+    )
     failures.extend(feedback_handoff_failures(feedback_handoffs, viewport_name))
     failures.extend(
         download_control_failures(download_controls, viewport_name, profile)
@@ -1718,6 +1756,19 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
             failures.extend(
                 failure.replace(f"{name}: ", f"manifest {name} ")
                 for failure in brief_failures
+            )
+
+        if (
+            isinstance(operator_briefings, list)
+            and isinstance(success_targets, list)
+            and isinstance(next_run_briefs, list)
+        ):
+            consistency_failures = guidance_consistency_failures(
+                operator_briefings, success_targets, next_run_briefs, name
+            )
+            failures.extend(
+                failure.replace(f"{name}: ", f"manifest {name} ")
+                for failure in consistency_failures
             )
 
         feedback_handoffs = raw.get("feedback_handoffs")

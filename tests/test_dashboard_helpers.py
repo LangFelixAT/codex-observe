@@ -881,9 +881,10 @@ def test_operator_briefing_html_summarizes_top_action_and_escapes_content() -> N
 
     assert 'class="co-briefing"' in rendered
     assert "Operator briefing" in rendered
-    assert "High risk" in rendered
-    assert "Largest &lt;thread&gt;" in rendered
-    assert "Set stop &amp; summarize" in rendered
+    assert "High risk run" in rendered
+    assert 'class="co-briefing-risk-signal"' in rendered
+    assert "Primary risk signal: Largest &lt;thread&gt;." in rendered
+    assert "Set stop &amp; summarize" not in rendered
     assert "Stop &lt;dominant&gt; worker" in rendered
     assert "largest_thread_share_pct: 57.7% -> below &lt;50%" in rendered
     assert "Largest <thread>" not in rendered

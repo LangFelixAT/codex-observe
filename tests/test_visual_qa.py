@@ -620,6 +620,48 @@ def test_next_run_brief_failures_require_copyable_plan() -> None:
     )
 
 
+def test_guidance_consistency_failures_require_same_habit_and_target() -> None:
+    operator = [
+        {
+            "best_habit": "Start a fresh session",
+            "proof_target": "session_duration_hours: 3.0 days -> below 24.0 hours",
+        }
+    ]
+    target = [
+        {
+            "metric": "session_duration_hours",
+            "current": "3.0 days",
+            "target": "below 24.0 hours",
+        }
+    ]
+    aligned_brief = [
+        {
+            "body": "Next run brief Start a fresh session session_duration_hours: 3.0 days -> below 24.0 hours"
+        }
+    ]
+
+    assert (
+        visual_qa.guidance_consistency_failures(
+            operator, target, aligned_brief, "desktop"
+        )
+        == []
+    )
+
+    failures = visual_qa.guidance_consistency_failures(
+        operator,
+        target,
+        [
+            {
+                "body": "Next run brief Set a stop condition largest_thread_share_pct: 100.0% -> below 50.0%"
+            }
+        ],
+        "narrow",
+    )
+
+    assert "narrow: operator habit does not match next run brief" in failures
+    assert "narrow: proof target does not match next run brief" in failures
+
+
 def test_feedback_handoff_failures_require_safe_feedback_contract() -> None:
     assert (
         feedback_handoff_failures(
@@ -652,7 +694,8 @@ def test_operator_briefing_failures_require_briefing_contract() -> None:
             [
                 {
                     "label": "Operator briefing",
-                    "heading": "High risk: Dominant thread concentration",
+                    "heading": "High risk run",
+                    "action": "Primary risk signal: Largest thread drives the run.",
                     "best_habit": "Set a stop condition for the dominant thread",
                     "scale": "33.2k tokens (57.7% of run)",
                     "proof_target": "largest_thread_share_pct: 57.7% -> below 50.0%",
@@ -734,8 +777,8 @@ def complete_viewport_results(tmp_path: Path) -> dict[str, dict[str, object]]:
             "operator_briefings": [
                 {
                     "label": "Operator briefing",
-                    "heading": "High risk: Dominant thread concentration",
-                    "action": "Inspect the largest thread before changing workflow.",
+                    "heading": "High risk run",
+                    "action": "Primary risk signal: Largest thread drives the run.",
                     "best_habit": "Set a stop condition for the dominant thread",
                     "scale": "33.2k tokens (57.7% of run)",
                     "proof_target": "largest_thread_share_pct: 57.7% -> below 50.0%",
@@ -919,8 +962,8 @@ def test_visual_manifest_records_review_evidence(tmp_path: Path) -> None:
     ]
     assert loaded["viewports"]["desktop"]["operator_briefings"][0] == {
         "label": "Operator briefing",
-        "heading": "High risk: Dominant thread concentration",
-        "action": "Inspect the largest thread before changing workflow.",
+        "heading": "High risk run",
+        "action": "Primary risk signal: Largest thread drives the run.",
         "best_habit": "Set a stop condition for the dominant thread",
         "scale": "33.2k tokens (57.7% of run)",
         "proof_target": "largest_thread_share_pct: 57.7% -> below 50.0%",
@@ -1150,8 +1193,8 @@ def test_real_profile_manifest_accepts_private_aggregate_variance(
         raw["operator_briefings"] = [
             {
                 "label": "Operator briefing",
-                "heading": "High risk: real private aggregate",
-                "action": "Inspect the largest thread before changing workflow.",
+                "heading": "High risk run",
+                "action": "Primary risk signal: Largest thread drives the run.",
                 "best_habit": "Split the dominant thread",
                 "scale": "1.1B tokens (56.1% of run)",
                 "proof_target": "largest_thread_share_pct: 56.1% -> below 50.0%",
@@ -1166,7 +1209,7 @@ def test_real_profile_manifest_accepts_private_aggregate_variance(
         raw["next_run_briefs"] = [
             {
                 "label": "Next run brief",
-                "body": "Next run brief Next Codex run plan Copy prompt",
+                "body": "Next run brief Next Codex run plan Split the dominant thread largest_thread_share_pct: 56.1% -> below 50.0% Copy prompt",
             }
         ]
         raw["comparison_previews"] = []
@@ -1184,6 +1227,15 @@ def test_real_profile_manifest_accepts_private_aggregate_variance(
 
     assert manifest["profile"] == visual_qa.PROFILE_REAL
     assert visual_manifest_failures(manifest) == []
+
+    manifest["viewports"]["desktop"]["next_run_briefs"][0]["body"] = (
+        "Next run brief Start a fresh session session_duration_hours: "
+        "3.0 days -> below 24.0 hours"
+    )
+    failures = visual_manifest_failures(manifest)
+
+    assert "manifest desktop operator habit does not match next run brief" in failures
+    assert "manifest desktop proof target does not match next run brief" in failures
 
 
 def test_visual_manifest_failures_rejects_unknown_profile(tmp_path: Path) -> None:

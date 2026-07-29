@@ -19,7 +19,6 @@ from codex_observe.analysis import (
     guardian_overhead_df,
     next_run_playbook_df,
     numericize,
-    opportunity_df,
     opportunity_html,
     playbook_html,
     prepare_threads,
@@ -40,10 +39,8 @@ from codex_observe.report import (
     report_markdown,
     report_next_run_brief,
     report_next_run_checklist,
-    report_success_target,
     session_portfolio_summary,
     session_risk_distribution,
-    report_triage,
     session_duration_hours,
     session_summaries,
 )
@@ -1573,10 +1570,7 @@ def operator_briefing_html(
 ) -> str:
     risk = html.escape(str(triage.get("risk_level") or "unknown").capitalize())
     driver = html.escape(
-        str(triage.get("primary_driver") or "No high-signal diagnostic")
-    )
-    action = html.escape(
-        str(triage.get("next_action") or "Inspect the largest thread.")
+        str(triage.get("primary_driver") or "No high-signal diagnostic").rstrip(".")
     )
     metric = html.escape(str(success_target.get("metric") or "total_tokens"))
     current = html.escape(str(success_target.get("current") or "unknown"))
@@ -1594,8 +1588,8 @@ def operator_briefing_html(
             '<section class="co-briefing">',
             "  <div>",
             '    <div class="co-briefing-label">Operator briefing</div>',
-            f"    <h3>{risk} risk: {driver}</h3>",
-            f"    <p>{action}</p>",
+            f"    <h3>{risk} risk run</h3>",
+            f'    <p class="co-briefing-risk-signal">Primary risk signal: {driver}.</p>',
             "  </div>",
             '  <div class="co-briefing-grid">',
             '    <div class="co-briefing-fact">',
@@ -2681,45 +2675,10 @@ def main() -> None:
 
     diagnostics = diagnostics_df(threads, usage, events, tools, duplicated_blocks)
     playbook = next_run_playbook_df(diagnostics)
-    repeated_prompt_tokens = 0
-    if (
-        not duplicated_blocks.empty
-        and "approx_tokens_replayed" in duplicated_blocks.columns
-    ):
-        repeated_prompt_tokens = int(
-            pd.to_numeric(duplicated_blocks["approx_tokens_replayed"], errors="coerce")
-            .fillna(0)
-            .sum()
-        )
-    largest_tool_output_chars = 0
-    if not tools.empty and "output_chars" in tools.columns:
-        largest_tool_output_chars = int(tools["output_chars"].fillna(0).max())
-    triage = report_triage(
-        {
-            "summary": {
-                "total_tokens": total_tokens,
-                "largest_thread_share_pct": pct_of_total(
-                    largest_thread_tokens, total_tokens
-                ),
-                "repeated_prompt_share_pct": pct_of_total(
-                    repeated_prompt_tokens, total_tokens
-                ),
-                "uncached_input_share_pct": pct_of_total(
-                    conv.total_uncached_input_tokens, total_tokens
-                ),
-                "largest_tool_output_chars": largest_tool_output_chars,
-                "compactions": int(len(compactions)),
-            },
-            "headline": {
-                "top_diagnostic": str(diagnostics.iloc[0]["Diagnostic"])
-                if not diagnostics.empty
-                else "No high-signal diagnostic",
-                "recommendation": str(playbook.iloc[0]["Habit"])
-                if not playbook.empty
-                else "Inspect the largest thread before changing workflow.",
-            },
-        }
-    )
+    report = build_report(str(db), session_id)
+    triage = dict(report.get("triage") or {})
+    opportunities = pd.DataFrame(report.get("opportunities") or [])
+    success_target = dict(report.get("success_target") or {})
     tab_overview, tab_agent, tab_timeline, tab_tools, tab_dup, tab_raw = st.tabs(
         [
             "Overview",
@@ -2729,24 +2688,6 @@ def main() -> None:
             "Duplication",
             "Raw tables",
         ]
-    )
-
-    success_summary = {
-        "total_tokens": total_tokens,
-        "largest_thread_tokens": largest_thread_tokens,
-        "largest_thread_share_pct": pct_of_total(largest_thread_tokens, total_tokens),
-        "repeated_prompt_tokens": repeated_prompt_tokens,
-        "repeated_prompt_share_pct": pct_of_total(repeated_prompt_tokens, total_tokens),
-        "uncached_input_tokens": int(conv.total_uncached_input_tokens or 0),
-        "uncached_input_share_pct": pct_of_total(
-            conv.total_uncached_input_tokens, total_tokens
-        ),
-        "largest_tool_output_chars": largest_tool_output_chars,
-        "compactions": int(len(compactions)),
-    }
-    opportunities = opportunity_df(success_summary)
-    success_target = report_success_target(
-        {"summary": success_summary, "opportunities": opportunities.to_dict("records")}
     )
 
     with tab_overview:
@@ -2776,7 +2717,7 @@ def main() -> None:
             unsafe_allow_html=True,
         )
         st.markdown(triage_card_html(triage), unsafe_allow_html=True)
-        report = build_report(str(db), session_id)
+
         st.markdown(
             next_run_checklist_html(
                 report.get("next_run_checklist") or report_next_run_checklist(report)
