@@ -16,6 +16,7 @@ from codex_observe.analysis import (
 )
 from codex_observe.dashboard import (
     chronological_comparison_order,
+    comparison_candidate_options,
     comparison_delta_cards_html,
     comparison_direction_html,
     comparison_download_payloads,
@@ -1140,6 +1141,106 @@ def test_chronological_comparison_order_uses_last_seen_then_stable_fallback() ->
         "after_id": "z-selected",
         "basis": "Stable fallback because session timestamps are tied or unavailable.",
     }
+
+
+def test_comparison_candidates_default_to_nearest_later_run() -> None:
+    conversations = pd.DataFrame(
+        [
+            {
+                "session_id": "selected",
+                "first_seen": "2026-01-01T12:00:00Z",
+            },
+            {
+                "session_id": "far-later",
+                "first_seen": "2026-01-01T14:00:00Z",
+            },
+            {
+                "session_id": "nearest-earlier",
+                "first_seen": "2026-01-01T11:59:00Z",
+            },
+            {
+                "session_id": "nearest-later",
+                "first_seen": "2026-01-01T12:10:00Z",
+            },
+        ]
+    )
+
+    options = comparison_candidate_options(conversations, "selected")
+
+    assert [option["session_id"] for option in options] == [
+        "nearest-later",
+        "nearest-earlier",
+        "far-later",
+    ]
+    assert options[0] == {
+        "session_id": "nearest-later",
+        "relationship": "Next run",
+        "default": "true",
+    }
+    assert options[1]["relationship"] == "Previous run"
+    assert options[2]["relationship"] == "Later run"
+
+
+def test_comparison_candidates_fall_back_to_nearest_earlier_run() -> None:
+    conversations = pd.DataFrame(
+        [
+            {
+                "session_id": "far-earlier",
+                "last_seen": "2026-01-01T10:00:00Z",
+            },
+            {
+                "session_id": "selected",
+                "last_seen": "2026-01-01T12:00:00Z",
+            },
+            {
+                "session_id": "nearest-earlier",
+                "last_seen": "2026-01-01T11:50:00Z",
+            },
+        ]
+    )
+
+    options = comparison_candidate_options(conversations, "selected")
+
+    assert [option["session_id"] for option in options] == [
+        "nearest-earlier",
+        "far-earlier",
+    ]
+    assert options[0]["relationship"] == "Previous run"
+    assert options[0]["default"] == "true"
+    assert options[1]["relationship"] == "Earlier run"
+
+
+def test_comparison_candidates_use_stable_fallback_for_tied_or_missing_times() -> None:
+    conversations = pd.DataFrame(
+        [
+            {"session_id": "z-selected", "first_seen": "2026-01-01T12:00:00Z"},
+            {"session_id": "b-missing"},
+            {"session_id": "a-tied", "first_seen": "2026-01-01T12:00:00Z"},
+            {"session_id": "a-missing"},
+        ]
+    )
+
+    options = comparison_candidate_options(conversations, "z-selected")
+
+    assert options == [
+        {
+            "session_id": "a-tied",
+            "relationship": "Same time",
+            "default": "true",
+        },
+        {
+            "session_id": "a-missing",
+            "relationship": "Time unavailable",
+            "default": "false",
+        },
+        {
+            "session_id": "b-missing",
+            "relationship": "Time unavailable",
+            "default": "false",
+        },
+    ]
+    assert comparison_candidate_options(conversations, "missing") == []
+    assert comparison_candidate_options(pd.DataFrame(), "z-selected") == []
 
 
 def test_comparison_direction_html_labels_aggregate_before_and_after_context() -> None:

@@ -1896,6 +1896,125 @@ def chronological_comparison_order(
     }
 
 
+def comparison_candidate_options(
+    conversations: pd.DataFrame, selected_session_id: str
+) -> list[dict[str, str]]:
+    if conversations.empty or "session_id" not in conversations.columns:
+        return []
+    rows = conversations.to_dict("records")
+    selected = next(
+        (
+            row
+            for row in rows
+            if str(row.get("session_id") or "") == str(selected_session_id)
+        ),
+        None,
+    )
+    if selected is None:
+        return []
+
+    selected_time = parse_ts(selected.get("first_seen")) or parse_ts(
+        selected.get("last_seen")
+    )
+    candidates = [
+        row
+        for row in rows
+        if str(row.get("session_id") or "") != str(selected_session_id)
+    ]
+    if not candidates:
+        return []
+
+    def candidate_time(row: dict[str, object]):
+        return parse_ts(row.get("first_seen")) or parse_ts(row.get("last_seen"))
+
+    candidate_times = [(row, candidate_time(row)) for row in candidates]
+    timed = [
+        (row, timestamp)
+        for row, timestamp in candidate_times
+        if selected_time and timestamp
+    ]
+    later = sorted(
+        ((row, timestamp) for row, timestamp in timed if timestamp > selected_time),
+        key=lambda item: (
+            item[1] - selected_time,
+            str(item[0].get("session_id") or ""),
+        ),
+    )
+    earlier = sorted(
+        ((row, timestamp) for row, timestamp in timed if timestamp < selected_time),
+        key=lambda item: (
+            selected_time - item[1],
+            str(item[0].get("session_id") or ""),
+        ),
+    )
+    tied = sorted(
+        ((row, timestamp) for row, timestamp in timed if timestamp == selected_time),
+        key=lambda item: str(item[0].get("session_id") or ""),
+    )
+    unavailable = sorted(
+        (
+            row
+            for row, timestamp in candidate_times
+            if not selected_time or not timestamp
+        ),
+        key=lambda row: str(row.get("session_id") or ""),
+    )
+
+    if later:
+        default_row = later[0][0]
+    elif earlier:
+        default_row = earlier[0][0]
+    elif tied:
+        default_row = tied[0][0]
+    else:
+        default_row = unavailable[0]
+    default_id = str(default_row.get("session_id") or "")
+    remaining_timed = sorted(
+        (
+            (row, timestamp)
+            for row, timestamp in timed
+            if str(row.get("session_id") or "") != default_id
+        ),
+        key=lambda item: (
+            abs((item[1] - selected_time).total_seconds()),
+            str(item[0].get("session_id") or ""),
+        ),
+    )
+    ordered = [default_row] + [row for row, _timestamp in remaining_timed]
+    ordered.extend(
+        row for row in unavailable if str(row.get("session_id") or "") != default_id
+    )
+
+    immediate_next_id = str(later[0][0].get("session_id") or "") if later else None
+    immediate_previous_id = (
+        str(earlier[0][0].get("session_id") or "") if earlier else None
+    )
+    options: list[dict[str, str]] = []
+    for row in ordered:
+        session_id = str(row.get("session_id") or "")
+        timestamp = candidate_time(row)
+        if session_id == immediate_next_id:
+            relationship = "Next run"
+        elif session_id == immediate_previous_id:
+            relationship = "Previous run"
+        elif selected_time and timestamp and timestamp > selected_time:
+            relationship = "Later run"
+        elif selected_time and timestamp and timestamp < selected_time:
+            relationship = "Earlier run"
+        elif selected_time and timestamp:
+            relationship = "Same time"
+        else:
+            relationship = "Time unavailable"
+        options.append(
+            {
+                "session_id": session_id,
+                "relationship": relationship,
+                "default": "true" if session_id == default_id else "false",
+            }
+        )
+    return options
+
+
 def comparison_run_summary(row: object) -> str:
     timestamp = parse_ts(row.get("first_seen")) or parse_ts(row.get("last_seen"))
     when = timestamp.isoformat(timespec="minutes") if timestamp else "unknown time"
@@ -2853,10 +2972,9 @@ def main() -> None:
             sampled_ingest_coverage_html(ingest_scope, db),
             unsafe_allow_html=True,
         )
+        comparison_candidates = comparison_candidate_options(conversations, session_id)
         comparison_options = [
-            str(row["session_id"])
-            for _, row in conversations.iterrows()
-            if str(row["session_id"]) != str(session_id)
+            candidate["session_id"] for candidate in comparison_candidates
         ]
         st.markdown(
             review_path_html(success_target, has_comparison=bool(comparison_options)),
@@ -2895,13 +3013,18 @@ def main() -> None:
         if comparison_options:
             st.subheader("Compare runs")
             comparison_labels = {}
+            relationships = {
+                candidate["session_id"]: candidate["relationship"]
+                for candidate in comparison_candidates
+            }
             for _, row in conversations.iterrows():
                 candidate_id = str(row["session_id"])
                 risk = str(row.get("triage_risk") or "unknown").capitalize()
                 last_seen = sidebar_time_label(row.get("last_seen")) or "unknown time"
                 tokens = fmt_short(row.get("total_tokens") or 0)
                 comparison_labels[candidate_id] = (
-                    f"{risk} risk | {last_seen} | {tokens} tokens | {candidate_id}"
+                    f"{relationships.get(candidate_id, 'Other run')} | {risk} risk | "
+                    f"{last_seen} | {tokens} tokens | {candidate_id}"
                 )
             candidate_session_id = st.selectbox(
                 "Compare with run",
