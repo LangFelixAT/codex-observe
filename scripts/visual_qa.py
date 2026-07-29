@@ -131,6 +131,12 @@ EXPECTED_DOWNLOAD_CONTROLS = [
     "Download comparison MD",
     "Download comparison JSON",
 ]
+EXPECTED_COMPARISON_SELECTION = {
+    "label": "Compare with run",
+    "relationship": "Next run",
+    "risk": "Low risk",
+    "session_id": "demo-session-focused-followup",
+}
 EXPECTED_COMPARISON_DIRECTION = {
     "label": "Comparison direction",
     "before": "2026-01-01T12:00+00:00 | High risk | 57.5k tokens",
@@ -427,6 +433,59 @@ def collect_report_scope_warnings(page) -> list[str]:
 () => Array.from(document.querySelectorAll('.co-report-scope')).map((card) => (card.innerText || '').replace(/\s+/g, ' ').trim()).filter(Boolean)
         """
     )
+
+
+def collect_comparison_selections(page) -> list[dict[str, str]]:
+    return page.evaluate(
+        r"""
+() => Array.from(document.querySelectorAll('[data-testid="stSelectbox"]')).map((control) => ({
+  label: (control.querySelector('label')?.innerText || '').replace(/\s+/g, ' ').trim(),
+  selected: (control.querySelector('input')?.value || '').replace(/\s+/g, ' ').trim(),
+  body: (control.innerText || '').replace(/\s+/g, ' ').trim(),
+})).filter((item) => item.label === 'Compare with run')
+        """
+    )
+
+
+def comparison_selection_failures(
+    selections: list[dict[str, str]],
+    viewport_name: str,
+    profile: str = PROFILE_DEMO,
+) -> list[str]:
+    if not selections:
+        return (
+            []
+            if profile == PROFILE_REAL
+            else [f"{viewport_name}: comparison selection not rendered"]
+        )
+    observed = selections[0]
+    text = " ".join(
+        str(observed.get(key) or "") for key in ["label", "selected", "body"]
+    )
+    if profile == PROFILE_REAL:
+        failures = []
+        if "Compare with run" not in text:
+            failures.append(f"{viewport_name}: comparison selection missing label")
+        if not any(
+            relationship in text
+            for relationship in [
+                "Next run",
+                "Previous run",
+                "Later run",
+                "Earlier run",
+                "Same time",
+                "Time unavailable",
+            ]
+        ):
+            failures.append(
+                f"{viewport_name}: comparison selection missing chronological relationship"
+            )
+        return failures
+    return [
+        f"{viewport_name}: comparison selection missing {key}: {expected}"
+        for key, expected in EXPECTED_COMPARISON_SELECTION.items()
+        if expected not in text
+    ]
 
 
 def collect_comparison_directions(page) -> list[dict[str, str]]:
@@ -1299,6 +1358,7 @@ def validate_dashboard_page(
     feedback_handoffs = collect_feedback_handoffs(page)
     download_controls = collect_download_controls(page)
     report_scope_warnings = collect_report_scope_warnings(page)
+    comparison_selections = collect_comparison_selections(page)
     comparison_directions = collect_comparison_directions(page)
     comparison_previews = collect_comparison_previews(page)
     comparison_review_paths = collect_comparison_review_paths(page)
@@ -1325,6 +1385,9 @@ def validate_dashboard_page(
     failures.extend(feedback_handoff_failures(feedback_handoffs, viewport_name))
     failures.extend(
         download_control_failures(download_controls, viewport_name, profile)
+    )
+    failures.extend(
+        comparison_selection_failures(comparison_selections, viewport_name, profile)
     )
     failures.extend(
         comparison_direction_failures(comparison_directions, viewport_name, profile)
@@ -1443,6 +1506,7 @@ name => {
         "feedback_handoffs": feedback_handoffs,
         "download_controls": download_controls,
         "report_scope_warnings": report_scope_warnings,
+        "comparison_selections": comparison_selections,
         "comparison_directions": comparison_directions,
         "comparison_previews": comparison_previews,
         "comparison_review_paths": comparison_review_paths,
@@ -2054,6 +2118,18 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
         report_scope_warnings = raw.get("report_scope_warnings")
         if not isinstance(report_scope_warnings, list):
             failures.append(f"manifest {name} missing report scope warning evidence")
+        comparison_selections = raw.get("comparison_selections")
+        if not isinstance(comparison_selections, list):
+            failures.append(f"manifest {name} missing comparison selection evidence")
+        else:
+            selection_failures = comparison_selection_failures(
+                comparison_selections, name, profile
+            )
+            failures.extend(
+                failure.replace(f"{name}: ", f"manifest {name} ")
+                for failure in selection_failures
+            )
+
         comparison_directions = raw.get("comparison_directions")
         if not isinstance(comparison_directions, list):
             failures.append(f"manifest {name} missing comparison direction evidence")

@@ -62,6 +62,12 @@ EXPECTED_VISUAL_DOWNLOAD_CONTROLS = {
     "Download comparison MD",
     "Download comparison JSON",
 }
+EXPECTED_VISUAL_COMPARISON_SELECTION = {
+    "Compare with run",
+    "Next run",
+    "Low risk",
+    "demo-session-focused-followup",
+}
 EXPECTED_VISUAL_COMPARISON_DIRECTION = {
     "Comparison direction",
     "2026-01-01T12:00+00:00 | High risk | 57.5k tokens",
@@ -2050,6 +2056,26 @@ def visual_manifest_evidence_failures(root: Path) -> list[str]:
                     f"visual QA manifest {viewport_name} missing safe feedback handoff evidence: {', '.join(sorted(missing_feedback_handoff))}"
                 )
 
+        comparison_selections = viewport.get("comparison_selections")
+        if not isinstance(comparison_selections, list) or not comparison_selections:
+            failures.append(
+                f"visual QA manifest missing {viewport_name} comparison selection evidence"
+            )
+        else:
+            selection_text = "\n".join(
+                " ".join(str(value) for value in item.values())
+                for item in comparison_selections
+                if isinstance(item, dict)
+            )
+            missing_selection = EXPECTED_VISUAL_COMPARISON_SELECTION - {
+                expected
+                for expected in EXPECTED_VISUAL_COMPARISON_SELECTION
+                if expected in selection_text
+            }
+            if missing_selection:
+                failures.append(
+                    f"visual QA manifest {viewport_name} missing comparison selection evidence: {', '.join(sorted(missing_selection))}"
+                )
         comparison_directions = viewport.get("comparison_directions")
         if not isinstance(comparison_directions, list) or not comparison_directions:
             failures.append(

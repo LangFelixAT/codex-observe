@@ -43,6 +43,8 @@ next_run_copy_control_failures = visual_qa.next_run_copy_control_failures
 feedback_handoff_failures = visual_qa.feedback_handoff_failures
 download_control_failures = visual_qa.download_control_failures
 collect_report_scope_warnings = visual_qa.collect_report_scope_warnings
+collect_comparison_selections = visual_qa.collect_comparison_selections
+comparison_selection_failures = visual_qa.comparison_selection_failures
 comparison_direction_failures = visual_qa.comparison_direction_failures
 comparison_preview_failures = visual_qa.comparison_preview_failures
 comparison_review_path_failures = visual_qa.comparison_review_path_failures
@@ -440,6 +442,51 @@ def test_collect_report_scope_warnings_reads_warning_cards() -> None:
             return ["Ingest scope: Sampled ingest"]
 
     assert collect_report_scope_warnings(FakePage()) == ["Ingest scope: Sampled ingest"]
+
+
+def test_collect_comparison_selections_records_selected_relationship() -> None:
+    class FakePage:
+        def evaluate(self, script: str) -> list[dict[str, str]]:
+            assert "stSelectbox" in script
+            assert "Compare with run" in script
+            return [
+                {
+                    "label": "Compare with run",
+                    "selected": "Next run | Low risk | demo-session-focused-followup",
+                    "body": "Compare with run Next run | Low risk | demo-session-focused-followup",
+                }
+            ]
+
+    selections = collect_comparison_selections(FakePage())
+
+    assert comparison_selection_failures(selections, "desktop") == []
+    assert comparison_selection_failures([], "desktop", profile="real") == []
+
+
+def test_comparison_selection_failures_require_demo_default_and_real_relationship() -> (
+    None
+):
+    failures = comparison_selection_failures(
+        [{"label": "Compare with run", "selected": "High risk | unrelated"}],
+        "narrow",
+    )
+
+    assert "narrow: comparison selection missing relationship: Next run" in failures
+    assert "narrow: comparison selection missing risk: Low risk" in failures
+    assert (
+        "narrow: comparison selection missing session_id: demo-session-focused-followup"
+        in failures
+    )
+
+    real_failures = comparison_selection_failures(
+        [{"label": "Compare with run", "selected": "High risk | run"}],
+        "desktop",
+        profile="real",
+    )
+    assert (
+        "desktop: comparison selection missing chronological relationship"
+        in real_failures
+    )
 
 
 def test_comparison_direction_failures_require_chronological_context() -> None:
@@ -973,6 +1020,13 @@ def complete_viewport_results(tmp_path: Path) -> dict[str, dict[str, object]]:
                     "body": "Safe feedback handoff docs/PUBLIC_TOUR_FEEDBACK.md .github/ISSUE_TEMPLATE/public_tour_feedback.yml synthetic or reviewed-redacted aggregate evidence codex-observe report JSON or Markdown private prompts Do not collect",
                 }
             ],
+            "comparison_selections": [
+                {
+                    "label": "Compare with run",
+                    "selected": "Next run | Low risk | 12:35 | 8.4k tokens | demo-session-focused-followup",
+                    "body": "Compare with run Next run | Low risk | 12:35 | 8.4k tokens | demo-session-focused-followup",
+                }
+            ],
             "comparison_directions": [
                 {
                     "label": "Comparison direction",
@@ -1199,6 +1253,11 @@ def test_visual_manifest_records_review_evidence(tmp_path: Path) -> None:
         "Do not collect"
         in loaded["viewports"]["desktop"]["feedback_handoffs"][0]["body"]
     )
+    assert loaded["viewports"]["desktop"]["comparison_selections"][0] == {
+        "label": "Compare with run",
+        "selected": "Next run | Low risk | 12:35 | 8.4k tokens | demo-session-focused-followup",
+        "body": "Compare with run Next run | Low risk | 12:35 | 8.4k tokens | demo-session-focused-followup",
+    }
     assert loaded["viewports"]["desktop"]["comparison_directions"][0] == {
         "label": "Comparison direction",
         "before": "2026-01-01T12:00+00:00 | High risk | 57.5k tokens",
@@ -1300,6 +1359,7 @@ def test_visual_manifest_failures_rejects_incomplete_evidence(tmp_path: Path) ->
     assert "manifest desktop native next run copy control not rendered" in failures
     assert "manifest desktop safe feedback handoff card not rendered" in failures
     assert "manifest desktop missing report scope warning evidence" in failures
+    assert "manifest desktop missing comparison selection evidence" in failures
     assert "manifest desktop comparison preview card not rendered" in failures
     assert "manifest desktop comparison review path not rendered" in failures
     assert "manifest desktop missing comparison scope warning evidence" in failures
@@ -1424,6 +1484,7 @@ def test_real_profile_manifest_accepts_private_aggregate_variance(
                 "body": "Next run brief Next Codex run plan Split the dominant thread largest_thread_share_pct: 56.1% -> below 50.0% Copy prompt",
             }
         ]
+        raw["comparison_selections"] = []
         raw["comparison_directions"] = []
         raw["comparison_previews"] = []
         raw["comparison_review_paths"] = []

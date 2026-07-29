@@ -752,6 +752,13 @@ def write_valid_visual_manifest(root: Path) -> None:
                     "body": "Safe feedback handoff docs/PUBLIC_TOUR_FEEDBACK.md .github/ISSUE_TEMPLATE/public_tour_feedback.yml synthetic or reviewed-redacted aggregate evidence codex-observe report JSON or Markdown private prompts Do not collect",
                 }
             ],
+            "comparison_selections": [
+                {
+                    "label": "Compare with run",
+                    "selected": "Next run | Low risk | 12:35 | 8.4k tokens | demo-session-focused-followup",
+                    "body": "Compare with run Next run | Low risk | 12:35 | 8.4k tokens | demo-session-focused-followup",
+                }
+            ],
             "comparison_directions": [
                 {
                     "label": "Comparison direction",
