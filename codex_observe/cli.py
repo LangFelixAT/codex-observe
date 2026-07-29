@@ -787,7 +787,6 @@ def tracking_doc_failures(root: Path | None = None) -> list[str]:
 
     body = tracking.read_text(encoding="utf-8")
     required = [
-        "Checked: 2026-07-13",
         "gh issue list --limit 20 --state all --json number,title,state,labels,updatedAt,url",
         "All current GitHub issues are closed",
         "There is no `.github/backlog` directory",
@@ -799,9 +798,13 @@ def tracking_doc_failures(root: Path | None = None) -> list[str]:
     failures = [
         f"docs/TRACKING.md missing {item}" for item in required if item not in body
     ]
+    if not re.search(r"^Checked: \d{4}-\d{2}-\d{2} with:$", body, re.MULTILINE):
+        failures.append("docs/TRACKING.md missing a YYYY-MM-DD checked date")
     for issue_number in range(1, 9):
         if f"#{issue_number}" not in body:
             failures.append(f"docs/TRACKING.md missing issue #{issue_number}")
+    if "#10" not in body:
+        failures.append("docs/TRACKING.md missing issue #10")
     return failures
 
 

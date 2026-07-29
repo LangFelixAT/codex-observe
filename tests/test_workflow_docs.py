@@ -181,7 +181,7 @@ def test_current_state_handoff_covers_gates_evidence_and_real_log_checkpoint() -
         "codex-observe evidence-bundle",
         "codex-observe.evidence-bundle.v1",
         "There is currently no publishable local issue draft",
-        "issues #1-#8 are closed",
+        "issues #1-#8 and #10 are closed",
         "attaching generated artifacts externally still requires explicit human approval",
         "human-approved private input path",
     ]:
@@ -590,7 +590,7 @@ def test_tracking_snapshot_records_current_issue_state_and_publish_guard() -> No
     config = read(".github/ISSUE_TEMPLATE/config.yml")
 
     for required in [
-        "Checked: 2026-07-13",
+        "Checked: 2026-07-29",
         "gh issue list --limit 20 --state all --json number,title,state,labels,updatedAt,url",
         "All current GitHub issues are closed",
         "There is no `.github/backlog` directory",
@@ -603,5 +603,6 @@ def test_tracking_snapshot_records_current_issue_state_and_publish_guard() -> No
         assert required in tracking
     for issue_number in range(1, 9):
         assert f"#{issue_number}" in tracking
+    assert "#10" in tracking
     assert "docs/TRACKING.md" in current
     assert "docs/TRACKING.md" in config

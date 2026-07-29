@@ -18,6 +18,32 @@ def dashboard_path() -> str:
     return str(Path(cli.__file__).with_name("dashboard.py"))
 
 
+def test_tracking_doc_failures_accepts_a_structured_current_snapshot(
+    tmp_path: Path,
+) -> None:
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "TRACKING.md").write_text(
+        "\n".join(
+            [
+                "Checked: 2026-07-29 with:",
+                "gh issue list --limit 20 --state all --json number,title,state,labels,updatedAt,url",
+                "All current GitHub issues are closed",
+                "There is no `.github/backlog` directory",
+                "no current publishable local issue draft",
+                "python scripts/backlog_publish_plan.py --json",
+                "explicit human approval",
+                "Commit and push the implementation branch",
+                *(f"#{number}" for number in range(1, 9)),
+                "#10",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    assert cli.tracking_doc_failures(tmp_path) == []
+
+
 def test_self_check_payload_is_privacy_safe() -> None:
     payload = cli.self_check_payload()
 
