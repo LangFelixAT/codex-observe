@@ -47,7 +47,7 @@ The visual QA manifest records desktop and narrow screenshots, answer-first oper
 
 ## Tracking State
 
-`docs/TRACKING.md` records the 2026-07-29 GitHub issue snapshot: issues #1-#8, #10, and #11 are closed, there is no `.github/backlog` directory, and there is no current publishable local issue draft. Issue #10 tracked the completed dashboard guidance-scope alignment; issue #11 tracked the completed answer-first start and resume flow. Completed local planning slices were retired instead of being published as stale GitHub issues. Fresh issue publication still requires explicit approval; public-tour observations should use `.github/ISSUE_TEMPLATE/public_tour_feedback.yml` and `docs/PUBLIC_TOUR_FEEDBACK.md` before becoming implementation issues.
+`docs/TRACKING.md` records the 2026-07-29 GitHub issue snapshot: issues #1-#8 and #10-#12 are closed, there is no `.github/backlog` directory, and there is no current publishable local issue draft. Issue #10 tracked the completed dashboard guidance-scope alignment; issue #11 tracked the completed answer-first start and resume flow; issue #12 split the concise user tour from explicit reviewer mode. Completed local planning slices were retired instead of being published as stale GitHub issues. Fresh issue publication still requires explicit approval; public-tour observations should use `.github/ISSUE_TEMPLATE/public_tour_feedback.yml` and `docs/PUBLIC_TOUR_FEEDBACK.md` before becoming implementation issues.
 
 The completed `.github/backlog/009-public-evidence-bundle.md` draft was implemented locally as `codex-observe evidence-bundle` and deleted after closeout. There is currently no publishable local issue draft; attaching generated artifacts externally still requires explicit human approval.
 

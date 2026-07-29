@@ -14,6 +14,7 @@ All current GitHub issues are closed:
 
 | Issue | State | Title |
 | --- | --- | --- |
+| #12 | Closed | Make the default tour a concise user journey |
 | #11 | Closed | Put the product answer first across start and resume flows |
 | #10 | Closed | Align dashboard guidance scopes and recommendation source |
 | #8 | Closed | Document supported log shapes and local validation workflow |

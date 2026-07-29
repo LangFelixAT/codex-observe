@@ -182,7 +182,7 @@ def test_current_state_handoff_covers_gates_evidence_and_real_log_checkpoint() -
         "codex-observe evidence-bundle",
         "codex-observe.evidence-bundle.v1",
         "There is currently no publishable local issue draft",
-        "issues #1-#8, #10, and #11 are closed",
+        "issues #1-#8 and #10-#12 are closed",
         "attaching generated artifacts externally still requires explicit human approval",
         "human-approved private input path",
     ]:
@@ -607,5 +607,6 @@ def test_tracking_snapshot_records_current_issue_state_and_publish_guard() -> No
         assert f"#{issue_number}" in tracking
     assert "#10" in tracking
     assert "#11" in tracking
+    assert "#12" in tracking
     assert "docs/TRACKING.md" in current
     assert "docs/TRACKING.md" in config
