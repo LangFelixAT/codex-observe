@@ -4259,6 +4259,10 @@ def private_validate_review_summary(
     if isinstance(portfolio, dict):
         top_driver = portfolio.get("top_driver")
         if isinstance(top_driver, dict):
+            summary["portfolio_scope"] = (
+                "full session history" if newest_files is None else "sampled sessions"
+            )
+            summary["portfolio_driver"] = top_driver.get("driver")
             summary["portfolio_pattern"] = top_driver.get("label")
             summary["portfolio_action"] = top_driver.get("action")
 
@@ -4266,9 +4270,23 @@ def private_validate_review_summary(
     if isinstance(recommendation, dict):
         target = recommendation.get("success_target_preview")
         if isinstance(target, dict):
+            summary["recommended_scope"] = "recommended run"
+            summary["recommended_driver"] = target.get("metric")
             summary["recommended_focus"] = target.get("action")
             summary["success_metric"] = target.get("metric")
             summary["success_target"] = target.get("target")
+
+    portfolio_driver = summary.get("portfolio_driver")
+    recommended_driver = summary.get("recommended_driver")
+    if (
+        portfolio_driver
+        and recommended_driver
+        and portfolio_driver != recommended_driver
+    ):
+        summary["focus_note"] = (
+            "Portfolio pattern summarizes the sampled history; recommended focus "
+            "is the first habit for the selected high-risk run."
+        )
 
     summary["status"] = "ready"
     summary["next_step"] = "Open the dashboard or read the generated private report."
@@ -4498,11 +4516,22 @@ def private_validate_lines(payload: dict[str, object]) -> list[str]:
         if review_summary.get("scope_note"):
             lines.append(f"- scope: {review_summary['scope_note']}")
         if review_summary.get("portfolio_pattern"):
-            lines.append(f"- portfolio pattern: {review_summary['portfolio_pattern']}")
+            scope = review_summary.get("portfolio_scope") or "session portfolio"
+            lines.append(
+                f"- portfolio pattern ({scope}): {review_summary['portfolio_pattern']}"
+            )
         if review_summary.get("portfolio_action"):
-            lines.append(f"- portfolio action: {review_summary['portfolio_action']}")
+            scope = review_summary.get("portfolio_scope") or "session portfolio"
+            lines.append(
+                f"- portfolio action ({scope}): {review_summary['portfolio_action']}"
+            )
         if review_summary.get("recommended_focus"):
-            lines.append(f"- recommended focus: {review_summary['recommended_focus']}")
+            scope = review_summary.get("recommended_scope") or "recommended run"
+            lines.append(
+                f"- recommended focus ({scope}): {review_summary['recommended_focus']}"
+            )
+        if review_summary.get("focus_note"):
+            lines.append(f"- note: {review_summary['focus_note']}")
         if review_summary.get("success_metric") and review_summary.get(
             "success_target"
         ):

@@ -135,11 +135,16 @@ def test_private_validate_writes_ignored_private_artifacts(tmp_path: Path) -> No
     assert review_summary["status"] == "ready"
     assert review_summary["scan_scope"] == "newest"
     assert "Sampled validation: newest 25 JSONL files" in review_summary["scope_note"]
+    assert review_summary["portfolio_scope"] == "sampled sessions"
+    assert review_summary["portfolio_driver"] == "largest_thread_share_pct"
     assert review_summary["portfolio_pattern"] == "Largest thread concentration"
     assert review_summary["portfolio_action"].startswith("Set stop conditions")
+    assert review_summary["recommended_scope"] == "recommended run"
+    assert review_summary["recommended_driver"] == "largest_thread_share_pct"
     assert review_summary["recommended_focus"].startswith("Set a stop condition")
     assert review_summary["success_metric"] == "largest_thread_share_pct"
     assert review_summary["success_target"] == "below 50.0%"
+    assert "focus_note" not in review_summary
     assert review_summary["sessions_artifact"].endswith("real-sessions-list.json")
     assert review_summary["report_markdown"].endswith("real-run-report.md")
     assert "codex-observe serve" in review_summary["dashboard_command"]
@@ -173,9 +178,44 @@ def test_private_validate_all_scans_full_history_without_repeat_prompt(
     assert payload["newest_files"] is None
     assert payload["review_summary"]["scan_scope"] == "all"
     assert "Full-history validation" in payload["review_summary"]["scope_note"]
+    assert payload["review_summary"]["portfolio_scope"] == "full session history"
     assert payload["review_summary"]["full_history_command"] is None
     assert not any("--all" in item for item in payload["next_commands"])
     assert any("codex-observe serve" in item for item in payload["next_commands"])
+
+
+def test_private_validate_review_summary_explains_differing_focus_scopes() -> None:
+    summary = cli.private_validate_review_summary(
+        {
+            "recommended_session": {"triage_risk": "high"},
+            "portfolio_summary": {
+                "top_driver": {
+                    "driver": "largest_tool_output_chars",
+                    "label": "Largest tool output",
+                    "action": "Narrow bulky commands before sharing output.",
+                }
+            },
+            "recommendation_detail": {
+                "success_target_preview": {
+                    "metric": "session_duration_hours",
+                    "action": "Start a fresh session at each durable checkpoint",
+                    "target": "below 24.0 hours",
+                }
+            },
+        },
+        artifact_labels={},
+        next_commands=[],
+        newest_files=25,
+    )
+
+    assert summary["portfolio_scope"] == "sampled sessions"
+    assert summary["portfolio_driver"] == "largest_tool_output_chars"
+    assert summary["recommended_scope"] == "recommended run"
+    assert summary["recommended_driver"] == "session_duration_hours"
+    assert summary["focus_note"] == (
+        "Portfolio pattern summarizes the sampled history; recommended focus "
+        "is the first habit for the selected high-risk run."
+    )
 
 
 def test_private_validate_cli_json_is_privacy_safe(tmp_path: Path, capsys) -> None:
@@ -347,8 +387,10 @@ def test_private_validate_serve_launches_dashboard_after_success(
     assert "Private validation status: ok" in output
     assert "Private review summary:" in output
     assert "scope: Sampled validation: newest 25 JSONL files" in output
-    assert "portfolio pattern: Largest thread concentration" in output
-    assert "recommended focus: Set a stop condition" in output
+    assert (
+        "portfolio pattern (sampled sessions): Largest thread concentration" in output
+    )
+    assert "recommended focus (recommended run): Set a stop condition" in output
     assert "success target: largest_thread_share_pct -> below 50.0%" in output
     assert "dashboard: codex-observe serve" in output
     assert "full history: codex-observe private-validate" in output

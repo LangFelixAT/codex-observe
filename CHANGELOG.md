@@ -5,6 +5,7 @@ All notable changes to Codex Observe will be documented here.
 The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
+- Clarified private validation summaries by separating portfolio-wide patterns from the recommended-run focus when sampled real histories point at different habits.
 - Prioritized very large tool outputs in the shared opportunity stack and terminal next-action summary so real-session reports align with the dashboard Focus signal when bulky command output is the top workflow issue.
 - Surfaced session Focus in the dashboard sidebar, selected-run metric grid, sidebar search, and visual QA evidence.
 - Added per-session Focus labels to session listings and JSON so large high-risk histories show the dominant reason to inspect each run.
