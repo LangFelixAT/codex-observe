@@ -34,10 +34,12 @@ sidebar_risk_filter_failures = visual_qa.sidebar_risk_filter_failures
 sidebar_session_search_failures = visual_qa.sidebar_session_search_failures
 sidebar_session_detail_failures = visual_qa.sidebar_session_detail_failures
 operator_briefing_failures = visual_qa.operator_briefing_failures
+action_first_layout_failures = visual_qa.action_first_layout_failures
 collect_review_paths = visual_qa.collect_review_paths
 review_path_failures = visual_qa.review_path_failures
 next_run_checklist_failures = visual_qa.next_run_checklist_failures
 next_run_brief_failures = visual_qa.next_run_brief_failures
+next_run_copy_control_failures = visual_qa.next_run_copy_control_failures
 feedback_handoff_failures = visual_qa.feedback_handoff_failures
 download_control_failures = visual_qa.download_control_failures
 collect_report_scope_warnings = visual_qa.collect_report_scope_warnings
@@ -581,6 +583,61 @@ def test_real_profile_comparison_delta_failures_are_data_driven() -> None:
     assert "desktop: comparison delta Total tokens missing direction" in failures
 
 
+def test_action_first_layout_failures_require_navigation_and_plan_before_metrics() -> (
+    None
+):
+    layout = {
+        "briefing_before_tabs": True,
+        "tabs_before_checklist": True,
+        "checklist_before_brief": True,
+        "brief_before_copy_prompt": True,
+        "copy_prompt_before_metrics": True,
+        "tabs_in_initial_viewport": True,
+        "tabs_visible_count": 6,
+        "tabs_total": 6,
+    }
+
+    assert action_first_layout_failures(layout, "desktop") == []
+
+    layout["tabs_in_initial_viewport"] = False
+    layout["copy_prompt_before_metrics"] = False
+    layout["tabs_visible_count"] = 5
+    failures = action_first_layout_failures(layout, "narrow")
+
+    assert (
+        "narrow: tab navigation is not fully visible in the initial viewport"
+        in failures
+    )
+    assert "narrow: copyable prompt does not precede metric grid" in failures
+    assert (
+        "narrow: complete tab navigation is not visible in the initial viewport"
+        in failures
+    )
+
+
+def test_next_run_copy_control_failures_require_prompt_and_native_button() -> None:
+    assert (
+        next_run_copy_control_failures(
+            [
+                {
+                    "prompt": "Next Codex run plan: Try one habit",
+                    "has_copy_button": True,
+                    "button_label": "Copy to clipboard",
+                }
+            ],
+            "desktop",
+        )
+        == []
+    )
+
+    failures = next_run_copy_control_failures(
+        [{"prompt": "Plan", "has_copy_button": False}], "narrow"
+    )
+
+    assert "narrow: next run copy prompt is missing" in failures
+    assert "narrow: next run copy button is missing" in failures
+
+
 def test_review_path_failures_require_next_review_path_contract() -> None:
     assert (
         review_path_failures(
@@ -628,13 +685,13 @@ def test_next_run_checklist_failures_require_operational_steps() -> None:
     )
 
 
-def test_next_run_brief_failures_require_copyable_plan() -> None:
+def test_next_run_brief_failures_require_actionable_plan() -> None:
     assert (
         next_run_brief_failures(
             [
                 {
                     "label": "Next run brief",
-                    "body": "Next run brief Next Codex run plan Set a stop condition for the dominant thread Largest thread drives the run largest_thread_share_pct: 57.7% -> below 50.0% Pause or split the run when one thread starts to dominate the work. Copy prompt",
+                    "body": "Next run brief Set a stop condition for the dominant thread Largest thread drives the run largest_thread_share_pct: 57.7% -> below 50.0% Pause or split the run when one thread starts to dominate the work.",
                 }
             ],
             "desktop",
@@ -650,7 +707,10 @@ def test_next_run_brief_failures_require_copyable_plan() -> None:
         [{"label": "Next run brief", "body": "Next run brief"}], "desktop"
     )
 
-    assert "desktop: next run brief missing: Next Codex run plan" in failures
+    assert (
+        "desktop: next run brief missing: Set a stop condition for the dominant thread"
+        in failures
+    )
     assert (
         "desktop: next run brief missing: largest_thread_share_pct: 57.7% -> below 50.0%"
         in failures
@@ -851,7 +911,25 @@ def complete_viewport_results(tmp_path: Path) -> dict[str, dict[str, object]]:
                 "briefing_in_initial_viewport": True,
                 "briefing_top": 120,
                 "briefing_bottom": 420,
-                "metric_grid_top": 450,
+                "metric_grid_top": 1500,
+                "viewport_height": viewport["height"],
+            },
+            "action_first_layout": {
+                "briefing_before_tabs": True,
+                "tabs_before_checklist": True,
+                "checklist_before_brief": True,
+                "brief_before_copy_prompt": True,
+                "copy_prompt_before_metrics": True,
+                "tabs_in_initial_viewport": True,
+                "tabs_visible_count": 6,
+                "tabs_total": 6,
+                "briefing_bottom": 420,
+                "tablist_top": 436,
+                "tablist_bottom": 478,
+                "checklist_top": 494,
+                "brief_top": 750,
+                "copy_prompt_top": 1100,
+                "metric_grid_top": 1500,
                 "viewport_height": viewport["height"],
             },
             "operator_briefings": [
@@ -879,7 +957,14 @@ def complete_viewport_results(tmp_path: Path) -> dict[str, dict[str, object]]:
             "next_run_briefs": [
                 {
                     "label": "Next run brief",
-                    "body": "Next run brief Next Codex run plan Set a stop condition for the dominant thread Largest thread drives the run largest_thread_share_pct: 57.7% -> below 50.0% Pause or split the run when one thread starts to dominate the work. Copy prompt",
+                    "body": "Next run brief Set a stop condition for the dominant thread Largest thread drives the run largest_thread_share_pct: 57.7% -> below 50.0% Pause or split the run when one thread starts to dominate the work.",
+                }
+            ],
+            "next_run_copy_controls": [
+                {
+                    "prompt": "Next Codex run plan: Try one habit",
+                    "has_copy_button": True,
+                    "button_label": "Copy to clipboard",
                 }
             ],
             "feedback_handoffs": [
@@ -1053,7 +1138,25 @@ def test_visual_manifest_records_review_evidence(tmp_path: Path) -> None:
         "briefing_in_initial_viewport": True,
         "briefing_top": 120,
         "briefing_bottom": 420,
-        "metric_grid_top": 450,
+        "metric_grid_top": 1500,
+        "viewport_height": 1000,
+    }
+    assert loaded["viewports"]["desktop"]["action_first_layout"] == {
+        "briefing_before_tabs": True,
+        "tabs_before_checklist": True,
+        "checklist_before_brief": True,
+        "brief_before_copy_prompt": True,
+        "copy_prompt_before_metrics": True,
+        "tabs_in_initial_viewport": True,
+        "tabs_visible_count": 6,
+        "tabs_total": 6,
+        "briefing_bottom": 420,
+        "tablist_top": 436,
+        "tablist_bottom": 478,
+        "checklist_top": 494,
+        "brief_top": 750,
+        "copy_prompt_top": 1100,
+        "metric_grid_top": 1500,
         "viewport_height": 1000,
     }
     assert loaded["viewports"]["desktop"]["operator_briefings"][0] == {
@@ -1080,10 +1183,11 @@ def test_visual_manifest_records_review_evidence(tmp_path: Path) -> None:
     assert loaded["viewports"]["desktop"]["next_run_briefs"][0]["label"] == (
         "Next run brief"
     )
-    assert (
-        "Next Codex run plan"
-        in loaded["viewports"]["desktop"]["next_run_briefs"][0]["body"]
-    )
+    assert loaded["viewports"]["desktop"]["next_run_copy_controls"][0] == {
+        "prompt": "Next Codex run plan: Try one habit",
+        "has_copy_button": True,
+        "button_label": "Copy to clipboard",
+    }
     assert loaded["viewports"]["desktop"]["feedback_handoffs"][0]["label"] == (
         "Safe feedback handoff"
     )
@@ -1152,10 +1256,12 @@ def test_visual_manifest_failures_rejects_incomplete_evidence(tmp_path: Path) ->
                 "metric_cards": [{"label": "Threads", "value": "3"}],
                 "success_targets": [],
                 "download_controls": ["Download report MD"],
+                "action_first_layout": {},
                 "operator_briefings": [],
                 "review_paths": [],
                 "next_run_checklists": [],
                 "next_run_briefs": [],
+                "next_run_copy_controls": [],
                 "feedback_handoffs": [],
                 "comparison_directions": [],
                 "comparison_previews": [],
@@ -1187,9 +1293,11 @@ def test_visual_manifest_failures_rejects_incomplete_evidence(tmp_path: Path) ->
     assert "manifest desktop metric card not rendered: Uncached input" in failures
     assert "manifest desktop success target card not rendered" in failures
     assert "manifest desktop missing answer-first layout evidence" in failures
+    assert "manifest desktop missing action-first layout evidence" in failures
     assert "manifest desktop operator briefing card not rendered" in failures
     assert "manifest desktop next review path card not rendered" in failures
     assert "manifest desktop next run checklist card not rendered" in failures
+    assert "manifest desktop native next run copy control not rendered" in failures
     assert "manifest desktop safe feedback handoff card not rendered" in failures
     assert "manifest desktop missing report scope warning evidence" in failures
     assert "manifest desktop comparison preview card not rendered" in failures

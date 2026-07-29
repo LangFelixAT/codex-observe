@@ -143,13 +143,12 @@ EXPECTED_VISUAL_NEXT_RUN_CHECKLIST = {
 
 EXPECTED_VISUAL_NEXT_RUN_BRIEF = {
     "Next run brief",
-    "Next Codex run plan",
     "Set a stop condition for the dominant thread",
     "Largest thread drives the run",
     "largest_thread_share_pct: 57.7% -> below 50.0%",
     "Pause or split the run when one thread starts to dominate the work.",
-    "Copy prompt",
 }
+EXPECTED_VISUAL_NEXT_RUN_COPY_PROMPT = "Next Codex run plan:"
 
 EXPECTED_VISUAL_FEEDBACK_HANDOFF = {
     "Safe feedback handoff",
@@ -1892,6 +1891,35 @@ def visual_manifest_evidence_failures(root: Path) -> list[str]:
                     f"visual QA manifest {viewport_name} missing portfolio briefing evidence: {', '.join(sorted(missing_portfolio))}"
                 )
 
+        action_first_layout = viewport.get("action_first_layout")
+        if not isinstance(action_first_layout, dict) or not action_first_layout:
+            failures.append(
+                f"visual QA manifest missing {viewport_name} action-first layout evidence"
+            )
+        else:
+            action_checks = {
+                "briefing_before_tabs": "operator briefing before tab navigation",
+                "tabs_before_checklist": "tab navigation before next run checklist",
+                "checklist_before_brief": "next run checklist before next run brief",
+                "brief_before_copy_prompt": "next run brief before copyable prompt",
+                "copy_prompt_before_metrics": "copyable prompt before metric grid",
+                "tabs_in_initial_viewport": "tab navigation inside initial viewport",
+            }
+            for key, label in action_checks.items():
+                if action_first_layout.get(key) is not True:
+                    failures.append(
+                        f"visual QA manifest {viewport_name} missing action-first ordering: {label}"
+                    )
+            expected_tabs = len(EXPECTED_VISUAL_TABS)
+            if action_first_layout.get("tabs_total") != expected_tabs:
+                failures.append(
+                    f"visual QA manifest {viewport_name} action-first tab count expected {expected_tabs}"
+                )
+            if action_first_layout.get("tabs_visible_count") != expected_tabs:
+                failures.append(
+                    f"visual QA manifest {viewport_name} complete tab navigation is not visible in the initial viewport"
+                )
+
         operator_briefings = viewport.get("operator_briefings")
         if not isinstance(operator_briefings, list) or not operator_briefings:
             failures.append(
@@ -1978,6 +2006,28 @@ def visual_manifest_evidence_failures(root: Path) -> list[str]:
                 failures.append(
                     f"visual QA manifest {viewport_name} missing next run brief evidence: {', '.join(sorted(missing_brief))}"
                 )
+
+        next_run_copy_controls = viewport.get("next_run_copy_controls")
+        if not isinstance(next_run_copy_controls, list) or not next_run_copy_controls:
+            failures.append(
+                f"visual QA manifest missing {viewport_name} next run copy control evidence"
+            )
+        else:
+            copy_control = next_run_copy_controls[0]
+            if not isinstance(copy_control, dict):
+                failures.append(
+                    f"visual QA manifest {viewport_name} next run copy control evidence is invalid"
+                )
+            else:
+                prompt = str(copy_control.get("prompt") or "")
+                if EXPECTED_VISUAL_NEXT_RUN_COPY_PROMPT not in prompt:
+                    failures.append(
+                        f"visual QA manifest {viewport_name} next run copy prompt is missing"
+                    )
+                if copy_control.get("has_copy_button") is not True:
+                    failures.append(
+                        f"visual QA manifest {viewport_name} next run copy button is missing"
+                    )
 
         feedback_handoffs = viewport.get("feedback_handoffs")
         if not isinstance(feedback_handoffs, list) or not feedback_handoffs:

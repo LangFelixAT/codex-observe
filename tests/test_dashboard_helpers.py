@@ -1798,3 +1798,5 @@ def test_next_run_brief_html_renders_secondary_watch_items() -> None:
     assert "Also watch" in rendered
     assert "Guardian overhead - 1.0B &lt;tokens&gt;; Uncached input - 56.0M" in rendered
     assert "Guardian overhead - 1.0B <tokens>" not in rendered
+    assert "Next Codex run plan" not in rendered
+    assert "Copy prompt" not in rendered

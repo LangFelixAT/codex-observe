@@ -216,13 +216,12 @@ EXPECTED_NEXT_RUN_CHECKLIST = [
 
 EXPECTED_NEXT_RUN_BRIEF = [
     "Next run brief",
-    "Next Codex run plan",
     "Set a stop condition for the dominant thread",
     "Largest thread drives the run",
     "largest_thread_share_pct: 57.7% -> below 50.0%",
     "Pause or split the run when one thread starts to dominate the work.",
-    "Copy prompt",
 ]
+EXPECTED_NEXT_RUN_COPY_PROMPT = "Next Codex run plan:"
 
 EXPECTED_FEEDBACK_HANDOFF = [
     "Safe feedback handoff",
@@ -852,6 +851,83 @@ def answer_first_layout_failures(
     return failures
 
 
+def collect_action_first_layout(page) -> dict[str, object]:
+    return page.evaluate(
+        r"""
+() => {
+  window.scrollTo(0, 0);
+  const briefing = document.querySelector('.co-briefing');
+  const tablist = document.querySelector('[role="tablist"]');
+  const checklist = document.querySelector('.co-next-run-checklist');
+  const brief = document.querySelector('.co-next-run-brief');
+  const metrics = document.querySelector('.co-metric-grid');
+  const copyBlock = Array.from(document.querySelectorAll('[data-testid="stCode"], .stCode')).find(
+    (item) => (item.innerText || '').includes('Next Codex run plan:')
+  );
+  if (!briefing || !tablist || !checklist || !brief || !copyBlock || !metrics) return {};
+  const rect = (element) => element.getBoundingClientRect();
+  const briefingRect = rect(briefing);
+  const tablistRect = rect(tablist);
+  const checklistRect = rect(checklist);
+  const briefRect = rect(brief);
+  const copyRect = rect(copyBlock);
+  const metricRect = rect(metrics);
+  const tabs = Array.from(tablist.querySelectorAll('[role="tab"]'));
+  const tabsVisible = tabs.filter((tab) => {
+    const tabRect = rect(tab);
+    return tabRect.width > 0 && tabRect.height > 0 && tabRect.left >= 0 && tabRect.right <= window.innerWidth && tabRect.top >= 0 && tabRect.bottom <= window.innerHeight;
+  });
+  return {
+    briefing_before_tabs: briefingRect.bottom <= tablistRect.top,
+    tabs_before_checklist: tablistRect.bottom <= checklistRect.top,
+    checklist_before_brief: checklistRect.bottom <= briefRect.top,
+    brief_before_copy_prompt: briefRect.bottom <= copyRect.top,
+    copy_prompt_before_metrics: copyRect.bottom <= metricRect.top,
+    tabs_in_initial_viewport: tablistRect.top >= 0 && tablistRect.bottom <= window.innerHeight,
+    tabs_visible_count: tabsVisible.length,
+    tabs_total: tabs.length,
+    briefing_bottom: Math.round(briefingRect.bottom),
+    tablist_top: Math.round(tablistRect.top),
+    tablist_bottom: Math.round(tablistRect.bottom),
+    checklist_top: Math.round(checklistRect.top),
+    brief_top: Math.round(briefRect.top),
+    copy_prompt_top: Math.round(copyRect.top),
+    metric_grid_top: Math.round(metricRect.top),
+    viewport_height: window.innerHeight,
+  };
+}
+        """
+    )
+
+
+def action_first_layout_failures(
+    layout: dict[str, object], viewport_name: str
+) -> list[str]:
+    if not layout:
+        return [f"{viewport_name}: missing action-first layout evidence"]
+    failures = []
+    checks = {
+        "briefing_before_tabs": "operator briefing does not precede tab navigation",
+        "tabs_before_checklist": "tab navigation does not precede next run checklist",
+        "checklist_before_brief": "next run checklist does not precede next run brief",
+        "brief_before_copy_prompt": "next run brief does not precede copyable prompt",
+        "copy_prompt_before_metrics": "copyable prompt does not precede metric grid",
+        "tabs_in_initial_viewport": "tab navigation is not fully visible in the initial viewport",
+    }
+    for key, message in checks.items():
+        if layout.get(key) is not True:
+            failures.append(f"{viewport_name}: {message}")
+    if layout.get("tabs_total") != len(TAB_CHECKS):
+        failures.append(
+            f"{viewport_name}: tab navigation expected {len(TAB_CHECKS)} tabs, got {layout.get('tabs_total', 'unknown')}"
+        )
+    if layout.get("tabs_visible_count") != len(TAB_CHECKS):
+        failures.append(
+            f"{viewport_name}: complete tab navigation is not visible in the initial viewport"
+        )
+    return failures
+
+
 def collect_review_paths(page) -> list[dict[str, str]]:
     return page.evaluate(
         r"""
@@ -951,6 +1027,36 @@ def collect_next_run_briefs(page) -> list[dict[str, str]]:
     )
 
 
+def collect_next_run_copy_controls(page) -> list[dict[str, object]]:
+    return page.evaluate(
+        r"""
+() => Array.from(document.querySelectorAll('[data-testid="stCode"], .stCode')).map((block) => {
+  const prompt = (block.innerText || '').replace(/\s+/g, ' ').trim();
+  const button = block.querySelector('button');
+  return {
+    prompt,
+    has_copy_button: Boolean(button),
+    button_label: (button?.getAttribute('aria-label') || button?.getAttribute('title') || '').trim(),
+  };
+}).filter((item) => item.prompt.includes('Next Codex run plan:'))
+        """
+    )
+
+
+def next_run_copy_control_failures(
+    controls: list[dict[str, object]], viewport_name: str
+) -> list[str]:
+    if not controls:
+        return [f"{viewport_name}: native next run copy control not rendered"]
+    observed = controls[0]
+    failures = []
+    if EXPECTED_NEXT_RUN_COPY_PROMPT not in str(observed.get("prompt") or ""):
+        failures.append(f"{viewport_name}: next run copy prompt is missing")
+    if observed.get("has_copy_button") is not True:
+        failures.append(f"{viewport_name}: next run copy button is missing")
+    return failures
+
+
 def next_run_brief_failures(
     briefs: list[dict[str, str]], viewport_name: str, profile: str = PROFILE_DEMO
 ) -> list[str]:
@@ -958,9 +1064,7 @@ def next_run_brief_failures(
         return [f"{viewport_name}: next run brief card not rendered"]
     body = str(briefs[0].get("body") or "")
     expected_items = (
-        ["Next run brief", "Next Codex run plan", "Copy prompt"]
-        if profile == PROFILE_REAL
-        else EXPECTED_NEXT_RUN_BRIEF
+        ["Next run brief"] if profile == PROFILE_REAL else EXPECTED_NEXT_RUN_BRIEF
     )
     return [
         f"{viewport_name}: next run brief missing: {expected}"
@@ -1110,6 +1214,8 @@ def validate_dashboard_page(
         pass
     answer_first_layout = collect_answer_first_layout(page)
     failures.extend(answer_first_layout_failures(answer_first_layout, viewport_name))
+    action_first_layout = collect_action_first_layout(page)
+    failures.extend(action_first_layout_failures(action_first_layout, viewport_name))
     page.get_by_role("tab", name="Overview", exact=True).click()
     page.wait_for_timeout(1500 if profile == PROFILE_REAL else 500)
     if profile == PROFILE_REAL:
@@ -1165,6 +1271,7 @@ def validate_dashboard_page(
     review_paths = collect_review_paths(page)
     next_run_checklists = collect_next_run_checklists(page)
     next_run_briefs = collect_next_run_briefs(page)
+    next_run_copy_controls = collect_next_run_copy_controls(page)
     feedback_handoffs = collect_feedback_handoffs(page)
     download_controls = collect_download_controls(page)
     report_scope_warnings = collect_report_scope_warnings(page)
@@ -1183,6 +1290,9 @@ def validate_dashboard_page(
         next_run_checklist_failures(next_run_checklists, viewport_name, profile)
     )
     failures.extend(next_run_brief_failures(next_run_briefs, viewport_name, profile))
+    failures.extend(
+        next_run_copy_control_failures(next_run_copy_controls, viewport_name)
+    )
     failures.extend(
         guidance_consistency_failures(
             operator_briefings, success_targets, next_run_briefs, viewport_name
@@ -1300,10 +1410,12 @@ name => {
         "sidebar_session_details": sidebar_session_details,
         "success_targets": success_targets,
         "answer_first_layout": answer_first_layout,
+        "action_first_layout": action_first_layout,
         "operator_briefings": operator_briefings,
         "review_paths": review_paths,
         "next_run_checklists": next_run_checklists,
         "next_run_briefs": next_run_briefs,
+        "next_run_copy_controls": next_run_copy_controls,
         "feedback_handoffs": feedback_handoffs,
         "download_controls": download_controls,
         "report_scope_warnings": report_scope_warnings,
@@ -1828,6 +1940,16 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
                 for failure in ordering_failures
             )
 
+        action_first_layout = raw.get("action_first_layout")
+        if not isinstance(action_first_layout, dict):
+            failures.append(f"manifest {name} missing action-first layout evidence")
+        else:
+            action_failures = action_first_layout_failures(action_first_layout, name)
+            failures.extend(
+                failure.replace(f"{name}: ", f"manifest {name} ")
+                for failure in action_failures
+            )
+
         operator_briefings = raw.get("operator_briefings")
         if not isinstance(operator_briefings, list):
             failures.append(f"manifest {name} missing operator briefing evidence")
@@ -1870,6 +1992,16 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
             failures.extend(
                 failure.replace(f"{name}: ", f"manifest {name} ")
                 for failure in brief_failures
+            )
+
+        next_run_copy_controls = raw.get("next_run_copy_controls")
+        if not isinstance(next_run_copy_controls, list):
+            failures.append(f"manifest {name} missing next run copy control evidence")
+        else:
+            copy_failures = next_run_copy_control_failures(next_run_copy_controls, name)
+            failures.extend(
+                failure.replace(f"{name}: ", f"manifest {name} ")
+                for failure in copy_failures
             )
 
         if (

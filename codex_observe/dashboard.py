@@ -571,9 +571,7 @@ def dashboard_css() -> str:
   white-space: normal;
 }
 
-.co-next-run-brief-prompt {
-  margin-top: 0.65rem;
-}
+
 
 .co-feedback-handoff {
   background: color-mix(in srgb, var(--co-accent) 5%, var(--co-panel));
@@ -1476,17 +1474,7 @@ def next_run_brief_html(brief: object) -> str:
         brief.get("guardrail")
         or "Pause, split, or summarize before the same driver dominates the run."
     )
-    prompt = str(brief.get("copy_prompt") or "").strip()
-    if not prompt:
-        prompt = "\n".join(
-            [
-                "Next Codex run plan:",
-                f"- Try: {habit}",
-                f"- Watch: {watch}",
-                f"- Target: move {metric} from {current} toward {target}",
-                f"- Guardrail: {guardrail}",
-            ]
-        )
+
     items = [
         ("Try", habit),
         ("Watch", watch),
@@ -1514,10 +1502,6 @@ def next_run_brief_html(brief: object) -> str:
             "  <p>Copy this aggregate-only plan into the next Codex run before exporting comparison evidence.</p>",
             '  <div class="co-next-run-brief-grid">',
             *[f"    {item}" for item in item_html],
-            "  </div>",
-            '  <div class="co-next-run-brief-item co-next-run-brief-prompt">',
-            "    <strong>Copy prompt</strong>",
-            f"    <code>{html.escape(prompt)}</code>",
             "  </div>",
             "</section>",
         ]
@@ -2730,6 +2714,16 @@ def main() -> None:
         operator_briefing_html(triage, success_target, opportunities),
         unsafe_allow_html=True,
     )
+    tab_overview, tab_agent, tab_timeline, tab_tools, tab_dup, tab_raw = st.tabs(
+        [
+            "Overview",
+            "Agent detail",
+            "Timeline & jumps",
+            "Tools",
+            "Duplication",
+            "Raw tables",
+        ]
+    )
 
     threads = read_sql(
         db,
@@ -2788,28 +2782,26 @@ def main() -> None:
 
     selected_duration_hours = session_duration_hours(conv.first_seen, conv.last_seen)
 
-    render_metric_grid(
-        [
-            ("Threads", fmt_int(conv.thread_count)),
-            ("Focus", str(conv.get("focus_label") or "Monitor")),
-            ("Duration", format_session_duration(selected_duration_hours)),
-            ("Roots", fmt_int(roots)),
-            ("Workers", fmt_int(workers)),
-            ("Explorers", fmt_int(explorers)),
-            ("Guardians", fmt_int(guardians)),
-            ("Tools", fmt_int(tool_total)),
-            ("Cache hit", f"{cache_pct:.1f}%"),
-            ("Compactions", fmt_int(len(compactions))),
-            (
-                "Largest thread",
-                metric_with_share(largest_thread_tokens, total_tokens),
-            ),
-            (
-                "Uncached input",
-                metric_with_share(conv.total_uncached_input_tokens, total_tokens),
-            ),
-        ]
-    )
+    overview_metrics = [
+        ("Threads", fmt_int(conv.thread_count)),
+        ("Focus", str(conv.get("focus_label") or "Monitor")),
+        ("Duration", format_session_duration(selected_duration_hours)),
+        ("Roots", fmt_int(roots)),
+        ("Workers", fmt_int(workers)),
+        ("Explorers", fmt_int(explorers)),
+        ("Guardians", fmt_int(guardians)),
+        ("Tools", fmt_int(tool_total)),
+        ("Cache hit", f"{cache_pct:.1f}%"),
+        ("Compactions", fmt_int(len(compactions))),
+        (
+            "Largest thread",
+            metric_with_share(largest_thread_tokens, total_tokens),
+        ),
+        (
+            "Uncached input",
+            metric_with_share(conv.total_uncached_input_tokens, total_tokens),
+        ),
+    ]
 
     duplicated_blocks = read_sql(
         db,
@@ -2830,18 +2822,25 @@ def main() -> None:
 
     diagnostics = diagnostics_df(threads, usage, events, tools, duplicated_blocks)
     playbook = next_run_playbook_df(diagnostics)
-    tab_overview, tab_agent, tab_timeline, tab_tools, tab_dup, tab_raw = st.tabs(
-        [
-            "Overview",
-            "Agent detail",
-            "Timeline & jumps",
-            "Tools",
-            "Duplication",
-            "Raw tables",
-        ]
-    )
 
     with tab_overview:
+        next_run_checklist = report.get(
+            "next_run_checklist"
+        ) or report_next_run_checklist(report)
+        next_run_brief = report.get("next_run_brief") or report_next_run_brief(report)
+        st.markdown(
+            next_run_checklist_html(next_run_checklist),
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            next_run_brief_html(next_run_brief),
+            unsafe_allow_html=True,
+        )
+        if isinstance(next_run_brief, dict):
+            copy_prompt = str(next_run_brief.get("copy_prompt") or "").strip()
+            if copy_prompt:
+                st.code(copy_prompt, language=None)
+        render_metric_grid(overview_metrics)
         st.markdown(
             portfolio_briefing_html(session_portfolio_summary(summaries)),
             unsafe_allow_html=True,
@@ -2865,18 +2864,6 @@ def main() -> None:
         )
         st.markdown(triage_card_html(triage), unsafe_allow_html=True)
 
-        st.markdown(
-            next_run_checklist_html(
-                report.get("next_run_checklist") or report_next_run_checklist(report)
-            ),
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            next_run_brief_html(
-                report.get("next_run_brief") or report_next_run_brief(report)
-            ),
-            unsafe_allow_html=True,
-        )
         st.markdown(
             feedback_handoff_html(report.get("feedback_handoff")),
             unsafe_allow_html=True,
