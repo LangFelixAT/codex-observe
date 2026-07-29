@@ -182,7 +182,7 @@ def test_current_state_handoff_covers_gates_evidence_and_real_log_checkpoint() -
         "codex-observe evidence-bundle",
         "codex-observe.evidence-bundle.v1",
         "There is currently no publishable local issue draft",
-        "issues #1-#8 and #10-#12 are closed",
+        "issues #1-#8 and #10-#14 are closed",
         "attaching generated artifacts externally still requires explicit human approval",
         "human-approved private input path",
     ]:
@@ -290,11 +290,11 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         "codex-observe tour",
         "codex-observe tour --reviewer",
         "codex-observe demo --serve --host 127.0.0.1 --port 8501",
-        "Overview operator briefing",
-        "risk distribution card",
-        "Overview triage card",
+        "initial-viewport operator briefing",
+        "portfolio and risk context",
+        "native copy-ready next-run prompt",
         "safe feedback handoff",
-        "dashboard comparison quick-read, sampled-ingest warning when present, review-path, metric delta cards including usage snapshots, safe feedback handoff, and next validation command cards plus report and comparison download controls",
+        "explicit chronological Before/After context",
         "codex-observe doctor --db .artifacts/demo/codex_observe_demo.sqlite --json",
         "codex-observe sessions --db .artifacts/demo/codex_observe_demo.sqlite --json",
         "structured `next_commands` for baseline report export, next-run report export, and comparison automation",
@@ -321,7 +321,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         "Tools quick read",
         "Duplication quick read",
         "Raw tables data inventory",
-        "comparison quick-read, sampled-ingest warning evidence when present, review-path, metric delta cards including usage snapshots, and next validation command cards plus report and comparison download controls",
+        "chronological comparison direction",
         "aggregate triage assessment",
         "required_commands",
         "paths handoff evidence",
@@ -354,7 +354,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         "regression suite",
         "clean-install smoke gate",
         "aggregate release audit",
-        "comparison quick-read, sampled-ingest warning evidence when present, review-path, metric delta cards including usage snapshots, and next validation command cards plus report and comparison download controls",
+        "chronological comparison direction",
         "synthetic demo generation",
         "aggregate-only session listing",
         "database doctor",
@@ -608,5 +608,7 @@ def test_tracking_snapshot_records_current_issue_state_and_publish_guard() -> No
     assert "#10" in tracking
     assert "#11" in tracking
     assert "#12" in tracking
+    assert "#13" in tracking
+    assert "#14" in tracking
     assert "docs/TRACKING.md" in current
     assert "docs/TRACKING.md" in config

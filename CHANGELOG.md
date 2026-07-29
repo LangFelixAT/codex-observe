@@ -5,6 +5,8 @@ All notable changes to Codex Observe will be documented here.
 The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
+- Ordered dashboard comparisons chronologically with explicit Before/After aggregate context, so the synthetic older high-risk run to newer low-risk follow-up correctly reports improvement instead of a reversed regression.
+- Moved dashboard navigation and the next-run action plan before supporting metrics, added a native copy control for the aggregate-only prompt, and extended desktop/narrow synthetic and real-profile visual QA to enforce the hierarchy.
 - Split `codex-observe tour` into a concise default user journey and explicit `--reviewer` mode while preserving the exhaustive JSON automation contract.
 - Put the product answer first across help, tour, path discovery, session selection, and the dashboard; recommendation tie-breaks are explicit and visual QA now proves the operator briefing precedes metrics within the initial desktop and narrow viewports.
 - Aligned dashboard operator guidance, proof targets, review paths, checklists, and next-run briefs on one authoritative report while keeping the selected-run risk signal explicitly scoped.

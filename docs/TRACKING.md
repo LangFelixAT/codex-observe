@@ -14,6 +14,8 @@ All current GitHub issues are closed:
 
 | Issue | State | Title |
 | --- | --- | --- |
+| #14 | Closed | Order dashboard comparisons chronologically |
+| #13 | Closed | Put next-run action and navigation before dashboard metrics |
 | #12 | Closed | Make the default tour a concise user journey |
 | #11 | Closed | Put the product answer first across start and resume flows |
 | #10 | Closed | Align dashboard guidance scopes and recommendation source |
