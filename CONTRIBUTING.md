@@ -65,6 +65,7 @@ codex-observe demo
 codex-observe demo --sessions .artifacts/demo/sessions --keep-sessions --json
 codex-observe ingest .artifacts/demo/sessions --db .artifacts/demo/ingest-contract.sqlite --json
 codex-observe sessions --db .artifacts/demo/codex_observe_demo.sqlite --json
+codex-observe sessions --db .artifacts/demo/codex_observe_demo.sqlite --risk high --focus thread --json
 codex-observe doctor --db .artifacts/demo/codex_observe_demo.sqlite --json
 codex-observe report --db .artifacts/demo/codex_observe_demo.sqlite --out .artifacts/demo/run-report.md
 codex-observe report --db .artifacts/demo/codex_observe_demo.sqlite --format json --out .artifacts/demo/run-report.json
@@ -72,7 +73,7 @@ codex-observe compare --before-report .artifacts/demo/run-report.json --after-re
 codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --format json --out .artifacts/demo/run-comparison.json
 ```
 
-The session listing is aggregate-only and includes aggregate triage risk plus a structured `recommended_session` so reviewers and automation can choose the highest-risk run without reading prompts, tool output, or parsing the human `next` string.
+The session listing is aggregate-only and includes aggregate triage risk, stable Focus values and distributions, composable `--risk`/`--focus` filters, and a structured `recommended_session` drawn from the matching scope so reviewers and automation can choose a run without reading prompts, tool output, or parsing the human `next` string.
 
 For UI-facing changes, run visual QA:
 
@@ -80,7 +81,7 @@ For UI-facing changes, run visual QA:
 python scripts/visual_qa.py
 ```
 
-`codex-observe self-check --visual --json` verifies Pillow and Playwright imports before the browser check. The visual QA script starts Streamlit, clicks Overview, Agent detail, Timeline & jumps, Tools, Duplication, and Raw tables, exercises the Agent detail selector, and writes desktop/narrow screenshots and a validated path-safe visual QA manifest with tab coverage, selector exercise, screenshot metadata, layout review, sidebar risk labels, expected high-risk default metric card evidence, operator-briefing evidence, complete initial-viewport tab navigation, checklist -> brief -> native copy prompt -> comparison -> metric ordering, nearest-follow-up comparison selection and chronological comparison direction, and success-target evidence to `.artifacts/visual/`. Recheck saved evidence and referenced screenshot files with `python scripts/visual_qa.py --verify-manifest .artifacts/visual/visual-qa-manifest.json`. For ignored private validation artifacts, use `codex-observe private-validate ~/.codex/sessions --visual --json` to run the bounded private loop plus real-profile browser QA in one command, or rerun only the browser check with `python scripts/visual_qa.py --profile real --db .artifacts/private/real-sessions.sqlite --out .artifacts/private/visual-real`; do not commit those screenshots or manifests.
+`codex-observe self-check --visual --json` verifies Pillow and Playwright imports before the browser check. The visual QA script starts Streamlit, clicks Overview, Agent detail, Timeline & jumps, Tools, Duplication, and Raw tables, exercises the Agent detail selector, and writes desktop/narrow screenshots and a validated path-safe visual QA manifest with tab coverage, selector exercise, screenshot metadata, layout review, sidebar risk labels, exercised Risk and Focus filters with narrowed-result, valid-selection, and restored-state evidence, expected high-risk default metric card evidence, operator-briefing evidence, complete initial-viewport tab navigation, checklist -> brief -> native copy prompt -> comparison -> metric ordering, nearest-follow-up comparison selection and chronological comparison direction, and success-target evidence to `.artifacts/visual/`. Recheck saved evidence and referenced screenshot files with `python scripts/visual_qa.py --verify-manifest .artifacts/visual/visual-qa-manifest.json`. For ignored private validation artifacts, use `codex-observe private-validate ~/.codex/sessions --visual --json` to run the bounded private loop plus real-profile browser QA in one command, or rerun only the browser check with `python scripts/visual_qa.py --profile real --db .artifacts/private/real-sessions.sqlite --out .artifacts/private/visual-real`; do not commit those screenshots or manifests.
 
 ## Parser changes
 

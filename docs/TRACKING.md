@@ -14,6 +14,7 @@ All current GitHub issues are closed:
 
 | Issue | State | Title |
 | --- | --- | --- |
+| #17 | Closed | Make Focus a first-class session-history filter |
 | #16 | Closed | Make run comparison the next dashboard step |
 | #15 | Closed | Default comparisons to the nearest chronological run |
 | #14 | Closed | Order dashboard comparisons chronologically |

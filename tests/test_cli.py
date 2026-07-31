@@ -42,6 +42,7 @@ def test_tracking_doc_failures_accepts_a_structured_current_snapshot(
                 "#14",
                 "#15",
                 "#16",
+                "#17",
             ]
         ),
         encoding="utf-8",
