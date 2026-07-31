@@ -144,13 +144,70 @@ FOCUS_LABELS = [
 ]
 
 
-def focus_filter_select_keys(target_label: str) -> list[str]:
-    target_index = FOCUS_LABELS.index(target_label) + 1
-    return ["ArrowDown"] * target_index + ["Enter"]
+def focus_option_label(
+    option_labels: list[str], target_label: str | None
+) -> str | None:
+    if target_label == "All focuses":
+        return next((label for label in option_labels if label == target_label), None)
+    preferred = next(
+        (
+            label
+            for label in option_labels
+            if target_label
+            and label.startswith(f"{target_label} (")
+            and not label.endswith("(0)")
+        ),
+        None,
+    )
+    return preferred or next(
+        (
+            label
+            for label in option_labels
+            if label != "All focuses" and not label.endswith("(0)")
+        ),
+        None,
+    )
 
 
-def focus_filter_reset_keys() -> list[str]:
-    return ["ArrowUp"] * len(FOCUS_LABELS) + ["Enter"]
+def open_option_labels(page, timeout_ms: int) -> list[str]:
+    page.wait_for_function(
+        "() => document.querySelectorAll('[role=option]').length > 0",
+        timeout=timeout_ms,
+    )
+    return page.evaluate(
+        r"""
+() => Array.from(document.querySelectorAll('[role="option"]')).map(
+  (option) => (option.innerText || option.textContent || '').trim()
+)
+        """
+    )
+
+
+def select_open_option(page, option_label: str, timeout_ms: int) -> bool:
+    page.wait_for_function(
+        r"""
+label => Array.from(document.querySelectorAll('[role="option"]')).some(
+  (option) => (option.innerText || option.textContent || '').trim() === label
+)
+        """,
+        arg=option_label,
+        timeout=timeout_ms,
+    )
+    return bool(
+        page.evaluate(
+            r"""
+label => {
+  const option = Array.from(document.querySelectorAll('[role="option"]')).find(
+    (item) => (item.innerText || item.textContent || '').trim() === label
+  );
+  if (!option) return false;
+  option.click();
+  return true;
+}
+            """,
+            option_label,
+        )
+    )
 
 
 EXPECTED_SIDEBAR_SESSION_SEARCH = ["Find session"]
@@ -487,44 +544,15 @@ def exercise_sidebar_focus_filter(
         else:
             visible_selector.click()
         target_label = "Monitor" if profile == PROFILE_DEMO else initial_focus
-        if viewport_name == "narrow":
-            if not target_label:
-                page.keyboard.press("Escape")
-                return evidence
-            for key in focus_filter_select_keys(target_label):
-                page.keyboard.press(key)
-            evidence["stage"] = "apply-filter"
-        else:
-            options = page.get_by_role("option")
-            options.first.wait_for(state="visible", timeout=timeout_ms)
-            option_labels = [
-                item.inner_text().strip() for item in options.all() if item.is_visible()
-            ]
-            target_option = next(
-                (
-                    option
-                    for option in option_labels
-                    if target_label
-                    and option.startswith(f"{target_label} (")
-                    and not option.endswith("(0)")
-                ),
-                None,
-            )
-            if target_option is None:
-                target_option = next(
-                    (
-                        option
-                        for option in option_labels
-                        if option != "All focuses" and not option.endswith("(0)")
-                    ),
-                    None,
-                )
-            if target_option is None:
-                page.keyboard.press("Escape")
-                return evidence
-            target_label = target_option.rsplit(" (", 1)[0]
-            evidence["stage"] = "apply-filter"
-            page.get_by_role("option", name=target_option, exact=True).click()
+        option_labels = open_option_labels(page, timeout_ms)
+        target_option = focus_option_label(option_labels, target_label)
+        if target_option is None:
+            page.keyboard.press("Escape")
+            return evidence
+        target_label = target_option.rsplit(" (", 1)[0]
+        evidence["stage"] = "apply-filter"
+        if not select_open_option(page, target_option, timeout_ms):
+            return evidence
         page.wait_for_function(
             "() => document.body.innerText.includes('after focus filter')",
             timeout=timeout_ms,
@@ -559,11 +587,10 @@ def exercise_sidebar_focus_filter(
         )
         if viewport_name == "narrow":
             visible_focus_selector.evaluate("element => element.click()")
-            for key in focus_filter_reset_keys():
-                page.keyboard.press(key)
         else:
             visible_focus_selector.click()
-            page.get_by_role("option", name="All focuses", exact=True).click()
+        if not select_open_option(page, "All focuses", timeout_ms):
+            return evidence
         page.wait_for_function(
             "() => !document.body.innerText.includes('after focus filter')",
             timeout=timeout_ms,
@@ -572,8 +599,19 @@ def exercise_sidebar_focus_filter(
         evidence["stage"] = "restore-session"
         restored_selection = False
         if initial_button_label:
-            restored_selection = page.evaluate(
-                r"""
+            with contextlib.suppress(Exception):
+                page.wait_for_function(
+                    r"""
+label => Array.from(document.querySelectorAll('button')).some((button) => {
+  const text = (button.innerText || '').trim();
+  return text === label || text === '> ' + label;
+})
+                    """,
+                    arg=initial_button_label,
+                    timeout=timeout_ms,
+                )
+                restored_selection = page.evaluate(
+                    r"""
 label => {
   const target = Array.from(document.querySelectorAll('button')).find((button) => {
     const text = (button.innerText || '').trim();
@@ -583,12 +621,25 @@ label => {
   target.click();
   return true;
 }
-                """,
-                initial_button_label,
-            )
+                    """,
+                    initial_button_label,
+                )
         if not restored_selection and initial_focus:
-            restored_selection = page.evaluate(
-                r"""
+            with contextlib.suppress(Exception):
+                page.wait_for_function(
+                    r"""
+focus => {
+  const marker = '| ' + focus + ' |';
+  return Array.from(document.querySelectorAll('button')).some(
+    (button) => (button.innerText || '').includes(marker)
+  );
+}
+                    """,
+                    arg=initial_focus,
+                    timeout=timeout_ms,
+                )
+                restored_selection = page.evaluate(
+                    r"""
 focus => {
   const marker = '| ' + focus + ' |';
   const target = Array.from(document.querySelectorAll('button')).find(
@@ -598,9 +649,9 @@ focus => {
   target.click();
   return true;
 }
-                """,
-                initial_focus,
-            )
+                    """,
+                    initial_focus,
+                )
         if not restored_selection and viewport_name == "narrow" and initial_risk:
             risk_selector = page.get_by_label("Risk filter")
             visible_risk_selector = next(
@@ -617,21 +668,53 @@ focus => {
                 page.get_by_label("Risk filter").first.evaluate(
                     "element => element.click()"
                 )
-                for key in focus_filter_reset_keys():
-                    page.keyboard.press(key)
+                if not select_open_option(page, "All risks", timeout_ms):
+                    return evidence
                 page.wait_for_function(
                     "() => !document.body.innerText.includes('after risk filter')",
                     timeout=timeout_ms,
                 )
                 restored_selection = True
+        if restored_selection and initial_button_label:
+            page.wait_for_function(
+                r"""
+label => Array.from(document.querySelectorAll('button')).some(
+  (button) => (button.innerText || '').trim() === '> ' + label
+)
+                """,
+                arg=initial_button_label,
+                timeout=timeout_ms,
+            )
+        elif restored_selection and initial_focus:
+            page.wait_for_function(
+                r"""
+focus => {
+  const marker = '| ' + focus + ' |';
+  return Array.from(document.querySelectorAll('button')).some((button) => {
+    const text = (button.innerText || '').trim();
+    return text.startsWith('> ') && text.includes(marker);
+  });
+}
+                """,
+                arg=initial_focus,
+                timeout=timeout_ms,
+            )
         if restored_selection and initial_focus:
             page.wait_for_function(
-                """
-focus => Array.from(document.querySelectorAll('.co-metric-card')).some((card) => {
-  const label = (card.querySelector('.co-metric-label')?.innerText || '').trim();
-  const value = (card.querySelector('.co-metric-value')?.innerText || '').trim();
-  return label === 'Focus' && value === focus;
-})
+                r"""
+focus => {
+  const visibleFocusValues = Array.from(document.querySelectorAll('.co-metric-card'))
+    .filter((card) => {
+      const style = getComputedStyle(card);
+      const rect = card.getBoundingClientRect();
+      const label = (card.querySelector('.co-metric-label')?.innerText || '').trim();
+      return label === 'Focus' && style.display !== 'none' &&
+        style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+    })
+    .map((card) => (card.querySelector('.co-metric-value')?.innerText || '').trim());
+  return visibleFocusValues.length > 0 &&
+    visibleFocusValues.every((value) => value === focus);
+}
                 """,
                 arg=initial_focus,
                 timeout=timeout_ms,

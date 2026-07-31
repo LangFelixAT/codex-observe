@@ -365,16 +365,14 @@ def test_collect_sidebar_risk_filter_uses_visible_text_and_aria_labels() -> None
     assert visual_qa.collect_sidebar_risk_filter(FakePage()) == ["Risk filter"]
 
 
-def test_focus_filter_keyboard_navigation_avoids_platform_specific_keys() -> None:
-    thread_keys = visual_qa.focus_filter_select_keys("Thread")
-    monitor_keys = visual_qa.focus_filter_select_keys("Monitor")
-    reset_keys = visual_qa.focus_filter_reset_keys()
+def test_focus_option_label_prefers_target_and_skips_empty_categories() -> None:
+    options = ["All focuses", "Thread (2)", "Guardian (0)", "Monitor (1)"]
 
-    assert thread_keys == ["ArrowDown", "ArrowDown", "Enter"]
-    assert monitor_keys == ["ArrowDown"] * 8 + ["Enter"]
-    assert reset_keys == ["ArrowUp"] * 8 + ["Enter"]
-    assert "Home" not in thread_keys + monitor_keys + reset_keys
-    assert "End" not in thread_keys + monitor_keys + reset_keys
+    assert visual_qa.focus_option_label(options, "Thread") == "Thread (2)"
+    assert visual_qa.focus_option_label(options, "Guardian") == "Thread (2)"
+    assert visual_qa.focus_option_label(options, None) == "Thread (2)"
+    assert visual_qa.focus_option_label(options, "All focuses") == "All focuses"
+    assert visual_qa.focus_option_label(["All focuses", "Thread (0)"], "Thread") is None
 
 
 def test_sidebar_focus_filter_failures_require_exercised_filter_contract() -> None:
