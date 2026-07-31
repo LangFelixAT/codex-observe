@@ -41,6 +41,7 @@ def test_tracking_doc_failures_accepts_a_structured_current_snapshot(
                 "#13",
                 "#14",
                 "#15",
+                "#16",
             ]
         ),
         encoding="utf-8",
@@ -1387,7 +1388,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
         == "manifest, terminal and reviewer README action plan, key findings, review checklist, feedback handoff, feedback runbook, feedback issue template, reproduce-local commands, validation commands, limitations doc, aggregate reports, and audit artifact verified"
     )
     assert (
-        "visual manifest schema and contract, screenshots, empty states, layout review, answer-first briefing, action-first navigation and plan ordering, native copy control, nearest-follow-up comparison selection, chronological comparison direction, risk labels, sidebar Risk filter, sidebar session search, sidebar session details, risk distribution, metric cards, dashboard quick reads, report and comparison downloads, report scope-warning evidence, comparison preview, comparison scope-warning evidence, comparison review path, deltas, operator briefing, next review path, next-run checklist, next-run brief, safe feedback handoff, and success target verified"
+        "visual manifest schema and contract, screenshots, empty states, layout review, answer-first briefing, action-first navigation, comparison, and plan ordering, native copy control, nearest-follow-up comparison selection, chronological comparison direction, risk labels, sidebar Risk filter, sidebar session search, sidebar session details, risk distribution, metric cards, dashboard quick reads, report and comparison downloads, report scope-warning evidence, comparison preview, comparison scope-warning evidence, comparison review path, deltas, operator briefing, next review path, next-run checklist, next-run brief, safe feedback handoff, and success target verified"
         in checks["visual QA manifest evidence"]["detail"]
     )
     report_payload = json.loads(report.with_suffix(".json").read_text(encoding="utf-8"))

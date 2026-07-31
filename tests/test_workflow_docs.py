@@ -182,7 +182,7 @@ def test_current_state_handoff_covers_gates_evidence_and_real_log_checkpoint() -
         "codex-observe evidence-bundle",
         "codex-observe.evidence-bundle.v1",
         "There is currently no publishable local issue draft",
-        "issues #1-#8 and #10-#15 are closed",
+        "issues #1-#8 and #10-#16 are closed",
         "attaching generated artifacts externally still requires explicit human approval",
         "human-approved private input path",
     ]:
@@ -293,6 +293,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         "initial-viewport operator briefing",
         "portfolio and risk context",
         "native copy-ready next-run prompt",
+        "comparison -> metric ordering",
         "safe feedback handoff",
         "explicit chronological Before/After context",
         "codex-observe doctor --db .artifacts/demo/codex_observe_demo.sqlite --json",
@@ -381,6 +382,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
     assert "visual QA manifest" in release
     assert "schema/contract evidence" in release
     assert "nearest-follow-up comparison selection" in release
+    assert "comparison -> metric ordering" in release
     assert "missing/empty database onboarding states" in release
     assert "metric cards" in release
     assert (
@@ -614,5 +616,6 @@ def test_tracking_snapshot_records_current_issue_state_and_publish_guard() -> No
     assert "#13" in tracking
     assert "#14" in tracking
     assert "#15" in tracking
+    assert "#16" in tracking
     assert "docs/TRACKING.md" in current
     assert "docs/TRACKING.md" in config

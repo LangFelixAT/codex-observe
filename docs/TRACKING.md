@@ -14,6 +14,7 @@ All current GitHub issues are closed:
 
 | Issue | State | Title |
 | --- | --- | --- |
+| #16 | Closed | Make run comparison the next dashboard step |
 | #15 | Closed | Default comparisons to the nearest chronological run |
 | #14 | Closed | Order dashboard comparisons chronologically |
 | #13 | Closed | Put next-run action and navigation before dashboard metrics |
