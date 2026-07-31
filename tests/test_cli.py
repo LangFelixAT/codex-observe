@@ -691,6 +691,7 @@ def write_valid_visual_manifest(root: Path) -> None:
             },
             "sidebar_risk_labels": sorted(cli.EXPECTED_VISUAL_RISK_LABELS),
             "sidebar_risk_filter": sorted(cli.EXPECTED_VISUAL_RISK_FILTER),
+            "sidebar_focus_filter": dict(cli.EXPECTED_VISUAL_FOCUS_FILTER),
             "sidebar_session_search": sorted(
                 cli.EXPECTED_VISUAL_SIDEBAR_SESSION_SEARCH
             ),
@@ -914,6 +915,7 @@ def test_visual_manifest_evidence_failures_validate_saved_sidebar_metric_and_suc
     ] = False
     payload["viewports"]["desktop"]["sidebar_risk_labels"] = ["High risk"]
     payload["viewports"]["desktop"].pop("sidebar_risk_filter")
+    payload["viewports"]["desktop"].pop("sidebar_focus_filter")
     payload["viewports"]["desktop"].pop("sidebar_session_search")
     payload["viewports"]["desktop"]["sidebar_session_details"] = []
     payload["viewports"]["desktop"]["quick_read_evidence"] = [
@@ -947,6 +949,9 @@ def test_visual_manifest_evidence_failures_validate_saved_sidebar_metric_and_suc
         in failures
     )
     assert "visual QA manifest missing desktop sidebar Risk filter evidence" in failures
+    assert (
+        "visual QA manifest missing desktop sidebar Focus filter evidence" in failures
+    )
     assert (
         "visual QA manifest missing desktop sidebar session search evidence" in failures
     )
@@ -1006,6 +1011,7 @@ def test_visual_manifest_evidence_rejects_stale_minimal_manifest_shape(
                     name: {
                         "sidebar_risk_labels": ["High risk", "Low risk"],
                         "sidebar_risk_filter": ["Risk filter"],
+                        "sidebar_focus_filter": dict(cli.EXPECTED_VISUAL_FOCUS_FILTER),
                         "sidebar_session_search": ["Find session"],
                         "sidebar_session_details": ["24 min duration", "6 snapshots"],
                         "metric_cards": [
@@ -1388,7 +1394,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
         == "manifest, terminal and reviewer README action plan, key findings, review checklist, feedback handoff, feedback runbook, feedback issue template, reproduce-local commands, validation commands, limitations doc, aggregate reports, and audit artifact verified"
     )
     assert (
-        "visual manifest schema and contract, screenshots, empty states, layout review, answer-first briefing, action-first navigation, comparison, and plan ordering, native copy control, nearest-follow-up comparison selection, chronological comparison direction, risk labels, sidebar Risk filter, sidebar session search, sidebar session details, risk distribution, metric cards, dashboard quick reads, report and comparison downloads, report scope-warning evidence, comparison preview, comparison scope-warning evidence, comparison review path, deltas, operator briefing, next review path, next-run checklist, next-run brief, safe feedback handoff, and success target verified"
+        "visual manifest schema and contract, screenshots, empty states, layout review, answer-first briefing, action-first navigation, comparison, and plan ordering, native copy control, nearest-follow-up comparison selection, chronological comparison direction, risk labels, sidebar Risk filter, sidebar Focus filter, sidebar session search, sidebar session details, risk distribution, metric cards, dashboard quick reads, report and comparison downloads, report scope-warning evidence, comparison preview, comparison scope-warning evidence, comparison review path, deltas, operator briefing, next review path, next-run checklist, next-run brief, safe feedback handoff, and success target verified"
         in checks["visual QA manifest evidence"]["detail"]
     )
     report_payload = json.loads(report.with_suffix(".json").read_text(encoding="utf-8"))

@@ -4,6 +4,7 @@ import argparse
 import contextlib
 import json
 import os
+import re
 import socket
 import sqlite3
 import subprocess
@@ -123,6 +124,24 @@ EXPECTED_METRIC_CARDS = [
 ]
 EXPECTED_SIDEBAR_RISK_LABELS = ["High risk", "Low risk"]
 EXPECTED_SIDEBAR_RISK_FILTER = ["Risk filter"]
+EXPECTED_SIDEBAR_FOCUS_FILTER = {
+    "label": "Focus filter",
+    "target": "Monitor",
+    "exercised": True,
+    "filtered": True,
+    "selection_valid": True,
+    "restored": True,
+}
+FOCUS_LABELS = [
+    "Duration",
+    "Thread",
+    "Guardian",
+    "Replay",
+    "Uncached",
+    "Tool out",
+    "Tokens",
+    "Monitor",
+]
 EXPECTED_SIDEBAR_SESSION_SEARCH = ["Find session"]
 EXPECTED_SIDEBAR_SESSION_DETAILS = ["Focus: Thread", "24 min duration", "6 snapshots"]
 EXPECTED_DOWNLOAD_CONTROLS = [
@@ -343,6 +362,307 @@ def sidebar_risk_filter_failures(labels: list[str], viewport_name: str) -> list[
         for label in EXPECTED_SIDEBAR_RISK_FILTER
         if label not in observed
     ]
+
+
+def sidebar_focus_filter_failures(
+    evidence: dict[str, object] | None,
+    viewport_name: str,
+    profile: str = PROFILE_DEMO,
+) -> list[str]:
+    if not isinstance(evidence, dict):
+        return [f"{viewport_name}: sidebar Focus filter evidence not found"]
+    failures = []
+    stage = str(evidence.get("stage") or "")
+    if stage and stage != "complete":
+        failures.append(
+            f"{viewport_name}: sidebar Focus filter interaction stopped at {stage}"
+        )
+    if evidence.get("label") != "Focus filter":
+        failures.append(f"{viewport_name}: sidebar Focus filter label not found")
+    for key in ["exercised", "filtered", "selection_valid", "restored"]:
+        if evidence.get(key) is not True:
+            failures.append(
+                f"{viewport_name}: sidebar Focus filter {key.replace('_', ' ')} not verified"
+            )
+    target = str(evidence.get("target") or "")
+    if profile == PROFILE_DEMO and target != "Monitor":
+        failures.append(
+            f"{viewport_name}: sidebar Focus filter expected Monitor target, got {target or 'none'}"
+        )
+    elif profile == PROFILE_REAL and target not in FOCUS_LABELS:
+        failures.append(
+            f"{viewport_name}: sidebar Focus filter target is not a stable Focus category"
+        )
+    return failures
+
+
+def exercise_sidebar_focus_filter(
+    page, viewport_name: str, profile: str = PROFILE_DEMO
+) -> dict[str, object]:
+    evidence: dict[str, object] = {
+        "label": "Focus filter",
+        "target": None,
+        "exercised": False,
+        "filtered": False,
+        "selection_valid": False,
+        "restored": False,
+        "stage": "locate-control",
+    }
+    timeout_ms = 60000 if profile == PROFILE_REAL else 10000
+    opened_sidebar = False
+
+    try:
+        selector = page.get_by_label("Focus filter")
+        visible_selector = next(
+            (item for item in selector.all() if item.is_visible()), None
+        )
+        if visible_selector is None:
+            opener = page.get_by_role(
+                "button", name=re.compile("open sidebar", re.IGNORECASE)
+            )
+            if opener.count() > 0:
+                opener.first.click()
+                opened_sidebar = True
+            else:
+                opened_sidebar = bool(
+                    page.evaluate(
+                        r"""
+() => {
+  const root = document.querySelector('[data-testid="stSidebarCollapsedControl"]');
+  const button = root?.matches('button') ? root : root?.querySelector('button');
+  if (!button) return false;
+  button.click();
+  return true;
+}
+                        """
+                    )
+                )
+            if not opened_sidebar:
+                return evidence
+            page.get_by_label("Focus filter").first.wait_for(
+                state="visible", timeout=timeout_ms
+            )
+            selector = page.get_by_label("Focus filter")
+            visible_selector = next(
+                (item for item in selector.all() if item.is_visible()), None
+            )
+        if visible_selector is None:
+            return evidence
+
+        initial_body = page_body_text(page, timeout_ms)
+        initial_focus = next(
+            (label for label in FOCUS_LABELS if f"Focus: {label}" in initial_body),
+            None,
+        )
+        initial_risk_match = re.search(
+            r"\b(High|Medium|Low|Unknown) risk\s*\|", initial_body
+        )
+        initial_risk = initial_risk_match.group(1) if initial_risk_match else None
+        initial_button_label = page.evaluate(
+            r"""
+() => {
+  const selected = Array.from(document.querySelectorAll('button')).find(
+    (button) => (button.innerText || '').trim().startsWith('> ')
+  );
+  if (!selected) return null;
+  return (selected.innerText || '').trim().slice(2);
+}
+            """
+        )
+
+        evidence["stage"] = "open-options"
+        if viewport_name == "narrow":
+            visible_selector.evaluate("element => element.click()")
+        else:
+            visible_selector.click()
+        target_label = "Monitor" if profile == PROFILE_DEMO else initial_focus
+        if viewport_name == "narrow":
+            if not target_label:
+                page.keyboard.press("Escape")
+                return evidence
+            if profile == PROFILE_DEMO:
+                page.keyboard.press("End")
+            else:
+                page.keyboard.type(target_label)
+            evidence["stage"] = "apply-filter"
+            page.keyboard.press("Enter")
+        else:
+            options = page.get_by_role("option")
+            options.first.wait_for(state="visible", timeout=timeout_ms)
+            option_labels = [
+                item.inner_text().strip() for item in options.all() if item.is_visible()
+            ]
+            target_option = next(
+                (
+                    option
+                    for option in option_labels
+                    if target_label
+                    and option.startswith(f"{target_label} (")
+                    and not option.endswith("(0)")
+                ),
+                None,
+            )
+            if target_option is None:
+                target_option = next(
+                    (
+                        option
+                        for option in option_labels
+                        if option != "All focuses" and not option.endswith("(0)")
+                    ),
+                    None,
+                )
+            if target_option is None:
+                page.keyboard.press("Escape")
+                return evidence
+            target_label = target_option.rsplit(" (", 1)[0]
+            evidence["stage"] = "apply-filter"
+            page.get_by_role("option", name=target_option, exact=True).click()
+        page.wait_for_function(
+            "() => document.body.innerText.includes('after focus filter')",
+            timeout=timeout_ms,
+        )
+        filtered_body = page_body_text(page, timeout_ms)
+        match = re.search(
+            r"Showing ([\d,]+) of ([\d,]+) conversations after .*focus filter",
+            filtered_body,
+        )
+        narrowed = bool(
+            match
+            and int(match.group(1).replace(",", ""))
+            < int(match.group(2).replace(",", ""))
+        )
+        evidence.update(
+            {
+                "target": target_label,
+                "exercised": True,
+                "filtered": narrowed,
+                "selection_valid": (
+                    f"Focus: {target_label}" in filtered_body
+                    and "No conversations match" not in filtered_body
+                    and not visible_text_has_error(filtered_body)
+                ),
+            }
+        )
+
+        evidence["stage"] = "restore-filter"
+        focus_selector = page.get_by_label("Focus filter")
+        visible_focus_selector = next(
+            item for item in focus_selector.all() if item.is_visible()
+        )
+        if viewport_name == "narrow":
+            visible_focus_selector.evaluate("element => element.click()")
+            page.keyboard.press("Home")
+            page.keyboard.press("Enter")
+        else:
+            visible_focus_selector.click()
+            page.get_by_role("option", name="All focuses", exact=True).click()
+        page.wait_for_function(
+            "() => !document.body.innerText.includes('after focus filter')",
+            timeout=timeout_ms,
+        )
+
+        evidence["stage"] = "restore-session"
+        restored_selection = False
+        if initial_button_label:
+            restored_selection = page.evaluate(
+                r"""
+label => {
+  const target = Array.from(document.querySelectorAll('button')).find((button) => {
+    const text = (button.innerText || '').trim();
+    return text === label || text === '> ' + label;
+  });
+  if (!target) return false;
+  target.click();
+  return true;
+}
+                """,
+                initial_button_label,
+            )
+        if not restored_selection and initial_focus:
+            restored_selection = page.evaluate(
+                r"""
+focus => {
+  const marker = '| ' + focus + ' |';
+  const target = Array.from(document.querySelectorAll('button')).find(
+    (button) => (button.innerText || '').includes(marker)
+  );
+  if (!target) return false;
+  target.click();
+  return true;
+}
+                """,
+                initial_focus,
+            )
+        if not restored_selection and viewport_name == "narrow" and initial_risk:
+            risk_selector = page.get_by_label("Risk filter")
+            visible_risk_selector = next(
+                (item for item in risk_selector.all() if item.is_visible()), None
+            )
+            if visible_risk_selector is not None:
+                visible_risk_selector.evaluate("element => element.click()")
+                page.keyboard.type(initial_risk)
+                page.keyboard.press("Enter")
+                page.wait_for_function(
+                    "() => document.body.innerText.includes('after risk filter')",
+                    timeout=timeout_ms,
+                )
+                page.get_by_label("Risk filter").first.evaluate(
+                    "element => element.click()"
+                )
+                page.keyboard.press("Home")
+                page.keyboard.press("Enter")
+                page.wait_for_function(
+                    "() => !document.body.innerText.includes('after risk filter')",
+                    timeout=timeout_ms,
+                )
+                restored_selection = True
+        if restored_selection and initial_focus:
+            page.wait_for_function(
+                """
+focus => Array.from(document.querySelectorAll('.co-metric-card')).some((card) => {
+  const label = (card.querySelector('.co-metric-label')?.innerText || '').trim();
+  const value = (card.querySelector('.co-metric-value')?.innerText || '').trim();
+  return label === 'Focus' && value === focus;
+})
+                """,
+                arg=initial_focus,
+                timeout=timeout_ms,
+            )
+        restored_body = page_body_text(page, timeout_ms)
+        evidence["restored"] = (
+            "No conversations match" not in restored_body
+            and "after focus filter" not in restored_body
+            and (not initial_focus or f"Focus: {initial_focus}" in restored_body)
+            and not visible_text_has_error(restored_body)
+        )
+        evidence["stage"] = "complete"
+    except Exception as exc:
+        evidence["stage"] = f"failed:{evidence['stage']}:{type(exc).__name__}"
+        try:
+            page.keyboard.press("Escape")
+        except Exception:
+            pass
+    finally:
+        if opened_sidebar:
+            try:
+                closer = page.get_by_role(
+                    "button", name=re.compile("close sidebar", re.IGNORECASE)
+                )
+                if closer.count() > 0 and closer.first.is_visible():
+                    closer.first.click()
+                else:
+                    page.evaluate(
+                        r"""
+() => {
+  const root = document.querySelector('[data-testid="stSidebarCollapseButton"]');
+  const button = root?.matches('button') ? root : root?.querySelector('button');
+  if (button) button.click();
+}
+                        """
+                    )
+            except Exception:
+                pass
+    return evidence
 
 
 def collect_sidebar_session_search(page) -> list[str]:
@@ -1342,6 +1662,10 @@ def validate_dashboard_page(
     )
     sidebar_risk_filter = collect_sidebar_risk_filter(page)
     failures.extend(sidebar_risk_filter_failures(sidebar_risk_filter, viewport_name))
+    sidebar_focus_filter = exercise_sidebar_focus_filter(page, viewport_name, profile)
+    failures.extend(
+        sidebar_focus_filter_failures(sidebar_focus_filter, viewport_name, profile)
+    )
     sidebar_session_search = collect_sidebar_session_search(page)
     failures.extend(
         sidebar_session_search_failures(sidebar_session_search, viewport_name)
@@ -1507,6 +1831,7 @@ name => {
         "metric_cards": metric_cards,
         "sidebar_risk_labels": sidebar_risk_labels,
         "sidebar_risk_filter": sidebar_risk_filter,
+        "sidebar_focus_filter": sidebar_focus_filter,
         "sidebar_session_search": sidebar_session_search,
         "sidebar_session_details": sidebar_session_details,
         "success_targets": success_targets,
@@ -1949,6 +2274,18 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
                 failure.replace(f"{name}: ", f"manifest {name} ")
                 for failure in filter_failures
             )
+        sidebar_focus_filter = raw.get("sidebar_focus_filter")
+        if not isinstance(sidebar_focus_filter, dict):
+            failures.append(f"manifest {name} missing sidebar Focus filter evidence")
+        else:
+            focus_filter_failures = sidebar_focus_filter_failures(
+                sidebar_focus_filter, name, profile
+            )
+            failures.extend(
+                failure.replace(f"{name}: ", f"manifest {name} ")
+                for failure in focus_filter_failures
+            )
+
         sidebar_session_search = raw.get("sidebar_session_search")
         if not isinstance(sidebar_session_search, list):
             failures.append(f"manifest {name} missing sidebar session search evidence")

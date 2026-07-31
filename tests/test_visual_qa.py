@@ -31,6 +31,7 @@ metric_card_failures = visual_qa.metric_card_failures
 metric_card_value_failures = visual_qa.metric_card_value_failures
 sidebar_risk_label_failures = visual_qa.sidebar_risk_label_failures
 sidebar_risk_filter_failures = visual_qa.sidebar_risk_filter_failures
+sidebar_focus_filter_failures = visual_qa.sidebar_focus_filter_failures
 sidebar_session_search_failures = visual_qa.sidebar_session_search_failures
 sidebar_session_detail_failures = visual_qa.sidebar_session_detail_failures
 operator_briefing_failures = visual_qa.operator_briefing_failures
@@ -362,6 +363,26 @@ def test_collect_sidebar_risk_filter_uses_visible_text_and_aria_labels() -> None
             return ["Risk filter"]
 
     assert visual_qa.collect_sidebar_risk_filter(FakePage()) == ["Risk filter"]
+
+
+def test_sidebar_focus_filter_failures_require_exercised_filter_contract() -> None:
+    evidence = dict(visual_qa.EXPECTED_SIDEBAR_FOCUS_FILTER)
+
+    assert sidebar_focus_filter_failures(evidence, "desktop") == []
+
+    evidence["filtered"] = False
+    evidence["restored"] = False
+    failures = sidebar_focus_filter_failures(evidence, "narrow")
+
+    assert "narrow: sidebar Focus filter filtered not verified" in failures
+    assert "narrow: sidebar Focus filter restored not verified" in failures
+
+
+def test_sidebar_focus_filter_failures_accept_real_profile_stable_target() -> None:
+    evidence = dict(visual_qa.EXPECTED_SIDEBAR_FOCUS_FILTER)
+    evidence["target"] = "Guardian"
+
+    assert sidebar_focus_filter_failures(evidence, "desktop", "real") == []
 
 
 def test_sidebar_session_search_failures_require_find_session_control() -> None:
@@ -932,6 +953,7 @@ def complete_viewport_results(tmp_path: Path) -> dict[str, dict[str, object]]:
             "agent_detail_selector_exercised": True,
             "sidebar_risk_labels": ["High risk", "Low risk"],
             "sidebar_risk_filter": ["Risk filter"],
+            "sidebar_focus_filter": dict(visual_qa.EXPECTED_SIDEBAR_FOCUS_FILTER),
             "sidebar_session_search": ["Find session"],
             "sidebar_session_details": [
                 "Focus: Thread",
@@ -1176,6 +1198,9 @@ def test_visual_manifest_records_review_evidence(tmp_path: Path) -> None:
         "Low risk",
     ]
     assert loaded["viewports"]["desktop"]["sidebar_risk_filter"] == ["Risk filter"]
+    assert loaded["viewports"]["desktop"]["sidebar_focus_filter"] == (
+        visual_qa.EXPECTED_SIDEBAR_FOCUS_FILTER
+    )
     assert loaded["viewports"]["desktop"]["sidebar_session_search"] == ["Find session"]
     assert loaded["viewports"]["desktop"]["sidebar_session_details"] == [
         "Focus: Thread",
@@ -1372,6 +1397,7 @@ def test_visual_manifest_failures_rejects_incomplete_evidence(tmp_path: Path) ->
     assert "manifest desktop screenshot is empty" in failures
     assert "manifest desktop sidebar risk label not found: Low risk" in failures
     assert "manifest desktop missing sidebar Risk filter evidence" in failures
+    assert "manifest desktop missing sidebar Focus filter evidence" in failures
     assert "manifest desktop missing sidebar session search evidence" in failures
     assert "manifest desktop risk distribution card not rendered" in failures
     assert "manifest desktop metric card not rendered: Largest thread" in failures
