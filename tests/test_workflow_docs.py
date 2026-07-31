@@ -107,19 +107,21 @@ def test_pr_template_requires_issue_verification_visual_evidence_and_privacy_rev
     assert "\\n" not in template
 
 
-def test_backlog_records_completed_slices_no_publishable_drafts_and_external_write_guard() -> (
+def test_backlog_records_completed_slices_active_draft_and_external_write_guard() -> (
     None
 ):
     backlog = read("docs/BACKLOG.md")
     issue_files = sorted((ROOT / ".github/backlog").glob("*.md"))
 
-    assert [path.name for path in issue_files] == []
+    assert [path.name for path in issue_files] == [
+        "010-bound-dashboard-history-rendering-for-large-session-sets.md"
+    ]
     assert "requires explicit approval" in backlog
     assert "python scripts/backlog_publish_plan.py" in backlog
     assert "python scripts/backlog_publish_plan.py --new-draft" in backlog
     assert "python scripts/backlog_publish_plan.py --json" in backlog
     assert "draft files were deleted" in backlog
-    assert "There are currently no publishable local issue drafts" in backlog
+    assert "Fresh approval-gated draft `010`" in backlog
     assert "Add a one-command public evidence bundle" in backlog
     assert "codex-observe evidence-bundle" in backlog
     assert "codex-observe.evidence-bundle.v1" in backlog
@@ -181,9 +183,9 @@ def test_current_state_handoff_covers_gates_evidence_and_real_log_checkpoint() -
         "missing/empty database onboarding states",
         "codex-observe evidence-bundle",
         "codex-observe.evidence-bundle.v1",
-        "There is currently no publishable local issue draft",
+        ".github/backlog/010-bound-dashboard-history-rendering-for-large-session-sets.md",
         "issues #1-#8 and #10-#17 are closed",
-        "attaching generated artifacts externally still requires explicit human approval",
+        "Attaching generated artifacts externally still requires explicit human approval",
         "human-approved private input path",
     ]:
         assert required in current
@@ -474,7 +476,9 @@ def test_completed_local_issue_records_stay_separate_from_active_drafts() -> Non
     active_drafts = [
         path.name for path in sorted((ROOT / ".github/backlog").glob("*.md"))
     ]
-    assert active_drafts == []
+    assert active_drafts == [
+        "010-bound-dashboard-history-rendering-for-large-session-sets.md"
+    ]
     for retired in [
         "001-first-run-demo.md",
         "002-diagnostics-summary.md",
@@ -584,7 +588,7 @@ def test_completed_fresh_draft_records_are_not_publishable_ready() -> None:
         in next_wave
     )
     assert "saved manifest schema/contract evidence" in next_wave
-    assert "There is no current publishable draft record" in next_wave
+    assert "Draft `010` is a fresh, validated, approval-gated proposal" in next_wave
     assert "codex-observe evidence-bundle" in next_wave
     assert "009" in next_wave
     assert "first human-approved private checkpoint are complete" in next_wave
@@ -600,8 +604,9 @@ def test_tracking_snapshot_records_current_issue_state_and_publish_guard() -> No
         "Checked: 2026-07-31",
         "gh issue list --limit 20 --state all --json number,title,state,labels,updatedAt,url",
         "All current GitHub issues are closed",
-        "There is no `.github/backlog` directory",
-        "no current publishable local issue draft",
+        "GitHub still has no open issue",
+        ".github/backlog/010-bound-dashboard-history-rendering-for-large-session-sets.md",
+        "it has not been published",
         "python scripts/backlog_publish_plan.py --new-draft",
         "python scripts/backlog_publish_plan.py --json",
         "explicit human approval",

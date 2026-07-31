@@ -31,7 +31,7 @@ All current GitHub issues are closed:
 | #2 | Closed | Fix Streamlit host and port CLI flags |
 | #1 | Closed | Track Codex Observe hardening pass |
 
-There is no `.github/backlog` directory and no current publishable local issue draft.
+GitHub still has no open issue. One fresh approval-gated local draft now exists at `.github/backlog/010-bound-dashboard-history-rendering-for-large-session-sets.md`; it has not been published.
 
 ## New work workflow
 
