@@ -365,6 +365,27 @@ def test_collect_sidebar_risk_filter_uses_visible_text_and_aria_labels() -> None
     assert visual_qa.collect_sidebar_risk_filter(FakePage()) == ["Risk filter"]
 
 
+def test_open_selectbox_targets_narrow_combobox_with_trusted_keyboard_input() -> None:
+    class FakeSelector:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, str | None]] = []
+
+        def press(self, key: str) -> None:
+            self.calls.append(("press", key))
+
+        def click(self) -> None:
+            self.calls.append(("click", None))
+
+    narrow = FakeSelector()
+    desktop = FakeSelector()
+
+    visual_qa.open_selectbox(narrow, "narrow")
+    visual_qa.open_selectbox(desktop, "desktop")
+
+    assert narrow.calls == [("press", "ArrowDown")]
+    assert desktop.calls == [("click", None)]
+
+
 def test_focus_option_label_prefers_target_and_skips_empty_categories() -> None:
     options = ["All focuses", "Thread (2)", "Guardian (0)", "Monitor (1)"]
 

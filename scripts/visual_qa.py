@@ -169,6 +169,13 @@ def focus_option_label(
     )
 
 
+def open_selectbox(selector, viewport_name: str) -> None:
+    if viewport_name == "narrow":
+        selector.press("ArrowDown")
+    else:
+        selector.click()
+
+
 def open_option_labels(page, timeout_ms: int) -> list[str]:
     page.wait_for_function(
         "() => document.querySelectorAll('[role=option]').length > 0",
@@ -539,10 +546,7 @@ def exercise_sidebar_focus_filter(
         )
 
         evidence["stage"] = "open-options"
-        if viewport_name == "narrow":
-            visible_selector.evaluate("element => element.click()")
-        else:
-            visible_selector.click()
+        open_selectbox(visible_selector, viewport_name)
         target_label = "Monitor" if profile == PROFILE_DEMO else initial_focus
         option_labels = open_option_labels(page, timeout_ms)
         target_option = focus_option_label(option_labels, target_label)
@@ -585,10 +589,7 @@ def exercise_sidebar_focus_filter(
         visible_focus_selector = next(
             item for item in focus_selector.all() if item.is_visible()
         )
-        if viewport_name == "narrow":
-            visible_focus_selector.evaluate("element => element.click()")
-        else:
-            visible_focus_selector.click()
+        open_selectbox(visible_focus_selector, viewport_name)
         if not select_open_option(page, "All focuses", timeout_ms):
             return evidence
         page.wait_for_function(
@@ -665,9 +666,7 @@ focus => {
                     "() => document.body.innerText.includes('after risk filter')",
                     timeout=timeout_ms,
                 )
-                page.get_by_label("Risk filter").first.evaluate(
-                    "element => element.click()"
-                )
+                open_selectbox(page.get_by_label("Risk filter").first, "narrow")
                 if not select_open_option(page, "All risks", timeout_ms):
                     return evidence
                 page.wait_for_function(
