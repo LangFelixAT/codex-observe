@@ -588,7 +588,7 @@ def test_completed_fresh_draft_records_are_not_publishable_ready() -> None:
         in next_wave
     )
     assert "saved manifest schema/contract evidence" in next_wave
-    assert "Draft `010` is a fresh, validated, approval-gated proposal" in next_wave
+    assert "Bound dashboard history rendering for large session sets" in next_wave
     assert "codex-observe evidence-bundle" in next_wave
     assert "009" in next_wave
     assert "first human-approved private checkpoint are complete" in next_wave

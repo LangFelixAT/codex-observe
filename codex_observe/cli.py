@@ -812,8 +812,6 @@ def tracking_doc_failures(root: Path | None = None) -> list[str]:
     required = [
         "gh issue list --limit 20 --state all --json number,title,state,labels,updatedAt,url",
         "All current GitHub issues are closed",
-        "There is no `.github/backlog` directory",
-        "no current publishable local issue draft",
         "python scripts/backlog_publish_plan.py --json",
         "explicit human approval",
         "Commit and push the implementation branch",
@@ -821,6 +819,21 @@ def tracking_doc_failures(root: Path | None = None) -> list[str]:
     failures = [
         f"docs/TRACKING.md missing {item}" for item in required if item not in body
     ]
+    active_drafts = active_backlog_drafts(root)
+    if active_drafts:
+        for draft in active_drafts:
+            relative = draft.relative_to(root).as_posix()
+            if relative not in body:
+                failures.append(f"docs/TRACKING.md missing active draft {relative}")
+        if "has not been published" not in body:
+            failures.append("docs/TRACKING.md missing active draft publication status")
+    else:
+        for item in [
+            "There is no `.github/backlog` directory",
+            "no current publishable local issue draft",
+        ]:
+            if item not in body:
+                failures.append(f"docs/TRACKING.md missing {item}")
     if not re.search(r"^Checked: \d{4}-\d{2}-\d{2} with:$", body, re.MULTILINE):
         failures.append("docs/TRACKING.md missing a YYYY-MM-DD checked date")
     for issue_number in range(1, 9):
@@ -1258,8 +1271,8 @@ RELEASE_WORKFLOW_DOC_REQUIREMENTS = {
         "layout review",
         "codex-observe evidence-bundle",
         "codex-observe.evidence-bundle.v1",
-        "There is currently no publishable local issue draft",
-        "attaching generated artifacts externally still requires explicit human approval",
+        "docs/TRACKING.md",
+        "Attaching generated artifacts externally still requires explicit human approval",
         "human-approved private input path",
     ],
     "docs/LIMITATIONS.md": [

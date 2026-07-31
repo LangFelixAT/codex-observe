@@ -74,7 +74,7 @@ Acceptance criteria:
 
 ## Active fresh issue drafts
 
-Draft `010` is a fresh, validated, approval-gated proposal to bound dashboard history rendering for large session sets. It remains local until explicit approval publishes it as a GitHub issue. The completed `009` evidence-bundle draft was implemented locally as `codex-observe evidence-bundle` and deleted after closeout.
+Draft `010`, `Bound dashboard history rendering for large session sets`, is a fresh, validated, approval-gated proposal at `.github/backlog/010-bound-dashboard-history-rendering-for-large-session-sets.md`. It remains local until explicit approval publishes it as a GitHub issue. The completed `009` evidence-bundle draft was implemented locally as `codex-observe evidence-bundle` and deleted after closeout.
 
 Future parser-shape promotion is tracked through `docs/REAL_LOG_FEEDBACK.md` and reviewed-redacted evidence, not as issue content ready to publish until there is a concrete new gap:
 

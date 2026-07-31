@@ -51,6 +51,36 @@ def test_tracking_doc_failures_accepts_a_structured_current_snapshot(
     assert cli.tracking_doc_failures(tmp_path) == []
 
 
+def test_tracking_doc_failures_accepts_approval_gated_active_draft(
+    tmp_path: Path,
+) -> None:
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    draft_dir = tmp_path / ".github" / "backlog"
+    draft_dir.mkdir(parents=True)
+    relative = ".github/backlog/010-active.md"
+    (tmp_path / relative).write_text("# Active draft\n", encoding="utf-8")
+    (docs / "TRACKING.md").write_text(
+        "\n".join(
+            [
+                "Checked: 2026-07-31 with:",
+                "gh issue list --limit 20 --state all --json number,title,state,labels,updatedAt,url",
+                "All current GitHub issues are closed",
+                relative,
+                "The active draft has not been published.",
+                "python scripts/backlog_publish_plan.py --json",
+                "explicit human approval",
+                "Commit and push the implementation branch",
+                *(f"#{number}" for number in range(1, 9)),
+                *(f"#{number}" for number in range(10, 18)),
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    assert cli.tracking_doc_failures(tmp_path) == []
+
+
 def test_cli_help_presents_two_primary_paths(capsys) -> None:
     try:
         cli.main(["--help"])
