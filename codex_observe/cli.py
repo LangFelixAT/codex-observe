@@ -1908,6 +1908,9 @@ def visual_manifest_evidence_failures(root: Path) -> list[str]:
                 "tabs_before_checklist": "tab navigation before next run checklist",
                 "checklist_before_brief": "next run checklist before next run brief",
                 "brief_before_copy_prompt": "next run brief before copyable prompt",
+                "comparison_present": "comparison control rendered",
+                "copy_prompt_before_comparison": "copyable prompt before comparison control",
+                "comparison_before_metrics": "comparison control before metric grid",
                 "copy_prompt_before_metrics": "copyable prompt before metric grid",
                 "tabs_in_initial_viewport": "tab navigation inside initial viewport",
             }

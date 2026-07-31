@@ -2959,57 +2959,10 @@ def main() -> None:
             copy_prompt = str(next_run_brief.get("copy_prompt") or "").strip()
             if copy_prompt:
                 st.code(copy_prompt, language=None)
-        render_metric_grid(overview_metrics)
-        st.markdown(
-            portfolio_briefing_html(session_portfolio_summary(summaries)),
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            risk_distribution_html(risk_distribution),
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            sampled_ingest_coverage_html(ingest_scope, db),
-            unsafe_allow_html=True,
-        )
         comparison_candidates = comparison_candidate_options(conversations, session_id)
         comparison_options = [
             candidate["session_id"] for candidate in comparison_candidates
         ]
-        st.markdown(
-            review_path_html(success_target, has_comparison=bool(comparison_options)),
-            unsafe_allow_html=True,
-        )
-        st.markdown(triage_card_html(triage), unsafe_allow_html=True)
-
-        st.markdown(
-            feedback_handoff_html(report.get("feedback_handoff")),
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            report_ingest_scope_warning_html(report),
-            unsafe_allow_html=True,
-        )
-        downloads = report_download_payloads(report)
-        export_left, export_right = st.columns(2)
-        with export_left:
-            st.download_button(
-                "Download report MD",
-                downloads["markdown"]["data"],
-                file_name=downloads["markdown"]["filename"],
-                mime=downloads["markdown"]["mime"],
-                width="stretch",
-                key=f"download_report_md_{session_id}",
-            )
-        with export_right:
-            st.download_button(
-                "Download report JSON",
-                downloads["json"]["data"],
-                file_name=downloads["json"]["filename"],
-                mime=downloads["json"]["mime"],
-                width="stretch",
-                key=f"download_report_json_{session_id}",
-            )
         if comparison_options:
             st.subheader("Compare runs")
             comparison_labels = {}
@@ -3080,6 +3033,53 @@ def main() -> None:
                     width="stretch",
                     key=f"download_comparison_json_{before_id}_{after_id}",
                 )
+        render_metric_grid(overview_metrics)
+        st.markdown(
+            portfolio_briefing_html(session_portfolio_summary(summaries)),
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            risk_distribution_html(risk_distribution),
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            sampled_ingest_coverage_html(ingest_scope, db),
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            review_path_html(success_target, has_comparison=bool(comparison_options)),
+            unsafe_allow_html=True,
+        )
+        st.markdown(triage_card_html(triage), unsafe_allow_html=True)
+
+        st.markdown(
+            feedback_handoff_html(report.get("feedback_handoff")),
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            report_ingest_scope_warning_html(report),
+            unsafe_allow_html=True,
+        )
+        downloads = report_download_payloads(report)
+        export_left, export_right = st.columns(2)
+        with export_left:
+            st.download_button(
+                "Download report MD",
+                downloads["markdown"]["data"],
+                file_name=downloads["markdown"]["filename"],
+                mime=downloads["markdown"]["mime"],
+                width="stretch",
+                key=f"download_report_md_{session_id}",
+            )
+        with export_right:
+            st.download_button(
+                "Download report JSON",
+                downloads["json"]["data"],
+                file_name=downloads["json"]["filename"],
+                mime=downloads["json"]["mime"],
+                width="stretch",
+                key=f"download_report_json_{session_id}",
+            )
         st.subheader("Next run success target")
         st.markdown(success_target_html(success_target), unsafe_allow_html=True)
         st.subheader("Opportunity stack")

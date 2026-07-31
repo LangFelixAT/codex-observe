@@ -638,6 +638,9 @@ def test_action_first_layout_failures_require_navigation_and_plan_before_metrics
         "tabs_before_checklist": True,
         "checklist_before_brief": True,
         "brief_before_copy_prompt": True,
+        "comparison_present": True,
+        "copy_prompt_before_comparison": True,
+        "comparison_before_metrics": True,
         "copy_prompt_before_metrics": True,
         "tabs_in_initial_viewport": True,
         "tabs_visible_count": 6,
@@ -646,7 +649,20 @@ def test_action_first_layout_failures_require_navigation_and_plan_before_metrics
 
     assert action_first_layout_failures(layout, "desktop") == []
 
+    real_single_run_layout = dict(layout)
+    real_single_run_layout["comparison_present"] = False
+    assert (
+        action_first_layout_failures(real_single_run_layout, "desktop", profile="real")
+        == []
+    )
+    assert (
+        "desktop: comparison control is not rendered"
+        in action_first_layout_failures(real_single_run_layout, "desktop")
+    )
+
     layout["tabs_in_initial_viewport"] = False
+    layout["copy_prompt_before_comparison"] = False
+    layout["comparison_before_metrics"] = False
     layout["copy_prompt_before_metrics"] = False
     layout["tabs_visible_count"] = 5
     failures = action_first_layout_failures(layout, "narrow")
@@ -655,6 +671,8 @@ def test_action_first_layout_failures_require_navigation_and_plan_before_metrics
         "narrow: tab navigation is not fully visible in the initial viewport"
         in failures
     )
+    assert "narrow: copyable prompt does not precede comparison control" in failures
+    assert "narrow: comparison control does not precede metric grid" in failures
     assert "narrow: copyable prompt does not precede metric grid" in failures
     assert (
         "narrow: complete tab navigation is not visible in the initial viewport"
@@ -966,6 +984,9 @@ def complete_viewport_results(tmp_path: Path) -> dict[str, dict[str, object]]:
                 "tabs_before_checklist": True,
                 "checklist_before_brief": True,
                 "brief_before_copy_prompt": True,
+                "comparison_present": True,
+                "copy_prompt_before_comparison": True,
+                "comparison_before_metrics": True,
                 "copy_prompt_before_metrics": True,
                 "tabs_in_initial_viewport": True,
                 "tabs_visible_count": 6,
@@ -976,6 +997,7 @@ def complete_viewport_results(tmp_path: Path) -> dict[str, dict[str, object]]:
                 "checklist_top": 494,
                 "brief_top": 750,
                 "copy_prompt_top": 1100,
+                "comparison_top": 1250,
                 "metric_grid_top": 1500,
                 "viewport_height": viewport["height"],
             },
@@ -1200,6 +1222,9 @@ def test_visual_manifest_records_review_evidence(tmp_path: Path) -> None:
         "tabs_before_checklist": True,
         "checklist_before_brief": True,
         "brief_before_copy_prompt": True,
+        "comparison_present": True,
+        "copy_prompt_before_comparison": True,
+        "comparison_before_metrics": True,
         "copy_prompt_before_metrics": True,
         "tabs_in_initial_viewport": True,
         "tabs_visible_count": 6,
@@ -1210,6 +1235,7 @@ def test_visual_manifest_records_review_evidence(tmp_path: Path) -> None:
         "checklist_top": 494,
         "brief_top": 750,
         "copy_prompt_top": 1100,
+        "comparison_top": 1250,
         "metric_grid_top": 1500,
         "viewport_height": 1000,
     }

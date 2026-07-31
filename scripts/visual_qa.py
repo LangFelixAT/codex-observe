@@ -919,6 +919,9 @@ def collect_action_first_layout(page) -> dict[str, object]:
   const tablist = document.querySelector('[role="tablist"]');
   const checklist = document.querySelector('.co-next-run-checklist');
   const brief = document.querySelector('.co-next-run-brief');
+  const comparison = Array.from(document.querySelectorAll('[data-testid="stSelectbox"]')).find(
+    (item) => (item.innerText || '').includes('Compare with run')
+  );
   const metrics = document.querySelector('.co-metric-grid');
   const copyBlock = Array.from(document.querySelectorAll('[data-testid="stCode"], .stCode')).find(
     (item) => (item.innerText || '').includes('Next Codex run plan:')
@@ -938,6 +941,7 @@ def collect_action_first_layout(page) -> dict[str, object]:
   const checklistRect = rect(checklist);
   const briefRect = rect(brief);
   const copyRect = rect(copyBlock);
+  const comparisonRect = comparison ? rect(comparison) : null;
   const metricRect = rect(metrics);
   const tabs = Array.from(tablist.querySelectorAll('[role="tab"]'));
   const tabsVisible = tabs.filter((tab) => {
@@ -949,6 +953,9 @@ def collect_action_first_layout(page) -> dict[str, object]:
     tabs_before_checklist: tablistRect.bottom <= checklistRect.top,
     checklist_before_brief: checklistRect.bottom <= briefRect.top,
     brief_before_copy_prompt: briefRect.bottom <= copyRect.top,
+    comparison_present: Boolean(comparisonRect),
+    copy_prompt_before_comparison: !comparisonRect || copyRect.bottom <= comparisonRect.top,
+    comparison_before_metrics: !comparisonRect || comparisonRect.bottom <= metricRect.top,
     copy_prompt_before_metrics: copyRect.bottom <= metricRect.top,
     tabs_in_initial_viewport: tablistRect.top >= 0 && tablistRect.bottom <= window.innerHeight,
     tabs_visible_count: tabsVisible.length,
@@ -959,6 +966,7 @@ def collect_action_first_layout(page) -> dict[str, object]:
     checklist_top: Math.round(checklistRect.top),
     brief_top: Math.round(briefRect.top),
     copy_prompt_top: Math.round(copyRect.top),
+    comparison_top: comparisonRect ? Math.round(comparisonRect.top) : null,
     metric_grid_top: Math.round(metricRect.top),
     viewport_height: window.innerHeight,
   };
@@ -968,7 +976,7 @@ def collect_action_first_layout(page) -> dict[str, object]:
 
 
 def action_first_layout_failures(
-    layout: dict[str, object], viewport_name: str
+    layout: dict[str, object], viewport_name: str, profile: str = "demo"
 ) -> list[str]:
     if not layout:
         return [f"{viewport_name}: missing action-first layout evidence"]
@@ -983,9 +991,13 @@ def action_first_layout_failures(
         "tabs_before_checklist": "tab navigation does not precede next run checklist",
         "checklist_before_brief": "next run checklist does not precede next run brief",
         "brief_before_copy_prompt": "next run brief does not precede copyable prompt",
+        "copy_prompt_before_comparison": "copyable prompt does not precede comparison control",
+        "comparison_before_metrics": "comparison control does not precede metric grid",
         "copy_prompt_before_metrics": "copyable prompt does not precede metric grid",
         "tabs_in_initial_viewport": "tab navigation is not fully visible in the initial viewport",
     }
+    if profile != "real" and layout.get("comparison_present") is not True:
+        failures.append(f"{viewport_name}: comparison control is not rendered")
     for key, message in checks.items():
         if layout.get(key) is not True:
             failures.append(f"{viewport_name}: {message}")
@@ -1298,7 +1310,9 @@ def validate_dashboard_page(
     answer_first_layout = collect_answer_first_layout(page)
     failures.extend(answer_first_layout_failures(answer_first_layout, viewport_name))
     action_first_layout = collect_action_first_layout(page)
-    failures.extend(action_first_layout_failures(action_first_layout, viewport_name))
+    failures.extend(
+        action_first_layout_failures(action_first_layout, viewport_name, profile)
+    )
     page.get_by_role("tab", name="Overview", exact=True).click()
     page.wait_for_timeout(1500 if profile == PROFILE_REAL else 500)
     if profile == PROFILE_REAL:
@@ -2032,7 +2046,9 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
         if not isinstance(action_first_layout, dict):
             failures.append(f"manifest {name} missing action-first layout evidence")
         else:
-            action_failures = action_first_layout_failures(action_first_layout, name)
+            action_failures = action_first_layout_failures(
+                action_first_layout, name, profile
+            )
             failures.extend(
                 failure.replace(f"{name}: ", f"manifest {name} ")
                 for failure in action_failures
