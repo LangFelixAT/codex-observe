@@ -31,6 +31,7 @@ from codex_observe.dashboard import (
     duplication_quick_read_html,
     empty_state_commands_html,
     feedback_handoff_html,
+    filter_conversations_by_focus,
     filter_conversations_by_risk,
     filter_conversations_by_search,
     format_session_duration,
@@ -47,6 +48,7 @@ from codex_observe.dashboard import (
     risk_distribution_html,
     risk_marker,
     sampled_ingest_coverage_html,
+    sidebar_focus_filter_options,
     sidebar_risk_filter_options,
     success_target_html,
     thread_brief_html,
@@ -145,6 +147,7 @@ def test_order_conversations_for_review_uses_risk_aware_session_summaries() -> N
     assert ordered["usage_snapshots"].tolist() == [6, 3]
     assert ordered["session_duration_hours"].tolist() == [84.0, 0.2]
     assert ordered["session_duration_days"].tolist() == [3.5, 0.0]
+    assert ordered["focus"].tolist() == ["duration", "monitor"]
     assert ordered["focus_label"].tolist() == ["Duration", "Monitor"]
     assert ordered["focus_driver"].tolist() == ["session_duration_hours", "none"]
     assert "_review_order" not in ordered.columns
@@ -197,6 +200,56 @@ def test_filter_conversations_by_risk_preserves_order_and_all_mode() -> None:
     assert filter_conversations_by_risk(conversations, "medium")[
         "session_id"
     ].tolist() == ["medium", "moderate"]
+
+
+def test_sidebar_focus_filter_options_count_stable_focus_values() -> None:
+    conversations = pd.DataFrame(
+        [
+            {
+                "session_id": "thread-a",
+                "focus": "thread",
+                "focus_label": "Thread",
+                "focus_driver": "largest_thread_share_pct",
+            },
+            {
+                "session_id": "thread-b",
+                "focus_label": "Thread",
+                "focus_driver": "largest_thread_share_pct",
+            },
+            {
+                "session_id": "monitor",
+                "focus_label": "Monitor",
+                "focus_driver": "none",
+            },
+        ]
+    )
+
+    assert sidebar_focus_filter_options(conversations) == [
+        ("All focuses", "all"),
+        ("Duration (0)", "duration"),
+        ("Thread (2)", "thread"),
+        ("Guardian (0)", "guardian"),
+        ("Replay (0)", "replay"),
+        ("Uncached (0)", "uncached"),
+        ("Tool out (0)", "tool-output"),
+        ("Tokens (0)", "tokens"),
+        ("Monitor (1)", "monitor"),
+    ]
+
+
+def test_filter_conversations_by_focus_preserves_order_and_all_mode() -> None:
+    conversations = pd.DataFrame(
+        [
+            {"session_id": "thread-a", "focus": "thread"},
+            {"session_id": "monitor", "focus": "monitor"},
+            {"session_id": "thread-b", "focus": "thread"},
+        ]
+    )
+
+    assert filter_conversations_by_focus(conversations, "all").equals(conversations)
+    assert filter_conversations_by_focus(conversations, "thread")[
+        "session_id"
+    ].tolist() == ["thread-a", "thread-b"]
 
 
 def test_filter_conversations_by_search_matches_sidebar_fields() -> None:

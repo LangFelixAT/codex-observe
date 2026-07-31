@@ -1337,7 +1337,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     assert report.with_name("run-comparison.json").exists()
     assert (
         checks["session listing"]["detail"]
-        == "2 sessions; triage risk, risk distribution, status, schema, limit and risk-filter metadata, usage snapshots, duration metadata, text recommended action, session table focus, duration, tool-output, and guardian columns, duration and tool-output drivers, structured driver summary, success-target preview, recommendation detail, review path, text validation next commands, and structured validation next commands verified"
+        == "2 sessions; triage risk, risk and focus distributions, status, schema, limit and composable risk/focus-filter metadata, usage snapshots, duration metadata, text recommended action, stable session focus values, duration, tool-output, and guardian columns, duration and tool-output drivers, structured driver summary, success-target preview, recommendation detail, review path, text validation next commands, and structured validation next commands verified"
     )
     assert checks["database doctor"]["detail"] == (
         "ok; schema, text next commands, next commands, and review path verified"
@@ -1526,6 +1526,17 @@ def test_sessions_missing_json_payload_is_actionable_and_schema_versioned() -> N
     assert payload["truncated"] is False
     assert payload["limit"] == cli.DEFAULT_SESSIONS_LIMIT
     assert payload["risk_filter"] is None
+    assert payload["focus_filter"] is None
+    assert payload["focus_distribution"] == {
+        "duration": 0,
+        "thread": 0,
+        "guardian": 0,
+        "replay": 0,
+        "uncached": 0,
+        "tool-output": 0,
+        "tokens": 0,
+        "monitor": 0,
+    }
     assert payload["matching_sessions"] == 0
     assert "codex-observe demo --db missing.sqlite" in payload["next_commands"]
     assert payload["review_path"][0]["label"] == "Create demo data"
@@ -1596,6 +1607,17 @@ def test_sessions_json_payload_limits_rows_without_changing_recommendation(
     assert payload["truncated"] is True
     assert payload["limit"] == 1
     assert payload["risk_filter"] is None
+    assert payload["focus_filter"] is None
+    assert payload["focus_distribution"] == {
+        "duration": 0,
+        "thread": 1,
+        "guardian": 0,
+        "replay": 0,
+        "uncached": 0,
+        "tool-output": 0,
+        "tokens": 0,
+        "monitor": 1,
+    }
     assert payload["matching_sessions"] == 2
     assert len(payload["sessions"]) == 1
     assert payload["sessions"][0]["session_id"] == "demo-session-cost-review"
@@ -1655,6 +1677,31 @@ def test_sessions_json_payload_filters_by_risk_and_keeps_distribution(
     assert payload["next_commands"][0].endswith("--out run-report.md")
 
 
+def test_sessions_json_payload_filters_by_focus_and_composes_with_risk(
+    tmp_path: Path,
+) -> None:
+    db = tmp_path / "demo.sqlite"
+    cli.create_demo_database(str(db), str(tmp_path / "sessions"))
+
+    payload = cli.sessions_json_payload(
+        str(db), risk_filter="low", focus_filter="monitor"
+    )
+
+    assert payload["status"] == "ok"
+    assert payload["total_sessions"] == 2
+    assert payload["matching_sessions"] == 1
+    assert payload["returned_sessions"] == 1
+    assert payload["risk_filter"] == "low"
+    assert payload["focus_filter"] == "monitor"
+    assert payload["focus_distribution"]["thread"] == 1
+    assert payload["focus_distribution"]["monitor"] == 1
+    assert payload["sessions"][0]["focus"] == "monitor"
+    assert payload["sessions"][0]["triage_risk"] == "low"
+    assert payload["recommended_session"]["session_id"] == (
+        "demo-session-focused-followup"
+    )
+
+
 def test_sessions_json_payload_reports_empty_filter_matches(tmp_path: Path) -> None:
     db = tmp_path / "demo.sqlite"
     cli.create_demo_database(str(db), str(tmp_path / "sessions"))
@@ -1687,6 +1734,30 @@ def test_sessions_cli_filters_text_by_risk(tmp_path: Path, capsys) -> None:
     assert " | low | " in captured.out
     assert " | high | " not in captured.out
     assert "Next: review the highest-risk matching run" in captured.out
+
+
+def test_sessions_cli_filters_text_by_focus_and_risk(tmp_path: Path, capsys) -> None:
+    db = tmp_path / "demo.sqlite"
+    cli.create_demo_database(str(db), str(tmp_path / "sessions"))
+
+    result = cli.main(
+        [
+            "sessions",
+            "--db",
+            str(db),
+            "--risk",
+            "high",
+            "--focus",
+            "thread",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert result == 0
+    assert "Focus distribution:" in captured.out
+    assert "Filter: high risk + Thread focus (1 of 2 sessions)." in captured.out
+    assert "demo-session-cost-review" in captured.out
+    assert "demo-session-focused-followup" not in captured.out
 
 
 def test_demo_payload_and_text_include_review_path() -> None:

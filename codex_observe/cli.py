@@ -22,7 +22,9 @@ from .parser import ingest
 from .report import (
     COMPARISON_SCHEMA_VERSION,
     REPORT_SCHEMA_VERSION,
+    SESSION_FOCUS_VALUES,
     build_report,
+    filter_session_summaries_by_focus,
     filter_session_summaries_by_risk,
     compare_reports,
     comparison_json,
@@ -31,6 +33,7 @@ from .report import (
     latest_ingest_scope,
     report_json,
     report_markdown,
+    session_focus_distribution,
     session_portfolio_summary,
     session_report_hint,
     session_risk_distribution,
@@ -2424,7 +2427,9 @@ def release_audit_report(
             if isinstance(session, dict)
         )
         sessions_have_focus = bool(sessions) and all(
-            session.get("focus_driver") and session.get("focus_label")
+            session.get("focus")
+            and session.get("focus_driver")
+            and session.get("focus_label")
             for session in sessions
             if isinstance(session, dict)
         )
@@ -2439,6 +2444,7 @@ def release_audit_report(
             and sessions_payload.get("truncated") is False
             and sessions_payload.get("limit") == DEFAULT_SESSIONS_LIMIT
             and sessions_payload.get("risk_filter") is None
+            and sessions_payload.get("focus_filter") is None
         )
         sessions_filter_payload = sessions_json_payload(
             actual_db_path, risk_filter="high"
@@ -2458,11 +2464,37 @@ def release_audit_report(
             == "high"
             and "Filter: high risk (1 of 2 sessions)." in session_filter_text
         )
+        sessions_focus_filter_payload = sessions_json_payload(
+            actual_db_path, risk_filter="low", focus_filter="monitor"
+        )
+        session_focus_filter_text = "\n".join(
+            session_summary_lines(
+                actual_db_path, risk_filter="low", focus_filter="monitor"
+            )
+        )
+        sessions_has_focus_filter = (
+            sessions_focus_filter_payload.get("risk_filter") == "low"
+            and sessions_focus_filter_payload.get("focus_filter") == "monitor"
+            and sessions_focus_filter_payload.get("total_sessions") == 2
+            and sessions_focus_filter_payload.get("matching_sessions") == 1
+            and sessions_focus_filter_payload.get("returned_sessions") == 1
+            and sessions_focus_filter_payload.get("recommended_session", {}).get(
+                "focus"
+            )
+            == "monitor"
+            and "Filter: low risk + Monitor focus (1 of 2 sessions)."
+            in session_focus_filter_text
+        )
         sessions_has_risk_distribution = (
             sessions_payload.get("risk_distribution", {}).get("high") == 1
             and sessions_payload.get("risk_distribution", {}).get("low") == 1
             and sessions_payload.get("risk_distribution", {}).get("medium") == 0
             and sessions_payload.get("risk_distribution", {}).get("unknown") == 0
+        )
+        sessions_has_focus_distribution = (
+            sessions_payload.get("focus_distribution", {}).get("thread") == 1
+            and sessions_payload.get("focus_distribution", {}).get("monitor") == 1
+            and sum(sessions_payload.get("focus_distribution", {}).values()) == 2
         )
         sessions_has_recommendation = bool(sessions_payload.get("recommended_session"))
         recommended_session = sessions_payload.get("recommended_session")
@@ -2553,7 +2585,10 @@ def release_audit_report(
             and all("largest_tool_output_chars" in row for row in sessions)
             and all("usage_snapshots" in row for row in sessions)
             and all("session_duration_hours" in row for row in sessions)
-            and all("focus_driver" in row and "focus_label" in row for row in sessions)
+            and all(
+                "focus" in row and "focus_driver" in row and "focus_label" in row
+                for row in sessions
+            )
         )
         session_listing_ok = (
             sessions_have_risk
@@ -2561,9 +2596,11 @@ def release_audit_report(
             and sessions_has_schema
             and sessions_has_status
             and sessions_has_risk_distribution
+            and sessions_has_focus_distribution
             and sessions_has_recommendation
             and sessions_has_limit_metadata
             and sessions_has_risk_filter
+            and sessions_has_focus_filter
             and sessions_has_next_commands
             and sessions_has_recommendation_detail
             and sessions_has_review_path
@@ -2572,9 +2609,9 @@ def release_audit_report(
         add(
             "session listing",
             session_listing_ok,
-            f"{len(sessions)} sessions; triage risk, risk distribution, status, schema, limit and risk-filter metadata, usage snapshots, duration metadata, text recommended action, session table focus, duration, tool-output, and guardian columns, duration and tool-output drivers, structured driver summary, success-target preview, recommendation detail, review path, text validation next commands, and structured validation next commands verified"
+            f"{len(sessions)} sessions; triage risk, risk and focus distributions, status, schema, limit and composable risk/focus-filter metadata, usage snapshots, duration metadata, text recommended action, stable session focus values, duration, tool-output, and guardian columns, duration and tool-output drivers, structured driver summary, success-target preview, recommendation detail, review path, text validation next commands, and structured validation next commands verified"
             if session_listing_ok
-            else "session listing missing aggregate triage risk, risk_distribution, status, schema_version, limit and risk-filter metadata, usage snapshots, duration metadata, text recommended action, recommended_session, recommendation_detail, review_path, text validation next commands, session table focus, duration, tool-output, and guardian columns, duration or tool-output driver, structured driver summary, success-target preview, validation next_commands, or next_commands",
+            else "session listing missing aggregate triage risk, risk_distribution, focus_distribution, status, schema_version, limit and composable risk/focus-filter metadata, usage snapshots, duration metadata, text recommended action, recommended_session, recommendation_detail, review_path, text validation next commands, stable session focus values, duration, tool-output, and guardian columns, duration or tool-output driver, structured driver summary, success-target preview, validation next_commands, or next_commands",
         )
     except FileNotFoundError as exc:
         sessions = []
@@ -3417,7 +3454,9 @@ def release_audit_lines(
 
 
 def sessions_missing_json_payload(
-    db_path: str, risk_filter: str | None = None
+    db_path: str,
+    risk_filter: str | None = None,
+    focus_filter: str | None = None,
 ) -> dict[str, object]:
     db_arg = _command_arg(db_path)
     return {
@@ -3430,8 +3469,10 @@ def sessions_missing_json_payload(
         "truncated": False,
         "limit": DEFAULT_SESSIONS_LIMIT,
         "risk_filter": risk_filter,
+        "focus_filter": focus_filter,
         "matching_sessions": 0,
         "risk_distribution": {"high": 0, "medium": 0, "low": 0, "unknown": 0},
+        "focus_distribution": session_focus_distribution([]),
         "portfolio_summary": session_portfolio_summary([]),
         "recommended_session": None,
         "recommendation_detail": None,
@@ -3565,9 +3606,12 @@ def sessions_json_payload(
     db_path: str,
     limit: int | None = DEFAULT_SESSIONS_LIMIT,
     risk_filter: str | None = None,
+    focus_filter: str | None = None,
 ) -> dict[str, object]:
     summaries = session_summaries(db_path)
+    normalized_focus = focus_filter.strip().lower() if focus_filter else None
     filtered = filter_session_summaries_by_risk(summaries, risk_filter)
+    filtered = filter_session_summaries_by_focus(filtered, normalized_focus)
     effective_limit = None if limit is None else max(1, int(limit))
     display_limit = len(filtered) if effective_limit is None else effective_limit
     displayed = filtered[:display_limit]
@@ -3582,7 +3626,9 @@ def sessions_json_payload(
         "truncated": len(displayed) < len(filtered),
         "limit": effective_limit,
         "risk_filter": risk_filter,
+        "focus_filter": normalized_focus,
         "risk_distribution": session_risk_distribution(summaries),
+        "focus_distribution": session_focus_distribution(summaries),
         "portfolio_summary": session_portfolio_summary(summaries, filtered),
         "ingest_scope": latest_ingest_scope(db_path),
     }
@@ -3602,9 +3648,18 @@ def sessions_json_payload(
         payload["recommended_session"] = None
         payload["recommendation_detail"] = None
         payload["review_path"] = sessions_review_path(db_path)
-        if summaries and risk_filter:
+        if summaries and risk_filter and not normalized_focus:
             payload["next"] = (
                 "remove --risk or choose one of high, medium, low, unknown."
+            )
+        elif summaries and normalized_focus and not risk_filter:
+            payload["next"] = (
+                f"remove --focus or choose one of {', '.join(SESSION_FOCUS_VALUES)}."
+            )
+        elif summaries and risk_filter and normalized_focus:
+            payload["next"] = (
+                "remove --risk and/or --focus, or choose values listed by "
+                "`codex-observe sessions --help`."
             )
         else:
             payload["next"] = (
@@ -5874,6 +5929,12 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Filter printed or returned sessions by aggregate triage risk",
     )
+    p_sessions.add_argument(
+        "--focus",
+        choices=SESSION_FOCUS_VALUES,
+        default=None,
+        help="Filter sessions by their primary workflow-improvement focus",
+    )
     p_compare = sub.add_parser(
         "compare",
         help="Compare two privacy-safe run reports or two sessions from one database",
@@ -6041,7 +6102,10 @@ def main(argv: list[str] | None = None) -> int:
                 print(
                     json.dumps(
                         sessions_json_payload(
-                            args.db, limit=args.limit, risk_filter=args.risk
+                            args.db,
+                            limit=args.limit,
+                            risk_filter=args.risk,
+                            focus_filter=args.focus,
                         ),
                         indent=2,
                         sort_keys=True,
@@ -6051,7 +6115,10 @@ def main(argv: list[str] | None = None) -> int:
                 lines = ingest_scope_lines(latest_ingest_scope(args.db), args.db)
                 lines.extend(
                     session_summary_lines(
-                        args.db, limit=args.limit, risk_filter=args.risk
+                        args.db,
+                        limit=args.limit,
+                        risk_filter=args.risk,
+                        focus_filter=args.focus,
                     )
                 )
                 print("\n".join(lines))
@@ -6059,7 +6126,11 @@ def main(argv: list[str] | None = None) -> int:
             if args.json:
                 print(
                     json.dumps(
-                        sessions_missing_json_payload(args.db, risk_filter=args.risk),
+                        sessions_missing_json_payload(
+                            args.db,
+                            risk_filter=args.risk,
+                            focus_filter=args.focus,
+                        ),
                         indent=2,
                         sort_keys=True,
                     )

@@ -24,6 +24,17 @@ from .analysis import (
 
 REPORT_SCHEMA_VERSION = "codex-observe.report.v1"
 COMPARISON_SCHEMA_VERSION = "codex-observe.comparison.v1"
+SESSION_FOCUS_CATALOG = {
+    "duration": {"driver": "session_duration_hours", "label": "Duration"},
+    "thread": {"driver": "largest_thread_share_pct", "label": "Thread"},
+    "guardian": {"driver": "guardian_input_share_pct", "label": "Guardian"},
+    "replay": {"driver": "repeated_prompt_share_pct", "label": "Replay"},
+    "uncached": {"driver": "uncached_input_share_pct", "label": "Uncached"},
+    "tool-output": {"driver": "largest_tool_output_chars", "label": "Tool out"},
+    "tokens": {"driver": "total_tokens", "label": "Tokens"},
+    "monitor": {"driver": "none", "label": "Monitor"},
+}
+SESSION_FOCUS_VALUES = tuple(SESSION_FOCUS_CATALOG)
 
 
 def command_arg(path: Path | str) -> str:
@@ -188,6 +199,27 @@ def sort_session_summaries(summaries: list[dict[str, Any]]) -> list[dict[str, An
     )
 
 
+def _session_focus_descriptor(value: str) -> dict[str, str]:
+    definition = SESSION_FOCUS_CATALOG[value]
+    return {
+        "value": value,
+        "driver": definition["driver"],
+        "label": definition["label"],
+    }
+
+
+def session_focus_value(summary: dict[str, Any]) -> str:
+    explicit = str(summary.get("focus") or "").strip().lower()
+    if explicit in SESSION_FOCUS_CATALOG:
+        return explicit
+    driver = str(summary.get("focus_driver") or "").strip()
+    label = str(summary.get("focus_label") or "").strip().casefold()
+    for value, definition in SESSION_FOCUS_CATALOG.items():
+        if driver == definition["driver"] or label == definition["label"].casefold():
+            return value
+    return "monitor"
+
+
 def session_focus(summary: dict[str, Any]) -> dict[str, str]:
     duration_hours = float(summary.get("session_duration_hours") or 0)
     thread_count = _safe_int(summary.get("threads"))
@@ -200,30 +232,30 @@ def session_focus(summary: dict[str, Any]) -> dict[str, str]:
     total_tokens = _safe_int(summary.get("total_tokens"))
 
     if duration_hours >= 24:
-        return {"driver": "session_duration_hours", "label": "Duration"}
+        return _session_focus_descriptor("duration")
     if thread_count >= 2 and largest_thread_share >= 50:
-        return {"driver": "largest_thread_share_pct", "label": "Thread"}
+        return _session_focus_descriptor("thread")
     if guardian_share >= 25 and guardian_tokens >= 25_000:
-        return {"driver": "guardian_input_share_pct", "label": "Guardian"}
+        return _session_focus_descriptor("guardian")
     if repeated_share >= 15:
-        return {"driver": "repeated_prompt_share_pct", "label": "Replay"}
+        return _session_focus_descriptor("replay")
     if uncached_share >= 35:
-        return {"driver": "uncached_input_share_pct", "label": "Uncached"}
+        return _session_focus_descriptor("uncached")
     if tool_chars >= 5_000:
-        return {"driver": "largest_tool_output_chars", "label": "Tool out"}
+        return _session_focus_descriptor("tool-output")
     if total_tokens >= 100_000:
-        return {"driver": "total_tokens", "label": "Tokens"}
+        return _session_focus_descriptor("tokens")
     if thread_count >= 2 and largest_thread_share >= 35:
-        return {"driver": "largest_thread_share_pct", "label": "Thread"}
+        return _session_focus_descriptor("thread")
     if repeated_share >= 8:
-        return {"driver": "repeated_prompt_share_pct", "label": "Replay"}
+        return _session_focus_descriptor("replay")
     if uncached_share >= 20:
-        return {"driver": "uncached_input_share_pct", "label": "Uncached"}
+        return _session_focus_descriptor("uncached")
     if tool_chars >= 2_000:
-        return {"driver": "largest_tool_output_chars", "label": "Tool out"}
+        return _session_focus_descriptor("tool-output")
     if total_tokens >= 25_000:
-        return {"driver": "total_tokens", "label": "Tokens"}
-    return {"driver": "none", "label": "Monitor"}
+        return _session_focus_descriptor("tokens")
+    return _session_focus_descriptor("monitor")
 
 
 def session_summaries(db_path: str) -> list[dict[str, Any]]:
@@ -358,6 +390,7 @@ def session_summaries(db_path: str) -> list[dict[str, Any]]:
             "largest_tool_output_chars": largest_tool_output_chars,
         }
         focus = session_focus(summary)
+        summary["focus"] = focus["value"]
         summary["focus_driver"] = focus["driver"]
         summary["focus_label"] = focus["label"]
         summaries.append(summary)
@@ -375,6 +408,15 @@ def filter_session_summaries_by_risk(
         for row in summaries
         if str(row.get("triage_risk") or "unknown").lower() == normalized
     ]
+
+
+def filter_session_summaries_by_focus(
+    summaries: list[dict[str, Any]], focus_filter: str | None = None
+) -> list[dict[str, Any]]:
+    if not focus_filter:
+        return summaries
+    normalized = focus_filter.strip().lower()
+    return [row for row in summaries if session_focus_value(row) == normalized]
 
 
 def session_report_hint(db_path: str, session_id: str | None = None) -> str:
@@ -403,6 +445,26 @@ def session_risk_distribution_line(distribution: dict[str, int]) -> str:
         f"low {int(distribution.get('low', 0))}, "
         f"unknown {int(distribution.get('unknown', 0))}"
     )
+
+
+def session_focus_distribution(summaries: list[dict[str, Any]]) -> dict[str, int]:
+    distribution = {value: 0 for value in SESSION_FOCUS_VALUES}
+    for row in summaries:
+        distribution[session_focus_value(row)] += 1
+    return distribution
+
+
+def session_focus_distribution_line(distribution: dict[str, int]) -> str:
+    values = (
+        f"{definition['label']} {int(distribution.get(value, 0))}"
+        for value, definition in SESSION_FOCUS_CATALOG.items()
+    )
+    return f"Focus distribution: {', '.join(values)}"
+
+
+def session_focus_filter_label(focus_filter: str) -> str:
+    definition = SESSION_FOCUS_CATALOG.get(focus_filter.strip().lower())
+    return definition["label"] if definition else focus_filter.strip()
 
 
 def _portfolio_driver_catalog() -> list[dict[str, Any]]:
@@ -816,7 +878,10 @@ def session_review_path_lines(db_path: str, session_id: str) -> list[str]:
 
 
 def session_summary_lines(
-    db_path: str, limit: int | None = 50, risk_filter: str | None = None
+    db_path: str,
+    limit: int | None = 50,
+    risk_filter: str | None = None,
+    focus_filter: str | None = None,
 ) -> list[str]:
     summaries = session_summaries(db_path)
     if not summaries:
@@ -831,25 +896,42 @@ def session_summary_lines(
             *(f"- {command}" for command in next_commands),
             f"Next: run `{next_commands[0]}` or `{next_commands[1]}`.",
         ]
-    distribution = session_risk_distribution(summaries)
+    risk_distribution = session_risk_distribution(summaries)
+    focus_distribution = session_focus_distribution(summaries)
     filtered = filter_session_summaries_by_risk(summaries, risk_filter)
+    filtered = filter_session_summaries_by_focus(filtered, focus_filter)
     portfolio = session_portfolio_summary(summaries, filtered)
     lines = [
-        session_risk_distribution_line(distribution),
+        session_risk_distribution_line(risk_distribution),
+        session_focus_distribution_line(focus_distribution),
         session_portfolio_summary_line(portfolio),
     ]
+    filter_parts = []
     if risk_filter:
-        normalized = risk_filter.strip().lower()
+        filter_parts.append(f"{risk_filter.strip().lower()} risk")
+    if focus_filter:
+        filter_parts.append(f"{session_focus_filter_label(focus_filter)} focus")
+    if filter_parts:
         lines.append(
-            f"Filter: {normalized} risk ({len(filtered)} of {len(summaries)} sessions)."
+            f"Filter: {' + '.join(filter_parts)} "
+            f"({len(filtered)} of {len(summaries)} sessions)."
         )
     if not filtered:
-        lines.extend(
-            [
-                "No sessions matched the risk filter.",
-                "Next: remove --risk or choose one of high, medium, low, unknown.",
-            ]
-        )
+        lines.append("No sessions matched the active filters.")
+        if risk_filter and not focus_filter:
+            lines.append(
+                "Next: remove --risk or choose one of high, medium, low, unknown."
+            )
+        elif focus_filter and not risk_filter:
+            lines.append(
+                "Next: remove --focus or choose one of "
+                f"{', '.join(SESSION_FOCUS_VALUES)}."
+            )
+        else:
+            lines.append(
+                "Next: remove --risk and/or --focus, or choose values listed by "
+                "`codex-observe sessions --help`."
+            )
         return lines
     recommended = filtered[0]
     recommended_session_id = str(recommended["session_id"])
@@ -879,9 +961,10 @@ def session_summary_lines(
             )
         )
     if len(displayed) < len(filtered):
-        if risk_filter:
+        if risk_filter or focus_filter:
             lines.append(
-                f"Showing {len(displayed)} of {len(filtered)} matching sessions ({len(summaries)} total)."
+                f"Showing {len(displayed)} of {len(filtered)} matching sessions "
+                f"({len(summaries)} total)."
             )
         else:
             lines.append(f"Showing {len(displayed)} of {len(summaries)} sessions.")
@@ -889,7 +972,7 @@ def session_summary_lines(
     next_commands = session_validation_commands(db_path, recommended_session_id)
     lines.append("Next commands:")
     lines.extend(f"- {command}" for command in next_commands)
-    next_scope = "matching " if risk_filter else ""
+    next_scope = "matching " if risk_filter or focus_filter else ""
     lines.append(
         f"Next: review the highest-risk {next_scope}run "
         f"({recommended['session_id']}, {recommended['triage_risk']} risk); "

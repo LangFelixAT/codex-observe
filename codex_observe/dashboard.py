@@ -30,6 +30,7 @@ from codex_observe.analysis import (
 )
 
 from codex_observe.report import (
+    SESSION_FOCUS_CATALOG,
     build_report,
     command_arg,
     compare_reports,
@@ -43,6 +44,7 @@ from codex_observe.report import (
     session_portfolio_summary,
     session_risk_distribution,
     session_duration_hours,
+    session_focus_value,
     session_summaries,
 )
 
@@ -2192,6 +2194,10 @@ def order_conversations_for_review(
         str(summary.get("session_id")): float(summary.get("session_duration_days") or 0)
         for summary in summaries
     }
+    focus_by_session = {
+        str(summary.get("session_id")): session_focus_value(summary)
+        for summary in summaries
+    }
     focus_label_by_session = {
         str(summary.get("session_id")): str(summary.get("focus_label") or "Monitor")
         for summary in summaries
@@ -2218,6 +2224,10 @@ def order_conversations_for_review(
     ]
     ordered["session_duration_days"] = [
         duration_days_by_session.get(str(session_id), 0.0)
+        for session_id in ordered["session_id"]
+    ]
+    ordered["focus"] = [
+        focus_by_session.get(str(session_id), "monitor")
         for session_id in ordered["session_id"]
     ]
     ordered["focus_label"] = [
@@ -2271,6 +2281,33 @@ def filter_conversations_by_risk(
     return conversations[risk_values == normalized].reset_index(drop=True)
 
 
+def sidebar_focus_filter_options(
+    conversations: pd.DataFrame,
+) -> list[tuple[str, str]]:
+    counts = {value: 0 for value in SESSION_FOCUS_CATALOG}
+    if not conversations.empty:
+        for _, row in conversations.iterrows():
+            counts[session_focus_value(row.to_dict())] += 1
+    options = [("All focuses", "all")]
+    options.extend(
+        (f"{definition['label']} ({counts[value]})", value)
+        for value, definition in SESSION_FOCUS_CATALOG.items()
+    )
+    return options
+
+
+def filter_conversations_by_focus(
+    conversations: pd.DataFrame, focus_filter: str | None
+) -> pd.DataFrame:
+    if not focus_filter or focus_filter == "all" or conversations.empty:
+        return conversations
+    normalized = focus_filter.strip().lower()
+    focus_values = conversations.apply(
+        lambda row: session_focus_value(row.to_dict()), axis=1
+    )
+    return conversations[focus_values == normalized].reset_index(drop=True)
+
+
 def filter_conversations_by_search(
     conversations: pd.DataFrame, query: str | None
 ) -> pd.DataFrame:
@@ -2284,6 +2321,7 @@ def filter_conversations_by_search(
             "preview",
             "last_seen",
             "triage_risk",
+            "focus",
             "focus_label",
             "focus_driver",
         ]
@@ -2750,7 +2788,7 @@ def main() -> None:
         st.metric("Conversations", len(conversations))
         search_query = st.text_input(
             "Find session",
-            placeholder="Search label, date, risk, or session fragment",
+            placeholder="Search label, date, risk, focus, or session fragment",
             key="sidebar_session_search",
         )
         risk_filter_options = sidebar_risk_filter_options(conversations)
@@ -2759,8 +2797,17 @@ def main() -> None:
             "Risk filter", risk_filter_labels, index=0, key="sidebar_risk_filter"
         )
         risk_filter = dict(risk_filter_options)[selected_risk_label]
-        filtered_conversations = filter_conversations_by_risk(
+        risk_filtered_conversations = filter_conversations_by_risk(
             conversations, risk_filter
+        )
+        focus_filter_options = sidebar_focus_filter_options(risk_filtered_conversations)
+        focus_filter_labels = [label for label, _value in focus_filter_options]
+        selected_focus_label = st.selectbox(
+            "Focus filter", focus_filter_labels, index=0, key="sidebar_focus_filter"
+        )
+        focus_filter = dict(focus_filter_options)[selected_focus_label]
+        filtered_conversations = filter_conversations_by_focus(
+            risk_filtered_conversations, focus_filter
         )
         filtered_conversations = filter_conversations_by_search(
             filtered_conversations, search_query
@@ -2770,6 +2817,8 @@ def main() -> None:
             active_filters.append("search")
         if risk_filter != "all":
             active_filters.append("risk")
+        if focus_filter != "all":
+            active_filters.append("focus")
         if active_filters:
             st.caption(
                 f"Showing {len(filtered_conversations)} of {len(conversations)} conversations after "

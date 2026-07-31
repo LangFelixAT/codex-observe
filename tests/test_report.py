@@ -18,6 +18,7 @@ from codex_observe.report import (
     comparison_markdown,
     comparison_review_path,
     default_report_session,
+    filter_session_summaries_by_focus,
     load_report_json,
     report_follow_up_commands,
     report_headline,
@@ -27,6 +28,8 @@ from codex_observe.report import (
     report_review_path,
     report_triage,
     report_success_target,
+    SESSION_FOCUS_VALUES,
+    session_focus_distribution,
     session_portfolio_drivers,
     session_portfolio_summary,
     session_recommended_action_lines,
@@ -728,6 +731,7 @@ def test_session_summaries_are_aggregate_only(tmp_path: Path) -> None:
             "uncached_input_share_pct": 39.5,
             "guardian_input_share_pct": 24.3,
             "largest_tool_output_chars": 3960,
+            "focus": "thread",
             "focus_driver": "largest_thread_share_pct",
             "focus_label": "Thread",
         },
@@ -750,11 +754,16 @@ def test_session_summaries_are_aggregate_only(tmp_path: Path) -> None:
             "uncached_input_share_pct": 14.3,
             "guardian_input_share_pct": 29.8,
             "largest_tool_output_chars": 880,
+            "focus": "monitor",
             "focus_driver": "none",
             "focus_label": "Monitor",
         },
     ]
     assert "Risk distribution: high 1, medium 0, low 1, unknown 0" in lines
+    assert (
+        "Focus distribution: Duration 0, Thread 1, Guardian 0, Replay 0, "
+        "Uncached 0, Tool out 0, Tokens 0, Monitor 1" in lines
+    )
     assert (
         "Session ID | Last seen | Risk | Focus | Duration | Threads | Tools | Snapshots | Tool out | Tokens | Uncached | Guardian"
         in lines
@@ -817,6 +826,49 @@ def test_session_summaries_are_aggregate_only(tmp_path: Path) -> None:
     assert "--session-id demo-session-cost-review --out run-report.md" in lines
     for private in PRIVATE_DEMO_STRINGS:
         assert private not in serialized
+
+
+def test_session_focus_contract_filters_and_composes_with_risk(tmp_path: Path) -> None:
+    db = demo_db(tmp_path)
+    summaries = session_summaries(str(db))
+
+    assert SESSION_FOCUS_VALUES == (
+        "duration",
+        "thread",
+        "guardian",
+        "replay",
+        "uncached",
+        "tool-output",
+        "tokens",
+        "monitor",
+    )
+    assert session_focus_distribution(summaries) == {
+        "duration": 0,
+        "thread": 1,
+        "guardian": 0,
+        "replay": 0,
+        "uncached": 0,
+        "tool-output": 0,
+        "tokens": 0,
+        "monitor": 1,
+    }
+    assert [
+        row["session_id"]
+        for row in filter_session_summaries_by_focus(summaries, "thread")
+    ] == ["demo-session-cost-review"]
+    assert [
+        row["session_id"]
+        for row in filter_session_summaries_by_focus(summaries, "monitor")
+    ] == ["demo-session-focused-followup"]
+
+    lines = "\n".join(
+        session_summary_lines(str(db), risk_filter="high", focus_filter="thread")
+    )
+
+    assert "Filter: high risk + Thread focus (1 of 2 sessions)." in lines
+    assert "demo-session-cost-review" in lines
+    assert "demo-session-focused-followup" not in lines
+    assert "Next: review the highest-risk matching run" in lines
 
 
 def test_session_listing_prioritizes_multi_day_target_preview(
