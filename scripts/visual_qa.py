@@ -142,6 +142,17 @@ FOCUS_LABELS = [
     "Tokens",
     "Monitor",
 ]
+
+
+def focus_filter_select_keys(target_label: str) -> list[str]:
+    target_index = FOCUS_LABELS.index(target_label) + 1
+    return ["ArrowDown"] * target_index + ["Enter"]
+
+
+def focus_filter_reset_keys() -> list[str]:
+    return ["ArrowUp"] * len(FOCUS_LABELS) + ["Enter"]
+
+
 EXPECTED_SIDEBAR_SESSION_SEARCH = ["Find session"]
 EXPECTED_SIDEBAR_SESSION_DETAILS = ["Focus: Thread", "24 min duration", "6 snapshots"]
 EXPECTED_DOWNLOAD_CONTROLS = [
@@ -480,12 +491,9 @@ def exercise_sidebar_focus_filter(
             if not target_label:
                 page.keyboard.press("Escape")
                 return evidence
-            if profile == PROFILE_DEMO:
-                page.keyboard.press("End")
-            else:
-                page.keyboard.type(target_label)
+            for key in focus_filter_select_keys(target_label):
+                page.keyboard.press(key)
             evidence["stage"] = "apply-filter"
-            page.keyboard.press("Enter")
         else:
             options = page.get_by_role("option")
             options.first.wait_for(state="visible", timeout=timeout_ms)
@@ -551,8 +559,8 @@ def exercise_sidebar_focus_filter(
         )
         if viewport_name == "narrow":
             visible_focus_selector.evaluate("element => element.click()")
-            page.keyboard.press("Home")
-            page.keyboard.press("Enter")
+            for key in focus_filter_reset_keys():
+                page.keyboard.press(key)
         else:
             visible_focus_selector.click()
             page.get_by_role("option", name="All focuses", exact=True).click()
@@ -609,8 +617,8 @@ focus => {
                 page.get_by_label("Risk filter").first.evaluate(
                     "element => element.click()"
                 )
-                page.keyboard.press("Home")
-                page.keyboard.press("Enter")
+                for key in focus_filter_reset_keys():
+                    page.keyboard.press(key)
                 page.wait_for_function(
                     "() => !document.body.innerText.includes('after risk filter')",
                     timeout=timeout_ms,

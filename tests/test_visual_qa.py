@@ -365,6 +365,18 @@ def test_collect_sidebar_risk_filter_uses_visible_text_and_aria_labels() -> None
     assert visual_qa.collect_sidebar_risk_filter(FakePage()) == ["Risk filter"]
 
 
+def test_focus_filter_keyboard_navigation_avoids_platform_specific_keys() -> None:
+    thread_keys = visual_qa.focus_filter_select_keys("Thread")
+    monitor_keys = visual_qa.focus_filter_select_keys("Monitor")
+    reset_keys = visual_qa.focus_filter_reset_keys()
+
+    assert thread_keys == ["ArrowDown", "ArrowDown", "Enter"]
+    assert monitor_keys == ["ArrowDown"] * 8 + ["Enter"]
+    assert reset_keys == ["ArrowUp"] * 8 + ["Enter"]
+    assert "Home" not in thread_keys + monitor_keys + reset_keys
+    assert "End" not in thread_keys + monitor_keys + reset_keys
+
+
 def test_sidebar_focus_filter_failures_require_exercised_filter_contract() -> None:
     evidence = dict(visual_qa.EXPECTED_SIDEBAR_FOCUS_FILTER)
 
