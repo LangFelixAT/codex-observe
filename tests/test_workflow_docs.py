@@ -182,7 +182,7 @@ def test_current_state_handoff_covers_gates_evidence_and_real_log_checkpoint() -
         "codex-observe evidence-bundle",
         "codex-observe.evidence-bundle.v1",
         "There is currently no publishable local issue draft",
-        "issues #1-#8 and #10-#14 are closed",
+        "issues #1-#8 and #10-#15 are closed",
         "attaching generated artifacts externally still requires explicit human approval",
         "human-approved private input path",
     ]:
@@ -321,6 +321,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         "Tools quick read",
         "Duplication quick read",
         "Raw tables data inventory",
+        "nearest-follow-up comparison selection",
         "chronological comparison direction",
         "aggregate triage assessment",
         "required_commands",
@@ -354,6 +355,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         "regression suite",
         "clean-install smoke gate",
         "aggregate release audit",
+        "nearest-follow-up comparison selection",
         "chronological comparison direction",
         "synthetic demo generation",
         "aggregate-only session listing",
@@ -378,6 +380,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
     assert "triage-risk" in release
     assert "visual QA manifest" in release
     assert "schema/contract evidence" in release
+    assert "nearest-follow-up comparison selection" in release
     assert "missing/empty database onboarding states" in release
     assert "metric cards" in release
     assert (
@@ -592,7 +595,7 @@ def test_tracking_snapshot_records_current_issue_state_and_publish_guard() -> No
     config = read(".github/ISSUE_TEMPLATE/config.yml")
 
     for required in [
-        "Checked: 2026-07-29",
+        "Checked: 2026-07-31",
         "gh issue list --limit 20 --state all --json number,title,state,labels,updatedAt,url",
         "All current GitHub issues are closed",
         "There is no `.github/backlog` directory",
@@ -610,5 +613,6 @@ def test_tracking_snapshot_records_current_issue_state_and_publish_guard() -> No
     assert "#12" in tracking
     assert "#13" in tracking
     assert "#14" in tracking
+    assert "#15" in tracking
     assert "docs/TRACKING.md" in current
     assert "docs/TRACKING.md" in config

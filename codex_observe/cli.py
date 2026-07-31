@@ -815,7 +815,7 @@ def tracking_doc_failures(root: Path | None = None) -> list[str]:
     for issue_number in range(1, 9):
         if f"#{issue_number}" not in body:
             failures.append(f"docs/TRACKING.md missing issue #{issue_number}")
-    for issue_number in [10, 11, 12, 13, 14]:
+    for issue_number in [10, 11, 12, 13, 14, 15]:
         if f"#{issue_number}" not in body:
             failures.append(f"docs/TRACKING.md missing issue #{issue_number}")
     return failures
@@ -3337,7 +3337,7 @@ def release_audit_report(
             f"{VISUAL_MANIFEST.as_posix()}; "
             f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['desktop']).as_posix()}; "
             f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['narrow']).as_posix()}; "
-            "visual manifest schema and contract, screenshots, empty states, layout review, answer-first briefing, action-first navigation and plan ordering, native copy control, chronological comparison direction, risk labels, sidebar Risk filter, sidebar session search, sidebar session details, risk distribution, metric cards, dashboard quick reads, report and comparison downloads, report scope-warning evidence, comparison preview, comparison scope-warning evidence, comparison review path, deltas, operator briefing, next review path, next-run checklist, next-run brief, safe feedback handoff, and success target verified"
+            "visual manifest schema and contract, screenshots, empty states, layout review, answer-first briefing, action-first navigation and plan ordering, native copy control, nearest-follow-up comparison selection, chronological comparison direction, risk labels, sidebar Risk filter, sidebar session search, sidebar session details, risk distribution, metric cards, dashboard quick reads, report and comparison downloads, report scope-warning evidence, comparison preview, comparison scope-warning evidence, comparison review path, deltas, operator briefing, next review path, next-run checklist, next-run brief, safe feedback handoff, and success target verified"
             if not visual_manifest_failures
             else "; ".join(visual_manifest_failures[:3]),
         )

@@ -5,6 +5,7 @@ All notable changes to Codex Observe will be documented here.
 The project follows semantic versioning once release distribution is decided.
 
 ## Unreleased
+- Defaulted dashboard comparisons to the nearest chronological follow-up, or nearest predecessor when no follow-up exists, with explicit Next run/Previous run labels and desktop/narrow synthetic plus real-profile visual evidence.
 - Ordered dashboard comparisons chronologically with explicit Before/After aggregate context, so the synthetic older high-risk run to newer low-risk follow-up correctly reports improvement instead of a reversed regression.
 - Moved dashboard navigation and the next-run action plan before supporting metrics, added a native copy control for the aggregate-only prompt, and extended desktop/narrow synthetic and real-profile visual QA to enforce the hierarchy.
 - Split `codex-observe tour` into a concise default user journey and explicit `--reviewer` mode while preserving the exhaustive JSON automation contract.

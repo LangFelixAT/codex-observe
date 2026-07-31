@@ -4,7 +4,7 @@ This file records the current issue-tracking state and the expected workflow for
 
 ## Current GitHub issue state
 
-Checked: 2026-07-29 with:
+Checked: 2026-07-31 with:
 
 ```powershell
 gh issue list --limit 20 --state all --json number,title,state,labels,updatedAt,url
@@ -14,6 +14,7 @@ All current GitHub issues are closed:
 
 | Issue | State | Title |
 | --- | --- | --- |
+| #15 | Closed | Default comparisons to the nearest chronological run |
 | #14 | Closed | Order dashboard comparisons chronologically |
 | #13 | Closed | Put next-run action and navigation before dashboard metrics |
 | #12 | Closed | Make the default tour a concise user journey |
