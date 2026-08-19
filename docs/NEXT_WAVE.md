@@ -72,9 +72,11 @@ Acceptance criteria:
 - [x] README and PR template ask contributors to attach or reference the manifest for UI-facing changes, and `codex-observe audit` verifies saved manifest schema/contract evidence, referenced screenshots, layout review, sidebar-risk labels, sidebar Risk filter evidence, bounded sidebar history page evidence, sidebar session search evidence, usage-snapshot comparison deltas, and high-risk metric evidence after visual QA runs.
 - [x] Tests cover manifest generation and saved-evidence validation without depending on a live browser.
 
-## Latest completed implementation issue
+## Active implementation issue
 
-GitHub issue #18, `Bound dashboard history rendering for large session sets`, completed with 50 conversations per page, range-aware Previous/Next controls, stable selected reports across page changes, filter-reset semantics, helper tests, and synthetic plus ignored real-profile desktop/narrow visual evidence. Draft `010` was published after explicit human approval and retired from the local backlog. The completed `009` evidence-bundle draft was implemented locally as `codex-observe evidence-bundle` and deleted after closeout.
+GitHub issue #19, `Protect saved visual QA evidence from test mutation`, is the active implementation slice. It isolates test-generated screenshots from saved local evidence and upgrades screenshot verification to exact byte-size plus SHA-256 integrity under manifest schema v2. Draft `011` was published under the standing authorization for GitHub tracking and retired from the local backlog.
+
+Issue #18, `Bound dashboard history rendering for large session sets`, completed with 50 conversations per page, range-aware Previous/Next controls, stable selected reports across page changes, filter-reset semantics, helper tests, and synthetic plus ignored real-profile desktop/narrow visual evidence. The completed `009` evidence-bundle draft was implemented locally as `codex-observe evidence-bundle` and deleted after closeout.
 
 Future parser-shape promotion is tracked through `docs/REAL_LOG_FEEDBACK.md` and reviewed-redacted evidence, not as issue content ready to publish until there is a concrete new gap:
 

@@ -43,6 +43,7 @@ def test_tracking_doc_failures_accepts_a_structured_current_snapshot(
                 "#16",
                 "#17",
                 "#18",
+                "#19",
             ]
         ),
         encoding="utf-8",
@@ -72,7 +73,7 @@ def test_tracking_doc_failures_accepts_approval_gated_active_draft(
                 "explicit human approval",
                 "Commit and push the implementation branch",
                 *(f"#{number}" for number in range(1, 9)),
-                *(f"#{number}" for number in range(10, 19)),
+                *(f"#{number}" for number in range(10, 20)),
             ]
         ),
         encoding="utf-8",

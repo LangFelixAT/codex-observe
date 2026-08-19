@@ -303,6 +303,7 @@ RETIRED_BACKLOG_DRAFTS = {
     ".github/backlog/008-public-readme-tour.md",
     ".github/backlog/009-public-evidence-bundle.md",
     ".github/backlog/010-bound-dashboard-history-rendering-for-large-session-sets.md",
+    ".github/backlog/011-protect-saved-visual-qa-evidence-from-test-mutation.md",
 }
 BACKLOG_FORBIDDEN_PATTERNS = [
     r"sample_from_uploaded\.sqlite",
@@ -859,7 +860,7 @@ def tracking_doc_failures(root: Path | None = None) -> list[str]:
     for issue_number in range(1, 9):
         if f"#{issue_number}" not in body:
             failures.append(f"docs/TRACKING.md missing issue #{issue_number}")
-    for issue_number in [10, 11, 12, 13, 14, 15, 16, 17, 18]:
+    for issue_number in [10, 11, 12, 13, 14, 15, 16, 17, 18, 19]:
         if f"#{issue_number}" not in body:
             failures.append(f"docs/TRACKING.md missing issue #{issue_number}")
     return failures

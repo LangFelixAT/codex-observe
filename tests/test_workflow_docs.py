@@ -118,6 +118,7 @@ def test_backlog_records_published_slice_retirement_and_external_write_guard() -
     assert "python scripts/backlog_publish_plan.py --json" in backlog
     assert "draft files were deleted" in backlog
     assert "Draft `010` was published as issue #18" in backlog
+    assert "draft `011` was published as issue #19" in backlog
     assert "Add a one-command public evidence bundle" in backlog
     assert "codex-observe evidence-bundle" in backlog
     assert "codex-observe.evidence-bundle.v1" in backlog
@@ -182,6 +183,7 @@ def test_current_state_handoff_covers_gates_evidence_and_real_log_checkpoint() -
         "50 conversations per page",
         "sidebar history page evidence",
         "issues #1-#8 and #10-#18 are closed",
+        "issue #19 is the active implementation slice",
         "Attaching generated artifacts externally still requires explicit human approval",
         "human-approved private input path",
     ]:
@@ -589,6 +591,7 @@ def test_completed_fresh_draft_records_are_not_publishable_ready() -> None:
     )
     assert "saved manifest schema/contract evidence" in next_wave
     assert "Bound dashboard history rendering for large session sets" in next_wave
+    assert "Protect saved visual QA evidence from test mutation" in next_wave
     assert "codex-observe evidence-bundle" in next_wave
     assert "009" in next_wave
     assert "first human-approved private checkpoint are complete" in next_wave
@@ -603,9 +606,9 @@ def test_tracking_snapshot_records_current_issue_state_and_publish_guard() -> No
     for required in [
         "Checked: 2026-08-19",
         "gh issue list --limit 20 --state all --json number,title,state,labels,updatedAt,url",
-        "All current GitHub issues are closed",
-        "Issue #18 closed after the dashboard began rendering",
-        "Draft `010` was published after explicit human approval",
+        "Current implementation issue",
+        "Issue #19 is the active implementation slice",
+        "Draft `011` was published under the standing authorization",
         "no current publishable local issue draft",
         "python scripts/backlog_publish_plan.py --new-draft",
         "python scripts/backlog_publish_plan.py --json",
@@ -624,5 +627,6 @@ def test_tracking_snapshot_records_current_issue_state_and_publish_guard() -> No
     assert "#16" in tracking
     assert "#17" in tracking
     assert "#18" in tracking
+    assert "#19" in tracking
     assert "docs/TRACKING.md" in current
     assert "docs/TRACKING.md" in config

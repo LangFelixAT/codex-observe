@@ -1,6 +1,6 @@
 # GitHub Backlog
 
-This file records completed and retired local vertical-slice planning. The draft files were deleted after completion, publication, or when they became human-input reminders rather than implementation slices; publishing issue content to GitHub still requires explicit approval, and completed drafts should not be published as new GitHub issues. Draft `010` was published as issue #18, completed with bounded 50-conversation dashboard history pages, and retired from `.github/backlog/`; the implemented next-wave closeout and completed evidence-bundle slice are summarized in `docs/NEXT_WAVE.md`.
+This file records completed and retired local vertical-slice planning. The draft files were deleted after completion, publication, or when they became human-input reminders rather than implementation slices; publishing issue content to GitHub still requires explicit approval, and completed drafts should not be published as new GitHub issues. Draft `010` was published as issue #18, completed with bounded 50-conversation dashboard history pages, and retired from `.github/backlog/`; draft `011` was published as issue #19 and retired before implementation; the implemented next-wave closeout and completed evidence-bundle slice are summarized in `docs/NEXT_WAVE.md`.
 
 ## Labels
 

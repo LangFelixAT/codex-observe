@@ -10,10 +10,11 @@ Checked: 2026-08-19 with:
 gh issue list --limit 20 --state all --json number,title,state,labels,updatedAt,url
 ```
 
-All current GitHub issues are closed:
+Current implementation issue:
 
 | Issue | State | Title |
 | --- | --- | --- |
+| #19 | Open | Protect saved visual QA evidence from test mutation |
 | #18 | Closed | Bound dashboard history rendering for large session sets |
 | #17 | Closed | Make Focus a first-class session-history filter |
 | #16 | Closed | Make run comparison the next dashboard step |
@@ -32,7 +33,7 @@ All current GitHub issues are closed:
 | #2 | Closed | Fix Streamlit host and port CLI flags |
 | #1 | Closed | Track Codex Observe hardening pass |
 
-Issue #18 closed after the dashboard began rendering large histories in bounded 50-conversation pages with range-aware Previous/Next navigation, stable selected reports, filter-reset semantics, helper tests, and synthetic plus ignored real-profile desktop/narrow evidence. Draft `010` was published after explicit human approval and retired from the local publishable backlog. There is no current publishable local issue draft.
+Issue #19 is the active implementation slice. It protects saved visual evidence from test mutation and binds every referenced screenshot to manifest schema v2 with exact byte size plus SHA-256 verification. Draft `011` was published under the standing authorization for GitHub tracking and retired from the local publishable backlog. Issue #18 remains closed after bounded dashboard history navigation shipped. There is no current publishable local issue draft.
 
 ## New work workflow
 

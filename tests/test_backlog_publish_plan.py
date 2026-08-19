@@ -90,7 +90,7 @@ def test_create_draft_scaffolds_valid_issue_template(tmp_path: Path) -> None:
     )
 
     assert created.relative_to(tmp_path).as_posix() == (
-        ".github/backlog/011-dashboard-next-habit-polish.md"
+        ".github/backlog/012-dashboard-next-habit-polish.md"
     )
     body = created.read_text(encoding="utf-8")
 
@@ -101,7 +101,7 @@ def test_create_draft_scaffolds_valid_issue_template(tmp_path: Path) -> None:
     assert "Use synthetic demo data only." in body
     assert backlog_publish_plan.validate_draft(created) == []
     assert backlog_publish_plan.publish_plan(tmp_path)[0]["body_file"] == (
-        ".github/backlog/011-dashboard-next-habit-polish.md"
+        ".github/backlog/012-dashboard-next-habit-polish.md"
     )
 
 
@@ -132,7 +132,7 @@ def test_backlog_publish_plan_new_draft_json_reports_created_draft(
     assert result == 0
     assert payload["status"] == "created"
     assert payload["requires_approval"] is True
-    assert payload["draft"] == ".github/backlog/011-improve-comparison-briefing.md"
+    assert payload["draft"] == ".github/backlog/012-improve-comparison-briefing.md"
     assert payload["publishable_drafts"][0]["labels"] == [
         "type: slice",
         "area: dashboard",
