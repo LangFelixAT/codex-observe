@@ -183,8 +183,8 @@ def test_current_state_handoff_covers_gates_evidence_and_real_log_checkpoint() -
         "50 conversations per page",
         "sidebar history page evidence",
         "schema-v2 exact byte-size and SHA-256 screenshot integrity",
-        "issues #1-#8 and #10-#18 are closed",
-        "issue #19 is the active implementation slice",
+        "issues #1-#8 and #10-#19 are closed",
+        "Issue #19 completed visual-evidence integrity",
         "Attaching generated artifacts externally still requires explicit human approval",
         "human-approved private input path",
     ]:
@@ -612,9 +612,9 @@ def test_tracking_snapshot_records_current_issue_state_and_publish_guard() -> No
     for required in [
         "Checked: 2026-08-19",
         "gh issue list --limit 20 --state all --json number,title,state,labels,updatedAt,url",
-        "Current implementation issue",
-        "Issue #19 is the active implementation slice",
-        "Draft `011` was published under the standing authorization",
+        "All current GitHub issues are closed",
+        "Issue #19 is closed",
+        "Draft `011` was completed",
         "no current publishable local issue draft",
         "python scripts/backlog_publish_plan.py --new-draft",
         "python scripts/backlog_publish_plan.py --json",

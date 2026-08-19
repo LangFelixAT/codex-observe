@@ -10,11 +10,11 @@ Checked: 2026-08-19 with:
 gh issue list --limit 20 --state all --json number,title,state,labels,updatedAt,url
 ```
 
-Current implementation issue:
+All current GitHub issues are closed:
 
 | Issue | State | Title |
 | --- | --- | --- |
-| #19 | Open | Protect saved visual QA evidence from test mutation |
+| #19 | Closed | Protect saved visual QA evidence from test mutation |
 | #18 | Closed | Bound dashboard history rendering for large session sets |
 | #17 | Closed | Make Focus a first-class session-history filter |
 | #16 | Closed | Make run comparison the next dashboard step |
@@ -33,7 +33,7 @@ Current implementation issue:
 | #2 | Closed | Fix Streamlit host and port CLI flags |
 | #1 | Closed | Track Codex Observe hardening pass |
 
-Issue #19 is the active implementation slice. It protects saved visual evidence from test mutation and binds every referenced screenshot to manifest schema v2 with exact byte size plus SHA-256 verification. Draft `011` was published under the standing authorization for GitHub tracking and retired from the local publishable backlog. Issue #18 remains closed after bounded dashboard history navigation shipped. There is no current publishable local issue draft.
+Issue #19 is closed after test-generated visual fixtures were isolated from saved evidence, manifest schema v2 bound every referenced screenshot to exact byte size plus SHA-256, and evidence-bundle synchronization was corrected to copy all manifest-referenced onboarding captures. Commit `af886ce` passed 296 tests, clean-install smoke, synthetic visual QA, manifest verification, evidence-bundle audit, and GitHub CI run `32300632202`. Draft `011` was completed and retired from the local publishable backlog. There is no current publishable local issue draft.
 
 ## New work workflow
 

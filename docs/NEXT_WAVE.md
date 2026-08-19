@@ -72,9 +72,9 @@ Acceptance criteria:
 - [x] README and PR template ask contributors to attach or reference the manifest for UI-facing changes, and `codex-observe audit` verifies saved manifest schema/contract evidence, referenced screenshots, layout review, sidebar-risk labels, sidebar Risk filter evidence, bounded sidebar history page evidence, sidebar session search evidence, usage-snapshot comparison deltas, and high-risk metric evidence after visual QA runs.
 - [x] Tests cover manifest generation and saved-evidence validation without depending on a live browser.
 
-## Active implementation issue
+## Latest completed implementation issue
 
-GitHub issue #19, `Protect saved visual QA evidence from test mutation`, is the active implementation slice. It isolates test-generated screenshots from saved local evidence and upgrades screenshot verification to exact byte-size plus SHA-256 integrity under manifest schema v2. Draft `011` was published under the standing authorization for GitHub tracking and retired from the local backlog.
+GitHub issue #19, `Protect saved visual QA evidence from test mutation`, is complete. Test-generated screenshots and public evidence bundles now stay in temporary directories, manifest schema v2 records exact byte size plus SHA-256 for every capture, both the verifier and release audit reject stale bytes or digests, and evidence-bundle synchronization copies every manifest-referenced onboarding screenshot. Draft `011` was completed and retired from the local backlog after 296 tests, clean-install smoke, synthetic visual QA, manifest verification, evidence-bundle audit, and GitHub CI run `32300632202` passed.
 
 Issue #18, `Bound dashboard history rendering for large session sets`, completed with 50 conversations per page, range-aware Previous/Next controls, stable selected reports across page changes, filter-reset semantics, helper tests, and synthetic plus ignored real-profile desktop/narrow visual evidence. The completed `009` evidence-bundle draft was implemented locally as `codex-observe evidence-bundle` and deleted after closeout.
 
