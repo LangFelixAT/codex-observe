@@ -29,7 +29,6 @@ def test_tracking_doc_failures_accepts_a_structured_current_snapshot(
                 "Checked: 2026-07-29 with:",
                 "gh issue list --limit 20 --state all --json number,title,state,labels,updatedAt,url",
                 "All current GitHub issues are closed",
-                "There is no `.github/backlog` directory",
                 "no current publishable local issue draft",
                 "python scripts/backlog_publish_plan.py --json",
                 "explicit human approval",
@@ -43,6 +42,7 @@ def test_tracking_doc_failures_accepts_a_structured_current_snapshot(
                 "#15",
                 "#16",
                 "#17",
+                "#18",
             ]
         ),
         encoding="utf-8",
@@ -72,7 +72,7 @@ def test_tracking_doc_failures_accepts_approval_gated_active_draft(
                 "explicit human approval",
                 "Commit and push the implementation branch",
                 *(f"#{number}" for number in range(1, 9)),
-                *(f"#{number}" for number in range(10, 18)),
+                *(f"#{number}" for number in range(10, 19)),
             ]
         ),
         encoding="utf-8",

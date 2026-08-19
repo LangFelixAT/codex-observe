@@ -14,18 +14,13 @@ backlog_publish_plan = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(backlog_publish_plan)
 
 
-def test_backlog_publish_plan_discovers_current_approval_gated_draft() -> None:
+def test_backlog_publish_plan_has_no_draft_after_issue_publication() -> None:
     drafts = backlog_publish_plan.discover_drafts(ROOT)
 
-    assert drafts == [
-        (
-            "Bound dashboard history rendering for large session sets",
-            ".github/backlog/010-bound-dashboard-history-rendering-for-large-session-sets.md",
-        )
-    ]
+    assert drafts == []
 
 
-def test_backlog_publish_plan_reports_current_fresh_draft(capsys) -> None:
+def test_backlog_publish_plan_reports_no_publishable_draft(capsys) -> None:
     result = backlog_publish_plan.main([])
     output = capsys.readouterr().out
 
@@ -33,8 +28,8 @@ def test_backlog_publish_plan_reports_current_fresh_draft(capsys) -> None:
     assert "requires explicit approval" in output
     assert "LangFelixAT/codex-observe" in output
     assert "Backlog draft validation passed" in output
-    assert "gh issue create" in output
-    assert "010-bound-dashboard-history-rendering-for-large-session-sets.md" in output
+    assert "No publishable drafts found" in output
+    assert "gh issue create" not in output
     assert "006-release-candidate-ux-evidence.md" not in output
     assert "007-real-log-parser-feedback-loop.md" not in output
     assert "008-public-readme-tour.md" not in output
@@ -95,7 +90,7 @@ def test_create_draft_scaffolds_valid_issue_template(tmp_path: Path) -> None:
     )
 
     assert created.relative_to(tmp_path).as_posix() == (
-        ".github/backlog/010-dashboard-next-habit-polish.md"
+        ".github/backlog/011-dashboard-next-habit-polish.md"
     )
     body = created.read_text(encoding="utf-8")
 
@@ -106,7 +101,7 @@ def test_create_draft_scaffolds_valid_issue_template(tmp_path: Path) -> None:
     assert "Use synthetic demo data only." in body
     assert backlog_publish_plan.validate_draft(created) == []
     assert backlog_publish_plan.publish_plan(tmp_path)[0]["body_file"] == (
-        ".github/backlog/010-dashboard-next-habit-polish.md"
+        ".github/backlog/011-dashboard-next-habit-polish.md"
     )
 
 
@@ -137,7 +132,7 @@ def test_backlog_publish_plan_new_draft_json_reports_created_draft(
     assert result == 0
     assert payload["status"] == "created"
     assert payload["requires_approval"] is True
-    assert payload["draft"] == ".github/backlog/010-improve-comparison-briefing.md"
+    assert payload["draft"] == ".github/backlog/011-improve-comparison-briefing.md"
     assert payload["publishable_drafts"][0]["labels"] == [
         "type: slice",
         "area: dashboard",
@@ -156,9 +151,7 @@ def test_backlog_publish_plan_exposes_machine_readable_current_plan(capsys) -> N
     assert payload["status"] == "ok"
     assert payload["repo"] == "LangFelixAT/codex-observe"
     assert payload["requires_approval"] is True
-    assert payload["publishable_drafts"][0]["body_file"] == (
-        ".github/backlog/010-bound-dashboard-history-rendering-for-large-session-sets.md"
-    )
+    assert payload["publishable_drafts"] == []
     assert "Backlog draft validation passed" not in output
 
 
@@ -166,12 +159,8 @@ def test_backlog_publish_plan_structured_plan_matches_command_output() -> None:
     plan = backlog_publish_plan.publish_plan(ROOT)
     commands = backlog_publish_plan.publish_commands(ROOT)
 
-    assert len(plan) == 1
-    assert plan[0]["body_file"] == (
-        ".github/backlog/010-bound-dashboard-history-rendering-for-large-session-sets.md"
-    )
-    assert plan[0]["labels"] == ["enhancement", "dashboard"]
-    assert commands == [plan[0]["command"]]
+    assert plan == []
+    assert commands == []
 
 
 def test_backlog_publish_plan_json_reports_validation_failures(

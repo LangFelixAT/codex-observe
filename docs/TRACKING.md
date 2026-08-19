@@ -4,16 +4,17 @@ This file records the current issue-tracking state and the expected workflow for
 
 ## Current GitHub issue state
 
-Checked: 2026-07-31 with:
+Checked: 2026-08-19 with:
 
 ```powershell
 gh issue list --limit 20 --state all --json number,title,state,labels,updatedAt,url
 ```
 
-All current GitHub issues are closed:
+Current implementation issue:
 
 | Issue | State | Title |
 | --- | --- | --- |
+| #18 | Open | Bound dashboard history rendering for large session sets |
 | #17 | Closed | Make Focus a first-class session-history filter |
 | #16 | Closed | Make run comparison the next dashboard step |
 | #15 | Closed | Default comparisons to the nearest chronological run |
@@ -31,7 +32,7 @@ All current GitHub issues are closed:
 | #2 | Closed | Fix Streamlit host and port CLI flags |
 | #1 | Closed | Track Codex Observe hardening pass |
 
-GitHub still has no open issue. One fresh approval-gated local draft now exists at `.github/backlog/010-bound-dashboard-history-rendering-for-large-session-sets.md`; it has not been published.
+Issue #18 is the active implementation slice. Draft `010` was published after explicit human approval and retired from the local publishable backlog. There is no current publishable local issue draft.
 
 ## New work workflow
 

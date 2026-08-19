@@ -107,21 +107,17 @@ def test_pr_template_requires_issue_verification_visual_evidence_and_privacy_rev
     assert "\\n" not in template
 
 
-def test_backlog_records_completed_slices_active_draft_and_external_write_guard() -> (
-    None
-):
+def test_backlog_records_published_slice_retirement_and_external_write_guard() -> None:
     backlog = read("docs/BACKLOG.md")
     issue_files = sorted((ROOT / ".github/backlog").glob("*.md"))
 
-    assert [path.name for path in issue_files] == [
-        "010-bound-dashboard-history-rendering-for-large-session-sets.md"
-    ]
+    assert issue_files == []
     assert "requires explicit approval" in backlog
     assert "python scripts/backlog_publish_plan.py" in backlog
     assert "python scripts/backlog_publish_plan.py --new-draft" in backlog
     assert "python scripts/backlog_publish_plan.py --json" in backlog
     assert "draft files were deleted" in backlog
-    assert "Fresh approval-gated draft `010`" in backlog
+    assert "Draft `010` was published as issue #18" in backlog
     assert "Add a one-command public evidence bundle" in backlog
     assert "codex-observe evidence-bundle" in backlog
     assert "codex-observe.evidence-bundle.v1" in backlog
@@ -183,7 +179,7 @@ def test_current_state_handoff_covers_gates_evidence_and_real_log_checkpoint() -
         "missing/empty database onboarding states",
         "codex-observe evidence-bundle",
         "codex-observe.evidence-bundle.v1",
-        ".github/backlog/010-bound-dashboard-history-rendering-for-large-session-sets.md",
+        "issue #18 is the active implementation slice",
         "issues #1-#8 and #10-#17 are closed",
         "Attaching generated artifacts externally still requires explicit human approval",
         "human-approved private input path",
@@ -476,9 +472,7 @@ def test_completed_local_issue_records_stay_separate_from_active_drafts() -> Non
     active_drafts = [
         path.name for path in sorted((ROOT / ".github/backlog").glob("*.md"))
     ]
-    assert active_drafts == [
-        "010-bound-dashboard-history-rendering-for-large-session-sets.md"
-    ]
+    assert active_drafts == []
     for retired in [
         "001-first-run-demo.md",
         "002-diagnostics-summary.md",
@@ -601,12 +595,12 @@ def test_tracking_snapshot_records_current_issue_state_and_publish_guard() -> No
     config = read(".github/ISSUE_TEMPLATE/config.yml")
 
     for required in [
-        "Checked: 2026-07-31",
+        "Checked: 2026-08-19",
         "gh issue list --limit 20 --state all --json number,title,state,labels,updatedAt,url",
-        "All current GitHub issues are closed",
-        "GitHub still has no open issue",
-        ".github/backlog/010-bound-dashboard-history-rendering-for-large-session-sets.md",
-        "it has not been published",
+        "Current implementation issue",
+        "Issue #18 is the active implementation slice",
+        "Draft `010` was published after explicit human approval",
+        "no current publishable local issue draft",
         "python scripts/backlog_publish_plan.py --new-draft",
         "python scripts/backlog_publish_plan.py --json",
         "explicit human approval",
@@ -623,5 +617,6 @@ def test_tracking_snapshot_records_current_issue_state_and_publish_guard() -> No
     assert "#15" in tracking
     assert "#16" in tracking
     assert "#17" in tracking
+    assert "#18" in tracking
     assert "docs/TRACKING.md" in current
     assert "docs/TRACKING.md" in config

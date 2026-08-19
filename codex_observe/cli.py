@@ -287,6 +287,7 @@ RETIRED_BACKLOG_DRAFTS = {
     ".github/backlog/007-real-log-parser-feedback-loop.md",
     ".github/backlog/008-public-readme-tour.md",
     ".github/backlog/009-public-evidence-bundle.md",
+    ".github/backlog/010-bound-dashboard-history-rendering-for-large-session-sets.md",
 }
 BACKLOG_FORBIDDEN_PATTERNS = [
     r"sample_from_uploaded\.sqlite",
@@ -811,7 +812,6 @@ def tracking_doc_failures(root: Path | None = None) -> list[str]:
     body = tracking.read_text(encoding="utf-8")
     required = [
         "gh issue list --limit 20 --state all --json number,title,state,labels,updatedAt,url",
-        "All current GitHub issues are closed",
         "python scripts/backlog_publish_plan.py --json",
         "explicit human approval",
         "Commit and push the implementation branch",
@@ -819,6 +819,14 @@ def tracking_doc_failures(root: Path | None = None) -> list[str]:
     failures = [
         f"docs/TRACKING.md missing {item}" for item in required if item not in body
     ]
+    if not any(
+        state in body
+        for state in [
+            "All current GitHub issues are closed",
+            "Current implementation issue",
+        ]
+    ):
+        failures.append("docs/TRACKING.md missing current GitHub issue state")
     active_drafts = active_backlog_drafts(root)
     if active_drafts:
         for draft in active_drafts:
@@ -828,10 +836,7 @@ def tracking_doc_failures(root: Path | None = None) -> list[str]:
         if "has not been published" not in body:
             failures.append("docs/TRACKING.md missing active draft publication status")
     else:
-        for item in [
-            "There is no `.github/backlog` directory",
-            "no current publishable local issue draft",
-        ]:
+        for item in ["no current publishable local issue draft"]:
             if item not in body:
                 failures.append(f"docs/TRACKING.md missing {item}")
     if not re.search(r"^Checked: \d{4}-\d{2}-\d{2} with:$", body, re.MULTILINE):
@@ -839,7 +844,7 @@ def tracking_doc_failures(root: Path | None = None) -> list[str]:
     for issue_number in range(1, 9):
         if f"#{issue_number}" not in body:
             failures.append(f"docs/TRACKING.md missing issue #{issue_number}")
-    for issue_number in [10, 11, 12, 13, 14, 15, 16, 17]:
+    for issue_number in [10, 11, 12, 13, 14, 15, 16, 17, 18]:
         if f"#{issue_number}" not in body:
             failures.append(f"docs/TRACKING.md missing issue #{issue_number}")
     return failures

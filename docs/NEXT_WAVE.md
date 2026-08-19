@@ -72,9 +72,9 @@ Acceptance criteria:
 - [x] README and PR template ask contributors to attach or reference the manifest for UI-facing changes, and `codex-observe audit` verifies saved manifest schema/contract evidence, referenced screenshots, layout review, sidebar-risk labels, sidebar Risk filter evidence, sidebar session search evidence, usage-snapshot comparison deltas, and high-risk metric evidence after visual QA runs.
 - [x] Tests cover manifest generation and saved-evidence validation without depending on a live browser.
 
-## Active fresh issue drafts
+## Active implementation issue
 
-Draft `010`, `Bound dashboard history rendering for large session sets`, is a fresh, validated, approval-gated proposal at `.github/backlog/010-bound-dashboard-history-rendering-for-large-session-sets.md`. It remains local until explicit approval publishes it as a GitHub issue. The completed `009` evidence-bundle draft was implemented locally as `codex-observe evidence-bundle` and deleted after closeout.
+GitHub issue #18, `Bound dashboard history rendering for large session sets`, is the active implementation slice. Draft `010` was published after explicit human approval and retired from the local backlog. The completed `009` evidence-bundle draft was implemented locally as `codex-observe evidence-bundle` and deleted after closeout.
 
 Future parser-shape promotion is tracked through `docs/REAL_LOG_FEEDBACK.md` and reviewed-redacted evidence, not as issue content ready to publish until there is a concrete new gap:
 

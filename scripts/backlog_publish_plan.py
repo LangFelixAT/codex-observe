@@ -22,6 +22,7 @@ RETIRED_DRAFTS = {
     ".github/backlog/007-real-log-parser-feedback-loop.md",
     ".github/backlog/008-public-readme-tour.md",
     ".github/backlog/009-public-evidence-bundle.md",
+    ".github/backlog/010-bound-dashboard-history-rendering-for-large-session-sets.md",
 }
 FORBIDDEN_PATTERNS = [
     r"sample_from_uploaded\.sqlite",
