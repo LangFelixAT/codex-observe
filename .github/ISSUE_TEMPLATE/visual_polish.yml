@@ -26,7 +26,7 @@ body:
         - [ ] Text does not overlap at desktop or narrow widths.
         - [ ] `ruff check`, `ruff format --check`, and `pytest -q` pass.
         - [ ] `codex-observe demo`, `python scripts/visual_qa.py`, and `python scripts/visual_qa.py --verify-manifest .artifacts/visual/visual-qa-manifest.json` pass.
-        - [ ] Screenshot filenames, visual QA manifest path, sidebar risk labels, expected high-risk metric card evidence, and layout review are recorded in the closeout.
+        - [ ] Screenshot filenames, schema-v2 visual QA manifest path with exact byte-size and SHA-256 integrity, sidebar risk labels, expected high-risk metric card evidence, and layout review are recorded in the closeout.
         - [ ] `codex-observe evidence-bundle --out .artifacts/public-evidence` is regenerated when reviewer-facing UI evidence is needed.
     validations:
       required: true

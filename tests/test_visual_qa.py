@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import socket
 from copy import deepcopy
@@ -209,6 +210,19 @@ def test_screenshot_quality_failures_accepts_nonblank_viewport_image(
     assert (
         screenshot_quality_failures(path, {"width": 390, "height": 900}, "narrow") == []
     )
+
+
+def test_screenshot_metadata_records_exact_size_and_sha256(tmp_path: Path) -> None:
+    path = tmp_path / "dashboard.png"
+    Image.new("RGB", (390, 900), (42, 120, 121)).save(path)
+
+    assert screenshot_metadata(path) == {
+        "filename": "dashboard.png",
+        "width": 390,
+        "height": 900,
+        "bytes": path.stat().st_size,
+        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+    }
 
 
 def test_screenshot_quality_failures_flags_blank_or_wrong_size_image(
@@ -1555,6 +1569,9 @@ def test_verify_visual_manifest_reports_success_and_failures(tmp_path: Path) -> 
     path = tmp_path / "visual-qa-manifest.json"
     write_visual_manifest(path, manifest)
 
+    assert (
+        visual_qa.VISUAL_MANIFEST_SCHEMA_VERSION == "codex-observe.visual-manifest.v2"
+    )
     assert manifest["schema_version"] == visual_qa.VISUAL_MANIFEST_SCHEMA_VERSION
     assert verify_visual_manifest(path) == (0, [])
 
@@ -1592,6 +1609,22 @@ def test_verify_visual_manifest_checks_referenced_screenshot_files(
     )
 
     Image.new("RGB", (390, 900), (42, 120, 121)).save(tmp_path / "dashboard-narrow.png")
+
+    invalid = deepcopy(manifest)
+    invalid["viewports"]["desktop"]["screenshot"]["bytes"] += 1
+    invalid["viewports"]["narrow"]["screenshot"]["sha256"] = "0" * 64
+    invalid["empty_states"]["empty_database"]["viewports"]["desktop"]["screenshot"].pop(
+        "sha256", None
+    )
+    failures = visual_manifest_file_failures(invalid, tmp_path)
+
+    assert "manifest desktop screenshot bytes do not match file" in failures
+    assert "manifest narrow screenshot sha256 does not match file" in failures
+    assert (
+        "manifest empty_database desktop screenshot sha256 missing or invalid"
+        in failures
+    )
+
     manifest["viewports"]["desktop"]["screenshot"]["bytes"] = 0
     assert "manifest desktop screenshot is empty" in visual_manifest_file_failures(
         manifest, tmp_path

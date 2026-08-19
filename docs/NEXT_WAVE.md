@@ -66,7 +66,7 @@ Goal: make screenshot evidence easier to review and harder to misinterpret.
 
 Acceptance criteria:
 
-- [x] `scripts/visual_qa.py` writes a schema-versioned JSON manifest next to the screenshots.
+- [x] `scripts/visual_qa.py` writes a schema-v2 JSON manifest with exact byte size and SHA-256 next to the screenshots.
 - [x] The manifest records local URL, database source, viewport sizes, screenshot filenames, clicked tabs, Agent detail selector exercise, sidebar risk labels, sidebar Risk filter evidence, bounded sidebar history page evidence, sidebar session search evidence, usage-snapshot comparison deltas, and expected high-risk default metric cards.
 - [x] The script checks minimum screenshot dimensions and obvious blank/exception states.
 - [x] README and PR template ask contributors to attach or reference the manifest for UI-facing changes, and `codex-observe audit` verifies saved manifest schema/contract evidence, referenced screenshots, layout review, sidebar-risk labels, sidebar Risk filter evidence, bounded sidebar history page evidence, sidebar session search evidence, usage-snapshot comparison deltas, and high-risk metric evidence after visual QA runs.

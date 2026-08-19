@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import hashlib
 import json
 import os
 import re
@@ -18,7 +19,7 @@ from PIL import Image
 from codex_observe.schema import SCHEMA_SQL
 
 
-VISUAL_MANIFEST_SCHEMA_VERSION = "codex-observe.visual-manifest.v1"
+VISUAL_MANIFEST_SCHEMA_VERSION = "codex-observe.visual-manifest.v2"
 PROFILE_DEMO = "demo"
 PROFILE_REAL = "real"
 VISUAL_PROFILES = {PROFILE_DEMO, PROFILE_REAL}
@@ -2261,6 +2262,14 @@ def screenshot_quality_failures(
     return failures
 
 
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def screenshot_metadata(path: Path) -> dict[str, object]:
     with Image.open(path) as image:
         width, height = image.size
@@ -2269,7 +2278,32 @@ def screenshot_metadata(path: Path) -> dict[str, object]:
         "width": width,
         "height": height,
         "bytes": path.stat().st_size,
+        "sha256": file_sha256(path),
     }
+
+
+def screenshot_integrity_failures(
+    screenshot: dict[str, object], label: str, path: Path | None = None
+) -> list[str]:
+    failures: list[str] = []
+    expected_bytes = int(screenshot.get("bytes") or 0)
+    if expected_bytes <= 0:
+        failures.append(f"{label} screenshot is empty")
+
+    expected_sha256 = str(screenshot.get("sha256") or "")
+    sha256_valid = re.fullmatch(r"[0-9a-f]{64}", expected_sha256) is not None
+    if not sha256_valid:
+        failures.append(f"{label} screenshot sha256 missing or invalid")
+
+    if path is None:
+        return failures
+
+    actual_bytes = path.stat().st_size
+    if expected_bytes > 0 and expected_bytes != actual_bytes:
+        failures.append(f"{label} screenshot bytes do not match file")
+    if sha256_valid and expected_sha256 != file_sha256(path):
+        failures.append(f"{label} screenshot sha256 does not match file")
+    return failures
 
 
 def evidence_path_label(path: str | Path) -> str:
@@ -2521,16 +2555,21 @@ def visual_empty_state_failures(
                 failures.append(
                     f"manifest {state_name} {viewport_name} screenshot height too small"
                 )
-            if int(screenshot.get("bytes") or 0) <= 0:
+            screenshot_path = (
+                manifest_dir / filename if manifest_dir is not None else None
+            )
+            if screenshot_path is not None and not screenshot_path.exists():
                 failures.append(
-                    f"manifest {state_name} {viewport_name} screenshot is empty"
+                    f"manifest {state_name} {viewport_name} screenshot file missing: {filename}"
                 )
-            if manifest_dir is not None:
-                screenshot_path = manifest_dir / filename
-                if not screenshot_path.exists():
-                    failures.append(
-                        f"manifest {state_name} {viewport_name} screenshot file missing: {filename}"
-                    )
+                screenshot_path = None
+            failures.extend(
+                screenshot_integrity_failures(
+                    screenshot,
+                    f"manifest {state_name} {viewport_name}",
+                    screenshot_path,
+                )
+            )
     return failures
 
 
@@ -2623,8 +2662,9 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
                 600, expected_viewport["height"]
             ):
                 failures.append(f"manifest {name} screenshot height too small")
-            if int(screenshot.get("bytes") or 0) <= 0:
-                failures.append(f"manifest {name} screenshot is empty")
+            failures.extend(
+                screenshot_integrity_failures(screenshot, f"manifest {name}")
+            )
 
         sidebar_risk_labels = raw.get("sidebar_risk_labels")
         if not isinstance(sidebar_risk_labels, list):
@@ -2961,8 +3001,11 @@ def visual_manifest_file_failures(
         for key in ["width", "height"]:
             if screenshot.get(key) != actual.get(key):
                 failures.append(f"manifest {name} screenshot {key} does not match file")
-        if int(screenshot.get("bytes") or 0) <= 0 or int(actual.get("bytes") or 0) <= 0:
-            failures.append(f"manifest {name} screenshot is empty")
+        failures.extend(
+            screenshot_integrity_failures(
+                screenshot, f"manifest {name}", screenshot_path
+            )
+        )
     failures.extend(
         visual_empty_state_failures(manifest.get("empty_states"), manifest_dir)
     )

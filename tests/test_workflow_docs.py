@@ -176,12 +176,13 @@ def test_current_state_handoff_covers_gates_evidence_and_real_log_checkpoint() -
         "Duplication quick read",
         "Raw tables data inventory",
         "operator-briefing evidence",
-        "saved manifest schema/contract",
+        "saved manifest schema-v2 contract",
         "missing/empty database onboarding states",
         "codex-observe evidence-bundle",
         "codex-observe.evidence-bundle.v1",
         "50 conversations per page",
         "sidebar history page evidence",
+        "schema-v2 exact byte-size and SHA-256 screenshot integrity",
         "issues #1-#8 and #10-#18 are closed",
         "issue #19 is the active implementation slice",
         "Attaching generated artifacts externally still requires explicit human approval",
@@ -254,6 +255,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         "pytest -q",
         "python scripts/visual_qa.py",
         "bounded sidebar history page evidence",
+        "SHA-256",
         "## Traceability cadence",
         "small, reviewable checkpoints",
         "git status --short --branch",
@@ -320,6 +322,8 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         "layout overflow/clipping checks",
         "50 conversations per page",
         "bounded sidebar history page evidence",
+        "schema-v2",
+        "SHA-256",
         "metric card evidence",
         "Agent detail thread brief",
         "Timeline quick read",
@@ -386,7 +390,9 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
     assert "triage-risk" in release
     assert "visual QA manifest" in release
     assert "bounded sidebar history page evidence" in release
-    assert "schema/contract evidence" in release
+    assert "schema-v2" in release
+    assert "SHA-256" in release
+    assert "schema-v2 contract evidence" in release
     assert "nearest-follow-up comparison selection" in release
     assert "comparison -> metric ordering" in release
     assert "missing/empty database onboarding states" in release

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shlex
 import sqlite3
 
 import sys
+from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from pathlib import Path
 from unittest.mock import patch
@@ -681,6 +683,7 @@ def write_valid_visual_manifest(root: Path) -> None:
                 "width": viewport["width"],
                 "height": viewport["height"],
                 "bytes": screenshot_path.stat().st_size,
+                "sha256": hashlib.sha256(screenshot_path.read_bytes()).hexdigest(),
             },
             "tabs_exercised": tabs,
             "quick_read_evidence": list(cli.EXPECTED_VISUAL_QUICK_READ_EVIDENCE),
@@ -857,6 +860,7 @@ def write_valid_visual_manifest(root: Path) -> None:
                     "width": viewport["width"],
                     "height": viewport["height"],
                     "bytes": screenshot_path.stat().st_size,
+                    "sha256": hashlib.sha256(screenshot_path.read_bytes()).hexdigest(),
                 },
                 "title": title,
                 "body": "Use the commands below to continue.",
@@ -910,19 +914,76 @@ def write_valid_visual_manifest(root: Path) -> None:
     )
 
 
-def preserve_visual_manifest():
-    manifest_path = Path.cwd() / cli.VISUAL_MANIFEST
-    previous_manifest = manifest_path.read_bytes() if manifest_path.exists() else None
-    return manifest_path, previous_manifest
+def isolate_visual_manifest():
+    original_manifest = cli.VISUAL_MANIFEST
+    temporary_visual_dir = TemporaryDirectory()
+    cli.VISUAL_MANIFEST = Path(temporary_visual_dir.name) / original_manifest
+    return original_manifest, temporary_visual_dir
 
 
 def restore_visual_manifest(
-    manifest_path: Path, previous_manifest: bytes | None
+    original_manifest: Path, temporary_visual_dir: TemporaryDirectory
 ) -> None:
-    if previous_manifest is None:
-        manifest_path.unlink(missing_ok=True)
-    else:
-        manifest_path.write_bytes(previous_manifest)
+    cli.VISUAL_MANIFEST = original_manifest
+    temporary_visual_dir.cleanup()
+
+
+def test_sync_visual_evidence_for_audit_copies_every_manifest_screenshot(
+    tmp_path: Path,
+) -> None:
+    original_manifest = cli.VISUAL_MANIFEST
+    source_manifest = tmp_path / "source" / "visual-qa-manifest.json"
+    target_manifest = tmp_path / "target" / "visual-qa-manifest.json"
+    try:
+        cli.VISUAL_MANIFEST = source_manifest
+        write_valid_visual_manifest(Path.cwd())
+        manifest = json.loads(source_manifest.read_text(encoding="utf-8"))
+        expected_filenames = {
+            viewport["screenshot"]["filename"]
+            for viewport in manifest["viewports"].values()
+        }
+        expected_filenames.update(
+            viewport["screenshot"]["filename"]
+            for state in manifest["empty_states"].values()
+            for viewport in state["viewports"].values()
+        )
+
+        cli.VISUAL_MANIFEST = target_manifest
+        cli.sync_visual_evidence_for_audit(source_manifest.parent)
+
+        assert target_manifest.read_bytes() == source_manifest.read_bytes()
+        assert {
+            path.name for path in target_manifest.parent.glob("*.png")
+        } == expected_filenames
+        for filename in expected_filenames:
+            assert (target_manifest.parent / filename).read_bytes() == (
+                source_manifest.parent / filename
+            ).read_bytes()
+    finally:
+        cli.VISUAL_MANIFEST = original_manifest
+
+
+def test_visual_manifest_fixture_does_not_mutate_saved_repository_evidence() -> None:
+    visual_dir = Path.cwd() / cli.VISUAL_MANIFEST.parent
+    before = {
+        path.relative_to(visual_dir): path.read_bytes()
+        for path in visual_dir.glob("*")
+        if path.is_file()
+    }
+    original_manifest, temporary_visual_dir = isolate_visual_manifest()
+    try:
+        write_valid_visual_manifest(Path.cwd())
+        assert cli.VISUAL_MANIFEST.is_file()
+        assert cli.VISUAL_MANIFEST.parent != visual_dir
+    finally:
+        restore_visual_manifest(original_manifest, temporary_visual_dir)
+
+    after = {
+        path.relative_to(visual_dir): path.read_bytes()
+        for path in visual_dir.glob("*")
+        if path.is_file()
+    }
+    assert after == before
 
 
 def test_visual_manifest_evidence_failures_validate_saved_sidebar_metric_and_success_target_evidence(
@@ -938,6 +999,7 @@ def test_visual_manifest_evidence_failures_validate_saved_sidebar_metric_and_suc
     write_valid_visual_manifest(tmp_path)
     manifest_path = tmp_path / cli.VISUAL_MANIFEST
 
+    assert cli.VISUAL_MANIFEST_SCHEMA_VERSION == "codex-observe.visual-manifest.v2"
     assert cli.visual_manifest_evidence_failures(tmp_path) == []
 
     payload = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -1033,6 +1095,29 @@ def test_visual_manifest_evidence_failures_validate_saved_sidebar_metric_and_suc
     )
     assert (
         "visual QA manifest missing desktop safe feedback handoff evidence" in failures
+    )
+
+
+def test_visual_manifest_evidence_failures_reject_screenshot_integrity_mismatches(
+    tmp_path: Path,
+) -> None:
+    write_valid_visual_manifest(tmp_path)
+    manifest_path = tmp_path / cli.VISUAL_MANIFEST
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    payload["viewports"]["desktop"]["screenshot"]["bytes"] += 1
+    payload["viewports"]["narrow"]["screenshot"]["sha256"] = "0" * 64
+    payload["empty_states"]["missing_database"]["viewports"]["desktop"][
+        "screenshot"
+    ].pop("sha256")
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    failures = cli.visual_manifest_evidence_failures(tmp_path)
+
+    assert "visual QA manifest desktop screenshot bytes do not match file" in failures
+    assert "visual QA manifest narrow screenshot sha256 does not match file" in failures
+    assert (
+        "visual QA manifest missing_database desktop screenshot sha256 missing or invalid"
+        in failures
     )
 
 
@@ -1178,12 +1263,12 @@ def test_public_evidence_bundle_artifact_failures_require_limitations(
     tmp_path: Path,
 ) -> None:
     bundle = tmp_path / "public-evidence"
-    manifest_path, previous_manifest = preserve_visual_manifest()
+    original_manifest, temporary_visual_dir = isolate_visual_manifest()
     try:
         write_valid_visual_manifest(Path.cwd())
         status, manifest = cli.public_evidence_bundle(str(bundle), run_visual=False)
     finally:
-        restore_visual_manifest(manifest_path, previous_manifest)
+        restore_visual_manifest(original_manifest, temporary_visual_dir)
 
     assert status == 0
     assert manifest["artifacts"]["limitations_markdown"] == "LIMITATIONS.md"
@@ -1270,12 +1355,12 @@ def test_public_evidence_bundle_audit_accepts_absolute_bundle_paths(
     tmp_path: Path,
 ) -> None:
     bundle = tmp_path / "public-evidence"
-    manifest_path, previous_manifest = preserve_visual_manifest()
+    original_manifest, temporary_visual_dir = isolate_visual_manifest()
     try:
         write_valid_visual_manifest(Path.cwd())
         status, _manifest = cli.public_evidence_bundle(str(bundle), run_visual=False)
     finally:
-        restore_visual_manifest(manifest_path, previous_manifest)
+        restore_visual_manifest(original_manifest, temporary_visual_dir)
 
     assert status == 0
 
@@ -1290,12 +1375,12 @@ def test_public_evidence_bundle_audit_requires_terminal_handoff(
     tmp_path: Path, monkeypatch
 ) -> None:
     bundle = tmp_path / "public-evidence"
-    manifest_path, previous_manifest = preserve_visual_manifest()
+    original_manifest, temporary_visual_dir = isolate_visual_manifest()
     try:
         write_valid_visual_manifest(Path.cwd())
         status, _manifest = cli.public_evidence_bundle(str(bundle), run_visual=False)
     finally:
-        restore_visual_manifest(manifest_path, previous_manifest)
+        restore_visual_manifest(original_manifest, temporary_visual_dir)
 
     assert status == 0
 
@@ -1344,7 +1429,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
     sessions = tmp_path / "sessions"
     report = tmp_path / "run-report.md"
     public_bundle = tmp_path / "public-evidence"
-    manifest_path, previous_manifest = preserve_visual_manifest()
+    original_manifest, temporary_visual_dir = isolate_visual_manifest()
     try:
         write_valid_visual_manifest(Path.cwd())
         bundle_status, _bundle = cli.public_evidence_bundle(
@@ -1358,7 +1443,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
             public_evidence_dir=public_bundle,
         )
     finally:
-        restore_visual_manifest(manifest_path, previous_manifest)
+        restore_visual_manifest(original_manifest, temporary_visual_dir)
 
     checks = {check["name"]: check for check in audit["checks"]}
     assert status == 0
@@ -1431,7 +1516,7 @@ def test_audit_report_runs_fast_release_checks(tmp_path: Path) -> None:
         == "manifest, terminal and reviewer README action plan, key findings, review checklist, feedback handoff, feedback runbook, feedback issue template, reproduce-local commands, validation commands, limitations doc, aggregate reports, and audit artifact verified"
     )
     assert (
-        "visual manifest schema and contract, screenshots, empty states, layout review, answer-first briefing, action-first navigation, comparison, and plan ordering, native copy control, nearest-follow-up comparison selection, chronological comparison direction, risk labels, sidebar Risk filter, sidebar Focus filter, sidebar history page, sidebar session search, sidebar session details, risk distribution, metric cards, dashboard quick reads, report and comparison downloads, report scope-warning evidence, comparison preview, comparison scope-warning evidence, comparison review path, deltas, operator briefing, next review path, next-run checklist, next-run brief, safe feedback handoff, and success target verified"
+        "visual manifest schema v2 and contract, screenshot byte-size and SHA-256 integrity, empty states, layout review, answer-first briefing, action-first navigation, comparison, and plan ordering, native copy control, nearest-follow-up comparison selection, chronological comparison direction, risk labels, sidebar Risk filter, sidebar Focus filter, sidebar history page, sidebar session search, sidebar session details, risk distribution, metric cards, dashboard quick reads, report and comparison downloads, report scope-warning evidence, comparison preview, comparison scope-warning evidence, comparison review path, deltas, operator briefing, next review path, next-run checklist, next-run brief, safe feedback handoff, and success target verified"
         in checks["visual QA manifest evidence"]["detail"]
     )
     report_payload = json.loads(report.with_suffix(".json").read_text(encoding="utf-8"))
@@ -1497,11 +1582,12 @@ def test_audit_cli_json_and_text_outputs_are_privacy_safe(
     db = tmp_path / "demo.sqlite"
     sessions = tmp_path / "sessions"
     report = tmp_path / "run-report.md"
-    manifest_path, previous_manifest = preserve_visual_manifest()
+    public_evidence = tmp_path / "public-evidence"
+    original_manifest, temporary_visual_dir = isolate_visual_manifest()
     try:
         write_valid_visual_manifest(Path.cwd())
         bundle_status, _bundle = cli.public_evidence_bundle(
-            ".artifacts/public-evidence", run_visual=False
+            str(public_evidence), run_visual=False
         )
         assert bundle_status == 0
         result = cli.main(
@@ -1513,6 +1599,8 @@ def test_audit_cli_json_and_text_outputs_are_privacy_safe(
                 str(sessions),
                 "--report-out",
                 str(report),
+                "--public-evidence-dir",
+                str(public_evidence),
                 "--json",
             ]
         )
@@ -1534,11 +1622,13 @@ def test_audit_cli_json_and_text_outputs_are_privacy_safe(
                 str(sessions),
                 "--report-out",
                 str(report),
+                "--public-evidence-dir",
+                str(public_evidence),
             ]
         )
         captured = capsys.readouterr()
     finally:
-        restore_visual_manifest(manifest_path, previous_manifest)
+        restore_visual_manifest(original_manifest, temporary_visual_dir)
 
     assert result == 0
     assert "Status: ok" in captured.out
@@ -2556,12 +2646,12 @@ def test_public_evidence_bundle_writes_privacy_safe_manifest_and_artifacts(
     stale_visual_dir = out / "visual"
     stale_visual_dir.mkdir(parents=True)
     (stale_visual_dir / "visual-qa-manifest.json").write_text("{}", encoding="utf-8")
-    manifest_path, previous_manifest = preserve_visual_manifest()
+    original_manifest, temporary_visual_dir = isolate_visual_manifest()
     try:
         write_valid_visual_manifest(Path.cwd())
         status, manifest = cli.public_evidence_bundle(str(out), run_visual=False)
     finally:
-        restore_visual_manifest(manifest_path, previous_manifest)
+        restore_visual_manifest(original_manifest, temporary_visual_dir)
 
     loaded = json.loads((out / "evidence-bundle.json").read_text(encoding="utf-8"))
     artifacts = loaded["artifacts"]
@@ -2737,7 +2827,7 @@ def test_evidence_bundle_cli_json_and_text_outputs_are_actionable(
     tmp_path: Path, capsys
 ) -> None:
     out = tmp_path / "bundle"
-    manifest_path, previous_manifest = preserve_visual_manifest()
+    original_manifest, temporary_visual_dir = isolate_visual_manifest()
     try:
         write_valid_visual_manifest(Path.cwd())
         result = cli.main(
@@ -2785,7 +2875,7 @@ def test_evidence_bundle_cli_json_and_text_outputs_are_actionable(
         result = cli.main(["evidence-bundle", "--out", str(text_out), "--skip-visual"])
         captured = capsys.readouterr()
     finally:
-        restore_visual_manifest(manifest_path, previous_manifest)
+        restore_visual_manifest(original_manifest, temporary_visual_dir)
 
     assert result == 0
     assert "Evidence bundle:" in captured.out

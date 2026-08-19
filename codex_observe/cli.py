@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import gc
+import hashlib
 import importlib.util
 import textwrap
 import json
@@ -46,7 +47,7 @@ from .report import (
 
 
 VISUAL_MANIFEST = Path(".artifacts/visual/visual-qa-manifest.json")
-VISUAL_MANIFEST_SCHEMA_VERSION = "codex-observe.visual-manifest.v1"
+VISUAL_MANIFEST_SCHEMA_VERSION = "codex-observe.visual-manifest.v2"
 VISUAL_MANIFEST_RECOVERY = (
     "run `python scripts/visual_qa.py`, then "
     f"`python scripts/visual_qa.py --verify-manifest {VISUAL_MANIFEST.as_posix()}`"
@@ -1240,9 +1241,9 @@ RELEASE_WORKFLOW_DOC_REQUIREMENTS = {
         "failed_checks",
         "plain-text required command list",
         "plain-text `Failed checks` section",
-        "validated manifest evidence",
+        "schema-v2 contract evidence",
+        "exact byte-size and SHA-256 integrity",
         "success-target evidence",
-        "path-safe visual QA manifest",
         "referenced screenshots",
         "layout review",
         "metric card evidence",
@@ -1288,7 +1289,7 @@ RELEASE_WORKFLOW_DOC_REQUIREMENTS = {
         "python scripts/visual_qa.py",
         "python scripts/visual_qa.py --verify-manifest .artifacts/visual/visual-qa-manifest.json",
         "metric card evidence",
-        "screenshot metadata",
+        "schema-v2 exact byte-size and SHA-256 screenshot integrity",
         "layout review",
         "codex-observe evidence-bundle",
         "codex-observe.evidence-bundle.v1",
@@ -1349,7 +1350,8 @@ RELEASE_WORKFLOW_DOC_REQUIREMENTS = {
         "referenced screenshot files",
         "layout review",
         "path-safe",
-        "validated manifest evidence",
+        "schema-v2",
+        "exact byte-size and SHA-256 integrity evidence",
         "Aggregate report artifacts",
         "## Data/privacy review",
         "New external network writes, telemetry, publishing, or hosted behavior are absent or explicitly approved.",
@@ -1514,6 +1516,33 @@ def png_dimensions(path: Path) -> tuple[int, int] | None:
     return int.from_bytes(header[16:20], "big"), int.from_bytes(header[20:24], "big")
 
 
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def visual_screenshot_integrity_failures(
+    screenshot: dict[str, object], path: Path, label: str
+) -> list[str]:
+    failures: list[str] = []
+    expected_bytes = int(screenshot.get("bytes") or 0)
+    actual_bytes = path.stat().st_size
+    if expected_bytes <= 0 or actual_bytes <= 0:
+        failures.append(f"{label} screenshot is empty")
+    elif expected_bytes != actual_bytes:
+        failures.append(f"{label} screenshot bytes do not match file")
+
+    expected_sha256 = str(screenshot.get("sha256") or "")
+    if re.fullmatch(r"[0-9a-f]{64}", expected_sha256) is None:
+        failures.append(f"{label} screenshot sha256 missing or invalid")
+    elif expected_sha256 != file_sha256(path):
+        failures.append(f"{label} screenshot sha256 does not match file")
+    return failures
+
+
 def visual_empty_state_evidence_failures(
     empty_states: object, manifest_dir: Path
 ) -> list[str]:
@@ -1644,13 +1673,13 @@ def visual_empty_state_evidence_failures(
                 failures.append(
                     f"visual QA manifest {state_name} {viewport_name} screenshot height too small"
                 )
-            if (
-                int(screenshot.get("bytes") or 0) <= 0
-                or screenshot_path.stat().st_size <= 0
-            ):
-                failures.append(
-                    f"visual QA manifest {state_name} {viewport_name} screenshot is empty"
+            failures.extend(
+                visual_screenshot_integrity_failures(
+                    screenshot,
+                    screenshot_path,
+                    f"visual QA manifest {state_name} {viewport_name}",
                 )
+            )
     return failures
 
 
@@ -1777,13 +1806,13 @@ def visual_manifest_evidence_failures(root: Path) -> list[str]:
                             failures.append(
                                 f"visual QA manifest {viewport_name} screenshot height too small"
                             )
-                    if (
-                        int(screenshot.get("bytes") or 0) <= 0
-                        or screenshot_path.stat().st_size <= 0
-                    ):
-                        failures.append(
-                            f"visual QA manifest {viewport_name} screenshot is empty"
+                    failures.extend(
+                        visual_screenshot_integrity_failures(
+                            screenshot,
+                            screenshot_path,
+                            f"visual QA manifest {viewport_name}",
                         )
+                    )
 
         layout = viewport.get("layout_review")
         if not isinstance(layout, dict):
@@ -3451,7 +3480,7 @@ def release_audit_report(
             f"{VISUAL_MANIFEST.as_posix()}; "
             f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['desktop']).as_posix()}; "
             f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['narrow']).as_posix()}; "
-            "visual manifest schema and contract, screenshots, empty states, layout review, answer-first briefing, action-first navigation, comparison, and plan ordering, native copy control, nearest-follow-up comparison selection, chronological comparison direction, risk labels, sidebar Risk filter, sidebar Focus filter, sidebar history page, sidebar session search, sidebar session details, risk distribution, metric cards, dashboard quick reads, report and comparison downloads, report scope-warning evidence, comparison preview, comparison scope-warning evidence, comparison review path, deltas, operator briefing, next review path, next-run checklist, next-run brief, safe feedback handoff, and success target verified"
+            "visual manifest schema v2 and contract, screenshot byte-size and SHA-256 integrity, empty states, layout review, answer-first briefing, action-first navigation, comparison, and plan ordering, native copy control, nearest-follow-up comparison selection, chronological comparison direction, risk labels, sidebar Risk filter, sidebar Focus filter, sidebar history page, sidebar session search, sidebar session details, risk distribution, metric cards, dashboard quick reads, report and comparison downloads, report scope-warning evidence, comparison preview, comparison scope-warning evidence, comparison review path, deltas, operator briefing, next review path, next-run checklist, next-run brief, safe feedback handoff, and success target verified"
             if not visual_manifest_failures
             else "; ".join(visual_manifest_failures[:3]),
         )
@@ -3841,12 +3870,12 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
         {
             "title": "Capture and verify UI evidence",
             "evidence": [
-                "visual manifest records desktop and narrow screenshots",
+                "visual manifest v2 records desktop and narrow screenshots with exact byte size and SHA-256",
                 "layout review, sidebar risk labels, sidebar Risk filter, sidebar Focus filter, sidebar history page, sidebar session search, sidebar session details, metric cards, report sampled-ingest warning evidence, comparison metric delta cards, comparison sampled-ingest warning evidence, comparison review path, report and comparison download controls, operator briefing, next review path, safe feedback handoff, dashboard quick reads, and success target are verified",
                 "tab checks cover Agent detail thread brief, Timeline quick read, Tools quick read, Duplication quick read, and Raw tables data inventory",
             ],
             "success_checks": [
-                "visual manifest verifies desktop and narrow screenshots",
+                "visual manifest verifies exact desktop and narrow screenshot bytes and SHA-256 digests",
                 "manifest verification records no layout overflow, clipped text, or Streamlit exceptions",
             ],
             "commands": [
@@ -5389,10 +5418,44 @@ def evidence_bundle_readme(manifest: dict[str, object]) -> str:
     return "\n".join(lines)
 
 
+def referenced_visual_screenshot_filenames(manifest: dict[str, object]) -> set[str]:
+    filenames: set[str] = set()
+
+    def collect(viewports: object) -> None:
+        if not isinstance(viewports, dict):
+            return
+        for viewport in viewports.values():
+            if not isinstance(viewport, dict):
+                continue
+            screenshot = viewport.get("screenshot")
+            if not isinstance(screenshot, dict):
+                continue
+            filename = screenshot.get("filename")
+            if not isinstance(filename, str) or not filename:
+                continue
+            if Path(filename).name != filename:
+                raise ValueError("visual screenshot filename must be basename-only")
+            filenames.add(filename)
+
+    collect(manifest.get("viewports"))
+    empty_states = manifest.get("empty_states")
+    if isinstance(empty_states, dict):
+        for state in empty_states.values():
+            if isinstance(state, dict):
+                collect(state.get("viewports"))
+    return filenames
+
+
 def sync_visual_evidence_for_audit(source_dir: Path) -> None:
     target_dir = VISUAL_MANIFEST.parent
     target_dir.mkdir(parents=True, exist_ok=True)
-    for name in ["visual-qa-manifest.json", *EXPECTED_VISUAL_SCREENSHOTS.values()]:
+    source_manifest = source_dir / "visual-qa-manifest.json"
+    names = {"visual-qa-manifest.json"}
+    if source_manifest.exists():
+        manifest = json.loads(source_manifest.read_text(encoding="utf-8"))
+        if isinstance(manifest, dict):
+            names.update(referenced_visual_screenshot_filenames(manifest))
+    for name in sorted(names):
         source = source_dir / name
         if source.exists():
             shutil.copy2(source, target_dir / name)
