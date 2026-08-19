@@ -179,8 +179,9 @@ def test_current_state_handoff_covers_gates_evidence_and_real_log_checkpoint() -
         "missing/empty database onboarding states",
         "codex-observe evidence-bundle",
         "codex-observe.evidence-bundle.v1",
-        "issue #18 is the active implementation slice",
-        "issues #1-#8 and #10-#17 are closed",
+        "50 conversations per page",
+        "sidebar history page evidence",
+        "issues #1-#8 and #10-#18 are closed",
         "Attaching generated artifacts externally still requires explicit human approval",
         "human-approved private input path",
     ]:
@@ -250,6 +251,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         "ruff format --check",
         "pytest -q",
         "python scripts/visual_qa.py",
+        "bounded sidebar history page evidence",
         "## Traceability cadence",
         "small, reviewable checkpoints",
         "git status --short --branch",
@@ -314,6 +316,8 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         "diagnostic-change summary",
         "python scripts/visual_qa.py",
         "layout overflow/clipping checks",
+        "50 conversations per page",
+        "bounded sidebar history page evidence",
         "metric card evidence",
         "Agent detail thread brief",
         "Timeline quick read",
@@ -369,6 +373,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
     assert "CONTRIBUTING.md" in release
     distribution = read("docs/DISTRIBUTION.md")
     changelog = read("CHANGELOG.md")
+    assert "Bounded dashboard history to 50 conversations per page" in changelog
     assert "ruff check" in release
     assert "ruff format --check" in release
     assert "python scripts/redact_fixtures.py" in release
@@ -378,6 +383,7 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
     assert "run-comparison.json" in release
     assert "triage-risk" in release
     assert "visual QA manifest" in release
+    assert "bounded sidebar history page evidence" in release
     assert "schema/contract evidence" in release
     assert "nearest-follow-up comparison selection" in release
     assert "comparison -> metric ordering" in release
@@ -597,8 +603,8 @@ def test_tracking_snapshot_records_current_issue_state_and_publish_guard() -> No
     for required in [
         "Checked: 2026-08-19",
         "gh issue list --limit 20 --state all --json number,title,state,labels,updatedAt,url",
-        "Current implementation issue",
-        "Issue #18 is the active implementation slice",
+        "All current GitHub issues are closed",
+        "Issue #18 closed after the dashboard began rendering",
         "Draft `010` was published after explicit human approval",
         "no current publishable local issue draft",
         "python scripts/backlog_publish_plan.py --new-draft",

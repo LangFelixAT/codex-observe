@@ -61,6 +61,21 @@ EXPECTED_VISUAL_FOCUS_FILTER = {
     "selection_valid": True,
     "restored": True,
 }
+EXPECTED_VISUAL_SIDEBAR_HISTORY_PAGE = {
+    "stage": "complete",
+    "range_label": "Showing 1-2 of 2 matching conversations",
+    "range_start": 1,
+    "range_end": 2,
+    "matching_count": 2,
+    "rendered_count": 2,
+    "page_size": 50,
+    "previous_disabled": True,
+    "next_disabled": True,
+    "page_changed": False,
+    "next_exercised": False,
+    "selection_stable": True,
+    "restored": True,
+}
 EXPECTED_VISUAL_SIDEBAR_SESSION_SEARCH = {"Find session"}
 EXPECTED_VISUAL_SIDEBAR_SESSION_DETAILS = {
     "Focus: Thread",
@@ -1844,6 +1859,22 @@ def visual_manifest_evidence_failures(root: Path) -> list[str]:
                     f"visual QA manifest {viewport_name} sidebar Focus filter evidence failed: {', '.join(focus_failures)}"
                 )
 
+        history_page = viewport.get("sidebar_history_page")
+        if not isinstance(history_page, dict):
+            failures.append(
+                f"visual QA manifest missing {viewport_name} sidebar history page evidence"
+            )
+        else:
+            history_failures = [
+                key
+                for key, expected in EXPECTED_VISUAL_SIDEBAR_HISTORY_PAGE.items()
+                if history_page.get(key) != expected
+            ]
+            if history_failures:
+                failures.append(
+                    f"visual QA manifest {viewport_name} sidebar history page evidence failed: {', '.join(history_failures)}"
+                )
+
         session_search = viewport.get("sidebar_session_search")
         if not isinstance(session_search, list):
             failures.append(
@@ -3419,7 +3450,7 @@ def release_audit_report(
             f"{VISUAL_MANIFEST.as_posix()}; "
             f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['desktop']).as_posix()}; "
             f"{(VISUAL_MANIFEST.parent / EXPECTED_VISUAL_SCREENSHOTS['narrow']).as_posix()}; "
-            "visual manifest schema and contract, screenshots, empty states, layout review, answer-first briefing, action-first navigation, comparison, and plan ordering, native copy control, nearest-follow-up comparison selection, chronological comparison direction, risk labels, sidebar Risk filter, sidebar Focus filter, sidebar session search, sidebar session details, risk distribution, metric cards, dashboard quick reads, report and comparison downloads, report scope-warning evidence, comparison preview, comparison scope-warning evidence, comparison review path, deltas, operator briefing, next review path, next-run checklist, next-run brief, safe feedback handoff, and success target verified"
+            "visual manifest schema and contract, screenshots, empty states, layout review, answer-first briefing, action-first navigation, comparison, and plan ordering, native copy control, nearest-follow-up comparison selection, chronological comparison direction, risk labels, sidebar Risk filter, sidebar Focus filter, sidebar history page, sidebar session search, sidebar session details, risk distribution, metric cards, dashboard quick reads, report and comparison downloads, report scope-warning evidence, comparison preview, comparison scope-warning evidence, comparison review path, deltas, operator briefing, next review path, next-run checklist, next-run brief, safe feedback handoff, and success target verified"
             if not visual_manifest_failures
             else "; ".join(visual_manifest_failures[:3]),
         )
@@ -3810,7 +3841,7 @@ def public_tour_steps(db_path: str = DEFAULT_DEMO_DB) -> list[dict[str, object]]
             "title": "Capture and verify UI evidence",
             "evidence": [
                 "visual manifest records desktop and narrow screenshots",
-                "layout review, sidebar risk labels, sidebar Risk filter, sidebar Focus filter, sidebar session search, sidebar session details, metric cards, report sampled-ingest warning evidence, comparison metric delta cards, comparison sampled-ingest warning evidence, comparison review path, report and comparison download controls, operator briefing, next review path, safe feedback handoff, dashboard quick reads, and success target are verified",
+                "layout review, sidebar risk labels, sidebar Risk filter, sidebar Focus filter, sidebar history page, sidebar session search, sidebar session details, metric cards, report sampled-ingest warning evidence, comparison metric delta cards, comparison sampled-ingest warning evidence, comparison review path, report and comparison download controls, operator briefing, next review path, safe feedback handoff, dashboard quick reads, and success target are verified",
                 "tab checks cover Agent detail thread brief, Timeline quick read, Tools quick read, Duplication quick read, and Raw tables data inventory",
             ],
             "success_checks": [
