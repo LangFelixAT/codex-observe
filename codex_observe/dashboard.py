@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 import html
 import sqlite3
 from pathlib import Path
@@ -50,6 +51,20 @@ from codex_observe.report import (
 
 
 RAW_TABLE_PREVIEW_ROWS = 500
+SIDEBAR_HISTORY_PAGE_SIZE = 50
+
+
+@dataclass(frozen=True)
+class ConversationHistoryPage:
+    conversations: pd.DataFrame
+    page_index: int
+    page_count: int
+    matching_count: int
+    range_start: int
+    range_end: int
+    has_previous: bool
+    has_next: bool
+    selected_session_id: str | None
 
 
 def parse_args() -> argparse.Namespace:
@@ -2248,6 +2263,66 @@ def order_conversations_for_review(
     return ordered.reset_index(drop=True)
 
 
+def conversation_filter_signature(
+    search_query: str | None,
+    risk_filter: str | None,
+    focus_filter: str | None,
+) -> tuple[str, str, str]:
+    normalized_query = " ".join(str(search_query or "").split()).casefold()
+    normalized_risk = str(risk_filter or "all").strip().casefold() or "all"
+    normalized_focus = str(focus_filter or "all").strip().casefold() or "all"
+    return normalized_query, normalized_risk, normalized_focus
+
+
+def conversation_history_page(
+    conversations: pd.DataFrame,
+    page_index: int,
+    selected_session_id: str | None,
+    *,
+    reset_page: bool = False,
+    page_size: int = SIDEBAR_HISTORY_PAGE_SIZE,
+) -> ConversationHistoryPage:
+    if page_size <= 0:
+        raise ValueError("page_size must be greater than zero")
+
+    matching_count = len(conversations)
+    if matching_count == 0:
+        return ConversationHistoryPage(
+            conversations=conversations.iloc[0:0].copy(),
+            page_index=0,
+            page_count=0,
+            matching_count=0,
+            range_start=0,
+            range_end=0,
+            has_previous=False,
+            has_next=False,
+            selected_session_id=None,
+        )
+
+    page_count = (matching_count + page_size - 1) // page_size
+    requested_page = 0 if reset_page else int(page_index or 0)
+    current_page = min(max(requested_page, 0), page_count - 1)
+    start = current_page * page_size
+    end = min(start + page_size, matching_count)
+
+    session_ids = conversations["session_id"].astype(str).tolist()
+    selected = str(selected_session_id) if selected_session_id is not None else None
+    if selected not in set(session_ids):
+        selected = session_ids[0]
+
+    return ConversationHistoryPage(
+        conversations=conversations.iloc[start:end].copy(),
+        page_index=current_page,
+        page_count=page_count,
+        matching_count=matching_count,
+        range_start=start + 1,
+        range_end=end,
+        has_previous=current_page > 0,
+        has_next=current_page + 1 < page_count,
+        selected_session_id=selected,
+    )
+
+
 def sidebar_risk_filter_options(conversations: pd.DataFrame) -> list[tuple[str, str]]:
     counts = {"high": 0, "medium": 0, "low": 0, "unknown": 0}
     if "triage_risk" in conversations.columns:
@@ -2824,25 +2899,53 @@ def main() -> None:
                 f"Showing {len(filtered_conversations)} of {len(conversations)} conversations after "
                 f"{', '.join(active_filters)} filter"
             )
-        if filtered_conversations.empty:
+        filter_signature = conversation_filter_signature(
+            search_query, risk_filter, focus_filter
+        )
+        filters_changed = (
+            st.session_state.get("sidebar_history_filter_signature") != filter_signature
+        )
+        history = conversation_history_page(
+            filtered_conversations,
+            page_index=st.session_state.get("sidebar_history_page", 0),
+            selected_session_id=st.session_state.get("selected_session_id"),
+            reset_page=filters_changed,
+        )
+        st.session_state["sidebar_history_filter_signature"] = filter_signature
+        st.session_state["sidebar_history_page"] = history.page_index
+
+        if history.matching_count == 0:
             st.info("No conversations match the current sidebar filters.")
             st.stop()
-        elif st.session_state.get("selected_session_id") not in set(
-            filtered_conversations["session_id"]
-        ):
-            st.session_state["selected_session_id"] = filtered_conversations.iloc[0][
-                "session_id"
-            ]
+
+        st.session_state["selected_session_id"] = history.selected_session_id
         st.markdown("### Conversations")
-        if (
-            "selected_session_id" not in st.session_state
-            and not filtered_conversations.empty
-        ):
-            st.session_state["selected_session_id"] = filtered_conversations.iloc[0][
-                "session_id"
-            ]
+        st.caption(
+            f"Showing {history.range_start}-{history.range_end} of "
+            f"{history.matching_count} matching conversations"
+        )
+        previous_column, next_column = st.columns(2)
+        with previous_column:
+            if st.button(
+                "Previous",
+                key="sidebar_history_previous",
+                disabled=not history.has_previous,
+                width="stretch",
+            ):
+                st.session_state["sidebar_history_page"] = history.page_index - 1
+                st.rerun()
+        with next_column:
+            if st.button(
+                "Next",
+                key="sidebar_history_next",
+                disabled=not history.has_next,
+                width="stretch",
+            ):
+                st.session_state["sidebar_history_page"] = history.page_index + 1
+                st.rerun()
+
         last_date = None
-        for _, row in filtered_conversations.iterrows():
+        for _, row in history.conversations.iterrows():
             day = str(row.get("last_seen") or "")[:10]
             if day != last_date:
                 st.markdown(f"#### {day or 'Unknown date'}")

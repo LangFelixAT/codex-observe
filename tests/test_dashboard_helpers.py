@@ -25,6 +25,8 @@ from codex_observe.dashboard import (
     comparison_preview_html,
     comparison_review_path_html,
     conversation_button_label,
+    conversation_filter_signature,
+    conversation_history_page,
     dashboard_css,
     data_inventory_html,
     dataframe_preview,
@@ -47,6 +49,7 @@ from codex_observe.dashboard import (
     review_path_html,
     risk_distribution_html,
     risk_marker,
+    SIDEBAR_HISTORY_PAGE_SIZE,
     sampled_ingest_coverage_html,
     sidebar_focus_filter_options,
     sidebar_risk_filter_options,
@@ -302,6 +305,103 @@ def test_filter_conversations_by_search_preserves_empty_query_and_no_columns() -
     assert filter_conversations_by_search(no_searchable_columns, "alpha").equals(
         no_searchable_columns
     )
+
+
+def test_conversation_history_page_bounds_rows_and_reports_range() -> None:
+    conversations = pd.DataFrame(
+        {"session_id": [f"session-{index}" for index in range(121)]}
+    )
+
+    history = conversation_history_page(
+        conversations,
+        page_index=1,
+        selected_session_id="session-75",
+    )
+
+    assert SIDEBAR_HISTORY_PAGE_SIZE == 50
+    assert history.conversations["session_id"].tolist() == [
+        f"session-{index}" for index in range(50, 100)
+    ]
+    assert history.page_index == 1
+    assert history.page_count == 3
+    assert history.matching_count == 121
+    assert history.range_start == 51
+    assert history.range_end == 100
+    assert history.has_previous is True
+    assert history.has_next is True
+    assert history.selected_session_id == "session-75"
+
+
+def test_conversation_history_page_resets_filters_without_losing_valid_selection() -> (
+    None
+):
+    conversations = pd.DataFrame(
+        {"session_id": [f"session-{index}" for index in range(121)]}
+    )
+
+    history = conversation_history_page(
+        conversations,
+        page_index=2,
+        selected_session_id="session-120",
+        reset_page=True,
+    )
+
+    assert history.page_index == 0
+    assert history.conversations["session_id"].tolist() == [
+        f"session-{index}" for index in range(50)
+    ]
+    assert history.selected_session_id == "session-120"
+    assert history.has_previous is False
+    assert history.has_next is True
+
+
+def test_conversation_history_page_clamps_page_and_repairs_invalid_selection() -> None:
+    conversations = pd.DataFrame(
+        {"session_id": [f"session-{index}" for index in range(61)]}
+    )
+
+    history = conversation_history_page(
+        conversations,
+        page_index=99,
+        selected_session_id="missing",
+    )
+
+    assert history.page_index == 1
+    assert history.conversations["session_id"].tolist() == [
+        f"session-{index}" for index in range(50, 61)
+    ]
+    assert history.selected_session_id == "session-0"
+    assert history.range_start == 51
+    assert history.range_end == 61
+    assert history.has_previous is True
+    assert history.has_next is False
+
+
+def test_conversation_history_page_handles_empty_matches() -> None:
+    history = conversation_history_page(
+        pd.DataFrame(columns=["session_id"]),
+        page_index=3,
+        selected_session_id="missing",
+    )
+
+    assert history.conversations.empty
+    assert history.page_index == 0
+    assert history.page_count == 0
+    assert history.matching_count == 0
+    assert history.range_start == 0
+    assert history.range_end == 0
+    assert history.selected_session_id is None
+    assert history.has_previous is False
+    assert history.has_next is False
+
+
+def test_conversation_filter_signature_normalizes_equivalent_filters() -> None:
+    assert conversation_filter_signature("  Alpha  BETA ", "HIGH", "Thread") == (
+        "alpha beta",
+        "high",
+        "thread",
+    )
+    assert conversation_filter_signature(None, None, None) == ("", "all", "all")
 
 
 def test_conversation_button_label_includes_risk_and_selection_marker() -> None:

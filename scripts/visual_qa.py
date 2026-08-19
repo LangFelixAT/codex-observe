@@ -132,6 +132,21 @@ EXPECTED_SIDEBAR_FOCUS_FILTER = {
     "selection_valid": True,
     "restored": True,
 }
+EXPECTED_SIDEBAR_HISTORY_PAGE = {
+    "stage": "complete",
+    "range_label": "Showing 1-2 of 2 matching conversations",
+    "range_start": 1,
+    "range_end": 2,
+    "matching_count": 2,
+    "rendered_count": 2,
+    "page_size": 50,
+    "previous_disabled": True,
+    "next_disabled": True,
+    "page_changed": False,
+    "next_exercised": False,
+    "selection_stable": True,
+    "restored": True,
+}
 FOCUS_LABELS = [
     "Duration",
     "Thread",
@@ -174,6 +189,13 @@ def open_selectbox(selector, viewport_name: str) -> None:
         selector.press("ArrowDown")
     else:
         selector.click()
+
+
+def activate_sidebar_history_button(button, viewport_name: str) -> None:
+    if viewport_name == "narrow":
+        button.press("Enter")
+    else:
+        button.click()
 
 
 def open_option_labels(page, timeout_ms: int) -> list[str]:
@@ -471,6 +493,84 @@ def sidebar_focus_filter_failures(
     return failures
 
 
+def sidebar_history_page_failures(
+    evidence: dict[str, object] | None,
+    viewport_name: str,
+    profile: str = PROFILE_DEMO,
+) -> list[str]:
+    if not isinstance(evidence, dict):
+        return [f"{viewport_name}: sidebar history evidence not found"]
+
+    failures = []
+    if evidence.get("stage") != "complete":
+        failures.append(
+            f"{viewport_name}: sidebar history interaction did not complete"
+        )
+
+    page_size = int(evidence.get("page_size") or 0)
+    matching_count = int(evidence.get("matching_count") or 0)
+    rendered_count = int(evidence.get("rendered_count") or 0)
+    range_start = int(evidence.get("range_start") or 0)
+    range_end = int(evidence.get("range_end") or 0)
+    range_label = str(evidence.get("range_label") or "")
+
+    if page_size != 50:
+        failures.append(f"{viewport_name}: sidebar history page size is not 50")
+    if rendered_count > 50:
+        failures.append(
+            f"{viewport_name}: sidebar history renders more than 50 conversations"
+        )
+    expected_rendered = max(range_end - range_start + 1, 0)
+    if rendered_count != expected_rendered:
+        failures.append(
+            f"{viewport_name}: sidebar history rendered count does not match range"
+        )
+    expected_range = (
+        f"Showing {range_start}-{range_end} of {matching_count} matching conversations"
+    )
+    if range_label != expected_range:
+        failures.append(f"{viewport_name}: sidebar history range label is inconsistent")
+    if evidence.get("previous_disabled") is not True:
+        failures.append(
+            f"{viewport_name}: sidebar history Previous should be disabled on page one"
+        )
+
+    has_multiple_pages = matching_count > page_size > 0
+    if has_multiple_pages:
+        if evidence.get("next_disabled") is not False:
+            failures.append(
+                f"{viewport_name}: sidebar history Next should be enabled for multiple pages"
+            )
+        if evidence.get("page_changed") is not True:
+            failures.append(f"{viewport_name}: sidebar history page did not change")
+        if evidence.get("next_exercised") is not True:
+            failures.append(
+                f"{viewport_name}: sidebar history Next navigation was not exercised"
+            )
+    elif evidence.get("next_disabled") is not True:
+        failures.append(
+            f"{viewport_name}: sidebar history Next should be disabled on the final page"
+        )
+
+    if profile == PROFILE_REAL and not has_multiple_pages:
+        failures.append(
+            f"{viewport_name}: real sidebar history did not expose multiple pages"
+        )
+    if profile == PROFILE_REAL and evidence.get("next_exercised") is not True:
+        failures.append(
+            f"{viewport_name}: sidebar history Next navigation was not exercised"
+        )
+    if evidence.get("selection_stable") is not True:
+        failures.append(
+            f"{viewport_name}: sidebar history selected report was not stable"
+        )
+    if evidence.get("restored") is not True:
+        failures.append(
+            f"{viewport_name}: sidebar history did not restore the first page"
+        )
+    return failures
+
+
 def exercise_sidebar_focus_filter(
     page, viewport_name: str, profile: str = PROFILE_DEMO
 ) -> dict[str, object]:
@@ -752,6 +852,184 @@ focus => {
                     )
             except Exception:
                 pass
+    return evidence
+
+
+def collect_sidebar_history_page(page) -> dict[str, object]:
+    return page.evaluate(
+        r"""
+() => {
+  const sidebar = document.querySelector('[data-testid="stSidebar"]') || document;
+  const text = sidebar.innerText || '';
+  const range = text.match(
+    /Showing ([\d,]+)-([\d,]+) of ([\d,]+) matching conversations/
+  );
+  const buttons = Array.from(sidebar.querySelectorAll('button'));
+  const conversationPattern =
+    /^(?:>\s+)?(?:!!|!|OK|\?\?)\s+(?:High|Medium|Low|Unknown) risk\b/;
+  const conversationButtons = buttons.filter((button) =>
+    conversationPattern.test((button.innerText || '').trim())
+  );
+  const previous = buttons.find(
+    (button) => (button.innerText || '').trim() === 'Previous'
+  );
+  const next = buttons.find(
+    (button) => (button.innerText || '').trim() === 'Next'
+  );
+  return {
+    range_label: range ? range[0] : '',
+    range_start: range ? Number(range[1].replace(/,/g, '')) : 0,
+    range_end: range ? Number(range[2].replace(/,/g, '')) : 0,
+    matching_count: range ? Number(range[3].replace(/,/g, '')) : 0,
+    rendered_count: conversationButtons.length,
+    page_size: 50,
+    previous_disabled: previous ? previous.disabled : null,
+    next_disabled: next ? next.disabled : null,
+  };
+}
+        """
+    )
+
+
+def exercise_sidebar_history_page(
+    page, viewport_name: str, profile: str = PROFILE_DEMO
+) -> dict[str, object]:
+    evidence: dict[str, object] = {
+        "stage": "locate-controls",
+        "range_label": "",
+        "range_start": 0,
+        "range_end": 0,
+        "matching_count": 0,
+        "rendered_count": 0,
+        "page_size": 50,
+        "previous_disabled": None,
+        "next_disabled": None,
+        "page_changed": False,
+        "next_exercised": False,
+        "selection_stable": False,
+        "restored": False,
+    }
+    timeout_ms = 60000 if profile == PROFILE_REAL else 10000
+    opened_sidebar = False
+
+    try:
+        next_buttons = page.get_by_role("button", name="Next", exact=True)
+        visible_next = next(
+            (item for item in next_buttons.all() if item.is_visible()), None
+        )
+        if visible_next is None:
+            opener = page.get_by_role(
+                "button", name=re.compile("open sidebar", re.IGNORECASE)
+            )
+            if opener.count() > 0:
+                opener.first.click()
+                opened_sidebar = True
+            else:
+                opened_sidebar = bool(
+                    page.evaluate(
+                        r"""
+() => {
+  const root = document.querySelector('[data-testid="stSidebarCollapsedControl"]');
+  const button = root?.matches('button') ? root : root?.querySelector('button');
+  if (!button) return false;
+  button.click();
+  return true;
+}
+                        """
+                    )
+                )
+            if not opened_sidebar:
+                return evidence
+            page.get_by_role("button", name="Next", exact=True).first.wait_for(
+                state="visible", timeout=timeout_ms
+            )
+            next_buttons = page.get_by_role("button", name="Next", exact=True)
+            visible_next = next(
+                (item for item in next_buttons.all() if item.is_visible()), None
+            )
+        if visible_next is None:
+            return evidence
+
+        evidence["stage"] = "read-first-page"
+        first_page = collect_sidebar_history_page(page)
+        evidence.update(first_page)
+        if not first_page.get("range_label"):
+            return evidence
+
+        briefing = page.locator(".co-briefing").first
+        initial_briefing = briefing.inner_text(timeout=timeout_ms)
+        matching_count = int(first_page.get("matching_count") or 0)
+        page_size = int(first_page.get("page_size") or 0)
+
+        if matching_count > page_size:
+            evidence["stage"] = "next-page"
+            activate_sidebar_history_button(visible_next, viewport_name)
+            page.wait_for_function(
+                r"""
+initialStart => {
+  const match = (document.body.innerText || '').match(
+    /Showing ([\d,]+)-([\d,]+) of ([\d,]+) matching conversations/
+  );
+  return match && Number(match[1].replace(/,/g, '')) > initialStart;
+}
+                """,
+                arg=int(first_page.get("range_start") or 0),
+                timeout=timeout_ms,
+            )
+            next_page = collect_sidebar_history_page(page)
+            evidence["next_exercised"] = True
+            evidence["page_changed"] = int(next_page.get("range_start") or 0) > int(
+                first_page.get("range_start") or 0
+            )
+            evidence["selection_stable"] = (
+                page.locator(".co-briefing").first.inner_text(timeout=timeout_ms)
+                == initial_briefing
+            )
+
+            evidence["stage"] = "previous-page"
+            previous_buttons = page.get_by_role("button", name="Previous", exact=True)
+            visible_previous = next(
+                (item for item in previous_buttons.all() if item.is_visible()), None
+            )
+            if visible_previous is None:
+                return evidence
+            activate_sidebar_history_button(visible_previous, viewport_name)
+            page.wait_for_function(
+                "label => document.body.innerText.includes(label)",
+                arg=str(first_page["range_label"]),
+                timeout=timeout_ms,
+            )
+            restored_page = collect_sidebar_history_page(page)
+            evidence["restored"] = (
+                restored_page == first_page
+                and page.locator(".co-briefing").first.inner_text(timeout=timeout_ms)
+                == initial_briefing
+            )
+        else:
+            evidence["selection_stable"] = True
+            evidence["restored"] = True
+
+        evidence["stage"] = "complete"
+    except Exception as exc:
+        evidence["stage"] = f"failed:{evidence['stage']}:{type(exc).__name__}"
+    finally:
+        if opened_sidebar:
+            with contextlib.suppress(Exception):
+                closer = page.get_by_role(
+                    "button", name=re.compile("close sidebar", re.IGNORECASE)
+                )
+                if closer.count() > 0 and closer.first.is_visible():
+                    closer.first.click()
+                else:
+                    page.evaluate(
+                        r"""
+() => {
+  const root = document.querySelector('[data-testid="stSidebarCollapseButton"]');
+  const button = root?.matches('button') ? root : root?.querySelector('button');
+  if (button) button.click();
+}
+                        """
+                    )
     return evidence
 
 
@@ -1756,6 +2034,10 @@ def validate_dashboard_page(
     failures.extend(
         sidebar_focus_filter_failures(sidebar_focus_filter, viewport_name, profile)
     )
+    sidebar_history_page = exercise_sidebar_history_page(page, viewport_name, profile)
+    failures.extend(
+        sidebar_history_page_failures(sidebar_history_page, viewport_name, profile)
+    )
     sidebar_session_search = collect_sidebar_session_search(page)
     failures.extend(
         sidebar_session_search_failures(sidebar_session_search, viewport_name)
@@ -1922,6 +2204,7 @@ name => {
         "sidebar_risk_labels": sidebar_risk_labels,
         "sidebar_risk_filter": sidebar_risk_filter,
         "sidebar_focus_filter": sidebar_focus_filter,
+        "sidebar_history_page": sidebar_history_page,
         "sidebar_session_search": sidebar_session_search,
         "sidebar_session_details": sidebar_session_details,
         "success_targets": success_targets,
@@ -2374,6 +2657,18 @@ def visual_manifest_failures(manifest: dict[str, object]) -> list[str]:
             failures.extend(
                 failure.replace(f"{name}: ", f"manifest {name} ")
                 for failure in focus_filter_failures
+            )
+
+        sidebar_history_page = raw.get("sidebar_history_page")
+        if not isinstance(sidebar_history_page, dict):
+            failures.append(f"manifest {name} missing sidebar history page evidence")
+        else:
+            history_failures = sidebar_history_page_failures(
+                sidebar_history_page, name, profile
+            )
+            failures.extend(
+                failure.replace(f"{name}: ", f"manifest {name} ")
+                for failure in history_failures
             )
 
         sidebar_session_search = raw.get("sidebar_session_search")

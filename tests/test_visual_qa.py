@@ -386,6 +386,29 @@ def test_open_selectbox_targets_narrow_combobox_with_trusted_keyboard_input() ->
     assert desktop.calls == [("click", None)]
 
 
+def test_activate_sidebar_history_button_uses_keyboard_for_clipped_narrow_control() -> (
+    None
+):
+    class FakeButton:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, str | None]] = []
+
+        def press(self, key: str) -> None:
+            self.calls.append(("press", key))
+
+        def click(self) -> None:
+            self.calls.append(("click", None))
+
+    narrow = FakeButton()
+    desktop = FakeButton()
+
+    visual_qa.activate_sidebar_history_button(narrow, "narrow")
+    visual_qa.activate_sidebar_history_button(desktop, "desktop")
+
+    assert narrow.calls == [("press", "Enter")]
+    assert desktop.calls == [("click", None)]
+
+
 def test_focus_option_label_prefers_target_and_skips_empty_categories() -> None:
     options = ["All focuses", "Thread (2)", "Guardian (0)", "Monitor (1)"]
 
@@ -414,6 +437,65 @@ def test_sidebar_focus_filter_failures_accept_real_profile_stable_target() -> No
     evidence["target"] = "Guardian"
 
     assert sidebar_focus_filter_failures(evidence, "desktop", "real") == []
+
+
+def test_sidebar_history_page_failures_accept_bounded_demo_history() -> None:
+    evidence = {
+        "stage": "complete",
+        "range_label": "Showing 1-2 of 2 matching conversations",
+        "range_start": 1,
+        "range_end": 2,
+        "matching_count": 2,
+        "rendered_count": 2,
+        "page_size": 50,
+        "previous_disabled": True,
+        "next_disabled": True,
+        "page_changed": False,
+        "next_exercised": False,
+        "selection_stable": True,
+        "restored": True,
+    }
+
+    assert visual_qa.sidebar_history_page_failures(evidence, "desktop") == []
+
+    evidence["rendered_count"] = 51
+    evidence["selection_stable"] = False
+    failures = visual_qa.sidebar_history_page_failures(evidence, "narrow")
+
+    assert "narrow: sidebar history renders more than 50 conversations" in failures
+    assert "narrow: sidebar history selected report was not stable" in failures
+
+
+def test_sidebar_history_page_failures_require_real_multi_page_navigation() -> None:
+    evidence = {
+        "stage": "complete",
+        "range_label": "Showing 1-50 of 120 matching conversations",
+        "range_start": 1,
+        "range_end": 50,
+        "matching_count": 120,
+        "rendered_count": 50,
+        "page_size": 50,
+        "previous_disabled": True,
+        "next_disabled": False,
+        "page_changed": True,
+        "next_exercised": True,
+        "selection_stable": True,
+        "restored": True,
+    }
+
+    assert (
+        visual_qa.sidebar_history_page_failures(evidence, "desktop", profile="real")
+        == []
+    )
+
+    evidence["matching_count"] = 50
+    evidence["next_exercised"] = False
+    failures = visual_qa.sidebar_history_page_failures(
+        evidence, "narrow", profile="real"
+    )
+
+    assert "narrow: real sidebar history did not expose multiple pages" in failures
+    assert "narrow: sidebar history Next navigation was not exercised" in failures
 
 
 def test_sidebar_session_search_failures_require_find_session_control() -> None:
@@ -985,6 +1067,7 @@ def complete_viewport_results(tmp_path: Path) -> dict[str, dict[str, object]]:
             "sidebar_risk_labels": ["High risk", "Low risk"],
             "sidebar_risk_filter": ["Risk filter"],
             "sidebar_focus_filter": dict(visual_qa.EXPECTED_SIDEBAR_FOCUS_FILTER),
+            "sidebar_history_page": dict(visual_qa.EXPECTED_SIDEBAR_HISTORY_PAGE),
             "sidebar_session_search": ["Find session"],
             "sidebar_session_details": [
                 "Focus: Thread",
@@ -1232,6 +1315,9 @@ def test_visual_manifest_records_review_evidence(tmp_path: Path) -> None:
     assert loaded["viewports"]["desktop"]["sidebar_focus_filter"] == (
         visual_qa.EXPECTED_SIDEBAR_FOCUS_FILTER
     )
+    assert loaded["viewports"]["desktop"]["sidebar_history_page"] == (
+        visual_qa.EXPECTED_SIDEBAR_HISTORY_PAGE
+    )
     assert loaded["viewports"]["desktop"]["sidebar_session_search"] == ["Find session"]
     assert loaded["viewports"]["desktop"]["sidebar_session_details"] == [
         "Focus: Thread",
@@ -1429,6 +1515,7 @@ def test_visual_manifest_failures_rejects_incomplete_evidence(tmp_path: Path) ->
     assert "manifest desktop sidebar risk label not found: Low risk" in failures
     assert "manifest desktop missing sidebar Risk filter evidence" in failures
     assert "manifest desktop missing sidebar Focus filter evidence" in failures
+    assert "manifest desktop missing sidebar history page evidence" in failures
     assert "manifest desktop missing sidebar session search evidence" in failures
     assert "manifest desktop risk distribution card not rendered" in failures
     assert "manifest desktop metric card not rendered: Largest thread" in failures
@@ -1517,6 +1604,21 @@ def test_real_profile_manifest_accepts_private_aggregate_variance(
     viewport_results = deepcopy(complete_viewport_results(tmp_path))
     for raw in viewport_results.values():
         raw["sidebar_risk_labels"] = ["High risk"]
+        raw["sidebar_history_page"] = {
+            "stage": "complete",
+            "range_label": "Showing 1-50 of 120 matching conversations",
+            "range_start": 1,
+            "range_end": 50,
+            "matching_count": 120,
+            "rendered_count": 50,
+            "page_size": 50,
+            "previous_disabled": True,
+            "next_disabled": False,
+            "page_changed": True,
+            "next_exercised": True,
+            "selection_stable": True,
+            "restored": True,
+        }
         raw["sidebar_session_details"] = ["Focus: Thread", "11 snapshots"]
         raw["risk_distributions"] = [
             {
