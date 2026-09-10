@@ -1,7 +1,11 @@
 from __future__ import annotations
 
-import tomllib
 from pathlib import Path
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - exercised by the Python 3.10 CI job
+    import tomli as tomllib
 
 import codex_observe
 
@@ -27,6 +31,7 @@ def test_package_metadata_is_release_ready() -> None:
     optional = pyproject["project"]["optional-dependencies"]
     assert set(optional["visual"]) == {"pillow>=10", "playwright"}
     assert {"pillow>=10", "playwright", "pytest", "ruff"}.issubset(set(optional["dev"]))
+    assert "tomli>=2; python_version < '3.11'" in optional["dev"]
 
     classifiers = set(project["classifiers"])
     assert "Framework :: Streamlit" in classifiers
@@ -58,12 +63,14 @@ def test_release_documents_exist_and_are_plain_utf8() -> None:
         raw.decode("utf-8")
 
 
-def test_changelog_records_current_unreleased_work() -> None:
+def test_changelog_records_current_release() -> None:
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
 
-    assert "## Unreleased" in changelog
-    assert "codex-observe demo" in changelog
-    assert "codex-observe doctor" in changelog
+    assert "## [Unreleased]" in changelog
+    assert "No unreleased changes." in changelog
+    assert "## [0.3.0] - 2026-09-10" in changelog
+    assert "local-first" in changelog
+    assert "private-validate" in changelog
     assert "visual QA" in changelog
 
 

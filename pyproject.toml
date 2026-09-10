@@ -43,6 +43,7 @@ dev = [
   "playwright",
   "pytest",
   "ruff",
+  "tomli>=2; python_version < '3.11'",
 ]
 
 [tool.ruff.lint]
