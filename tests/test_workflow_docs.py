@@ -132,71 +132,32 @@ def test_backlog_records_published_slice_retirement_and_external_write_guard() -
     assert "codex-observe.evidence-bundle.v1" in backlog
 
 
-def test_current_state_handoff_covers_gates_evidence_and_real_log_checkpoint() -> None:
+def test_current_state_handoff_is_concise_and_release_focused() -> None:
     current = read("docs/CURRENT.md")
     readme = read("README.md")
-    amazing = read("docs/AMAZING.md")
-
-    assert "terminal sharing warnings" in amazing
 
     for required in [
+        "# Current Project State",
+        "Version 0.3.0",
+        "local-first",
+        "source checkout",
+        "codex-observe demo --serve",
+        "codex-observe private-validate",
+        "Python 3.10",
+        "Python 3.11",
+        "Python 3.12",
+        "296 tests",
+        "Visual and release evidence",
+        "python scripts/visual_qa.py --profile real",
+        "Issue #20",
+        "No feature work",
         "docs/AMAZING.md",
         "docs/RELEASE.md",
         "docs/LIMITATIONS.md",
-        "docs/PUBLIC_TOUR_FEEDBACK.md",
         "docs/TRACKING.md",
-        "codex-observe tour",
-        "codex-observe tour --reviewer",
-        "codex-observe demo --serve --host 127.0.0.1 --port 8501",
-        "codex-observe doctor --db .artifacts/demo/codex_observe_demo.sqlite --json",
-        "structured `next_commands`",
-        "follow-up command templates",
-        "next validation command",
-        "success-target preview",
-        "terminal privacy warning",
-        "privacy-warning",
-        "private reports or comparisons",
-        "copy-pasteable",
-        "copy-pasteable next actions",
-        "same `--db` path",
-        "priority-preserving next-step recommendations",
-        "ruff check",
-        "ruff format --check",
-        "pytest -q",
-        "codex-observe self-check --json",
-        "codex-observe self-check --visual --json",
-        "codex-observe paths --json",
-        "guided `private-validate --newest-files 25 --json` command",
-        "codex-observe audit --json",
-        "aggregate triage assessment",
-        "required_commands",
-        "paths handoff evidence",
-        "private-validate` handoff contract",
-        "triage",
-        "plain `codex-observe audit` prints",
-        "python scripts/visual_qa.py",
-        "python scripts/visual_qa.py --verify-manifest .artifacts/visual/visual-qa-manifest.json",
-        "python scripts/visual_qa.py --profile real",
-        "metric card evidence",
-        "Agent detail thread brief",
-        "Timeline quick read",
-        "Tools quick read",
-        "Duplication quick read",
-        "Raw tables data inventory",
-        "operator-briefing evidence",
-        "saved manifest schema-v2 contract",
-        "missing/empty database onboarding states",
-        "codex-observe evidence-bundle",
-        "codex-observe.evidence-bundle.v1",
-        "50 conversations per page",
-        "sidebar history page evidence",
-        "schema-v2 exact byte-size and SHA-256 screenshot integrity",
-        "issues #1-#8 and #10-#19 are closed",
-        "Issue #19 completed visual-evidence integrity",
-        "Attaching generated artifacts externally still requires explicit human approval",
-        "human-approved private input path",
     ]:
         assert required in current
+    assert len(current.splitlines()) <= 120
     assert "docs/CURRENT.md" in readme
     assert "docs/LIMITATIONS.md" in readme
 
@@ -251,6 +212,8 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
     contributing = read("CONTRIBUTING.md")
     readme = read("README.md")
     release = read("docs/RELEASE.md")
+    distribution = read("docs/DISTRIBUTION.md")
+    changelog = read("CHANGELOG.md")
     ci = read(".github/workflows/ci.yml")
 
     for required in [
@@ -324,63 +287,42 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
         "machine-readable generation status",
     ]:
         assert internal_contract_term not in readme
-    assert "CONTRIBUTING.md" in release
-    distribution = read("docs/DISTRIBUTION.md")
-    changelog = read("CHANGELOG.md")
-    assert "Bounded dashboard history to 50 conversations per page" in changelog
-    assert "ruff check" in release
-    assert "ruff format --check" in release
-    assert "python scripts/redact_fixtures.py" in release
-    assert "docs/REAL_LOG_FEEDBACK.md" in release
-    assert "run-report.json" in release
-    assert "run-comparison.md" in release
-    assert "run-comparison.json" in release
-    assert "triage-risk" in release
-    assert "visual QA manifest" in release
-    assert "bounded sidebar history page evidence" in release
-    assert "schema-v2" in release
-    assert "SHA-256" in release
-    assert "schema-v2 contract evidence" in release
-    assert "nearest-follow-up comparison selection" in release
-    assert "comparison -> metric ordering" in release
-    assert "missing/empty database onboarding states" in release
-    assert "metric cards" in release
-    assert (
-        "public tour JSON evidence including dashboard quick-read guidance, report/comparison sampled-scope warning guidance, baseline-to-next-run validation-loop guidance, comparison review-path guidance, and report/comparison-download evidence"
-        in release
-    )
-    assert "operator briefing" in release
-    assert "risk distribution" in release
-    assert "safe feedback handoff" in release
-    assert (
-        "comparison quick-read, sampled-ingest warning evidence when present, review-path, metric delta cards including usage snapshots, safe feedback handoff, and next validation command cards plus report and comparison download controls"
-        in release
-    )
-    assert "required_commands" in release
-    assert "codex-observe self-check --json" in release
-    assert "codex-observe.self-check.v1" in release
-    assert "codex-observe self-check --visual --json" in release
-    assert "private-sharing review metadata" in release
-    assert "text privacy-warning evidence" in release
-    assert "terminal privacy warning" in release
-    assert "report/comparison terminal privacy-warning evidence" in release
-    assert "review_required_before_sharing" in release
-    assert "structured `next_commands`" in release
-    assert "follow-up command templates" in release
-    assert "docs/CURRENT.md" in release
-    assert "dashboard empty-state next actions" in release
-    assert "private real-log checkpoint" in release
-    assert (
-        "private validation handoff evidence including real-profile visual QA next-command metadata"
-        in release
-    )
-    assert "private-validate` handoff contract" in release
-    assert "--newest-files <n>" in release
-    assert "risk_distribution" in release
-    assert "docs/LIMITATIONS.md" in release
-    assert "release branch is pushed to `origin`" in release
-    assert "tracking snapshot" in release
-    assert "git status --short --branch" in release
+    for required_release_item in [
+        "# Release Checklist",
+        "Version 0.3.0",
+        'python -m pip install -e ".[dev]"',
+        "python -m playwright install --with-deps chromium",
+        "Playwright plus Pillow",
+        "ruff check",
+        "ruff format --check",
+        "pytest -q",
+        "codex-observe self-check --json",
+        "codex-observe paths --json",
+        "codex-observe demo",
+        "codex-observe report",
+        "codex-observe compare",
+        "python scripts/visual_qa.py",
+        "python scripts/visual_qa.py --verify-manifest",
+        "codex-observe evidence-bundle",
+        "codex-observe audit --json",
+        "GitHub Actions",
+        "git status --short --branch",
+        "CHANGELOG.md",
+        "docs/CURRENT.md",
+        "docs/DISTRIBUTION.md",
+        "docs/LIMITATIONS.md",
+        "docs/REAL_LOG_FEEDBACK.md",
+        "review before sharing",
+    ]:
+        assert required_release_item in release
+    assert len(release.splitlines()) <= 160
+    for stale_contract_dump in [
+        "public tour JSON evidence including",
+        "bounded sidebar history page evidence",
+        "metric card evidence",
+        "required_commands",
+    ]:
+        assert stale_contract_dump not in release
     for required_distribution_item in [
         "codex-observe evidence-bundle --out .artifacts/public-evidence",
         "codex-observe self-check --json",

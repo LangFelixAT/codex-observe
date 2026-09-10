@@ -1,58 +1,86 @@
 # Release Checklist
 
-Codex Observe is an offline tool for local Codex session logs. A release is ready only when a new user can install it, understand the data boundaries, and verify that the dashboard works on representative data.
+Version 0.3.0 is ready when a fresh source checkout installs, the automated quality and evidence gates pass, the public docs match the product, and the release can be reproduced without private session data.
 
-## Data and privacy
+## Scope
 
-- Codex Observe reads local `.jsonl` session logs and local SQLite databases.
-- The app does not intentionally send session content to any external service.
-- Streamlit serves the dashboard locally by default when launched with `127.0.0.1`.
-- Users should treat screenshots, exported tables, issue bodies, and bug reports as potentially sensitive because they may contain prompts, file paths, command output, or tool results.
-- Any future telemetry, hosted mode, sharing feature, or package publishing credential must be explicitly designed and approved before implementation.
+- Supported distribution is a source checkout with an editable install.
+- Supported runtimes are Python 3.10, Python 3.11, and Python 3.12.
+- PyPI publishing, binary installers, hosted mode, and telemetry are outside this release.
+- Review [the current state](CURRENT.md), [distribution policy](DISTRIBUTION.md), [known limitations](LIMITATIONS.md), and [real-log workflow](REAL_LOG_FEEDBACK.md) before release.
 
-## Pre-release checks
+## Prepare
 
-- [ ] `ruff check` passes.
-- [ ] `ruff format --check` passes.
-- [ ] `pytest -q` passes.
-- [ ] `codex-observe self-check --json` passes with `codex-observe.self-check.v1`, supported runtime, package version, dashboard module, no-scan privacy metadata, and next-command evidence; `codex-observe self-check --visual --json` passes before browser visual QA when visual/dev extras are installed.
-- [ ] `codex-observe paths --json` passes and emits `codex-observe.paths.v1` with `scans_sessions=false`, `raw_content_included=false`, `review_required_before_sharing=true`, human-readable `private-validate --newest-files 25 --serve` guidance first, guided `private-validate --newest-files 25 --json` guidance for automation, sampled manual ingest guidance, and a structured review path without scanning private logs; `codex-observe audit --json` verifies the synthetic `private-validate` handoff contract for bounded sampling, ignored artifacts, privacy-safe top-level JSON, report export, private review summary, sampled/full-history scope guidance, full-history follow-up, and dashboard next command.
-- [ ] GitHub Actions CI passes for lint, format, tests, Markdown/JSON aggregate report export with review-path and feedback-handoff evidence, aggregate comparison with feedback-handoff and sampled-coverage evidence, visual QA, and reviewer evidence-bundle artifact upload.
-- [ ] The release branch is pushed to `origin`, `git status --short --branch` is clean/synced, and any local-only evidence or unfinished work is explicitly called out before handoff.
-- [ ] `codex-observe demo` passes with terminal `Review path` and `Next commands` guidance, `codex-observe demo --sessions .artifacts/demo/sessions --keep-sessions --json` emits `codex-observe.demo.v1` with structured `next_commands` and a structured `review_path`, plain `codex-observe ingest .artifacts/demo/sessions --db .artifacts/demo/ingest-contract.sqlite` prints terminal `Review path`, `Next commands`, and private-sharing review guidance, `codex-observe ingest .artifacts/demo/sessions --db .artifacts/demo/ingest-contract.sqlite --json` emits aggregate-only `codex-observe.ingest.v1` counts, skipped-category evidence, privacy metadata with `review_required_before_sharing`, structured `next_commands`, and a structured `review_path`, and bounded real-history sampling with `--newest-files <n>` reports matched, processed, deferred JSONL counts, persists sampled-ingest scope for doctor/sessions/report/comparison/dashboard warnings, prints sample coverage plus the next sample-expansion command, and keeps the same sharing-review contract.
-- [ ] `codex-observe audit` passes after visual QA and `.artifacts/public-evidence` exist, including schema-versioned demo creation JSON review-path evidence, synthetic ingest JSON review-path evidence, private-sharing review metadata, text privacy-warning evidence, bounded plain-tour evidence, exhaustive reviewer text, and public tour JSON evidence including dashboard quick-read guidance, report/comparison sampled-scope warning guidance, baseline-to-next-run validation-loop guidance, comparison review-path guidance, and report/comparison-download evidence plus a top-level review path, terminal feedback handoff, plain text next-command footer, and per-step success checks, generated public evidence bundle terminal and README action plan plus key findings, review checklist, structured feedback handoff, bundled feedback issue template, reproduce-local commands, next-run validation commands, manifest, and limitations artifacts, CI reviewer evidence-bundle generation/upload, issue template evidence/privacy requirements, tracking snapshot evidence, saved visual manifest schema-v2 contract evidence with exact byte-size and SHA-256 integrity for referenced screenshots, missing/empty database onboarding states, layout review, sidebar risk labels, sidebar Risk filter, exercised sidebar Focus filter with narrowed-result, valid-selection, and restored-state evidence, bounded sidebar history page evidence for 50-item Previous/Next navigation and stable selection, sidebar session search, sidebar focus, duration, and snapshot-count evidence, high-risk metric cards including selected-run focus and duration, dashboard quick-read evidence, report sampled-ingest warning evidence when present, comparison quick-read, sampled-ingest warning evidence when present, review-path, metric delta cards including usage snapshots, safe feedback handoff, and next validation command cards plus report and comparison download controls, operator briefing, risk distribution, portfolio briefing, next-review path, next-run checklist, next-run brief, safe feedback handoff, and dashboard success target, the redaction validation privacy check for privacy-safe JSON failures with error codes and raw-ID `--verify-only` rejection, report/comparison terminal privacy-warning evidence, paths handoff evidence, private validation handoff evidence including real-profile visual QA next-command metadata, private review-summary metadata, sampled/full-history scope metadata, and full-history follow-up metadata, default handoff status, optional `--visual` execution status, and `private-validate --visual` help discoverability, plain-text required command list, plain-text `Failed checks` section on failures, and `codex-observe audit --json` includes `schema_version` plus the machine-readable `required_commands` and `failed_checks` verification lists; audit also checks that report/compare help surfaces advertise opportunity-stack and opportunity-change concepts.
-- [ ] `codex-observe doctor --db .artifacts/demo/codex_observe_demo.sqlite` prints terminal `Review path` and `Next commands` guidance, and `codex-observe doctor --db .artifacts/demo/codex_observe_demo.sqlite --json` passes with `schema_version`, structured `next_commands`, and structured `review_path` evidence.
-- [ ] `codex-observe sessions --db .artifacts/demo/codex_observe_demo.sqlite` lists aggregate-only session summaries with risk distribution, portfolio briefing with dominant-driver evidence, plain-text Focus, Duration, Snapshots, Tool out, and Guardian columns, recommended-action block before the table with selection reason, primary-driver evidence, habit, target, and same-band tie-breaker, review path, terminal `Next commands`, and bounded output that can be expanded with `--limit <n>` and narrowed with composable `--risk high|medium|low|unknown` and `--focus duration|thread|guardian|replay|uncached|tool-output|tokens|monitor` filters; `codex-observe sessions --db .artifacts/demo/codex_observe_demo.sqlite --json` includes `schema_version`, `status`, `total_sessions`, `matching_sessions`, `returned_sessions`, `truncated`, `risk_filter`, `focus_filter`, aggregate `risk_distribution`, stable-keyed `focus_distribution`, per-session `usage_snapshots`, `session_duration_hours`, `focus`, `focus_driver`, `focus_label`, a structured `recommended_session`, aggregate-driver `recommendation_detail` with ordered `driver_summary` labels and a structured success-target preview, a structured `review_path` for report, next-run validation, compare, and safe feedback steps, and structured `next_commands` for baseline export plus next-run report and comparison validation for the highest-risk run, and missing database JSON remains machine-readable.
-- [ ] `codex-observe report --db .artifacts/demo/codex_observe_demo.sqlite --out .artifacts/demo/run-report.md` creates an aggregate-only Markdown report and terminal confirmation with a top-level recommended action, usage-snapshot summary, cost-profile evidence, aggregate triage assessment, persisted ingest-scope warning when available, terminal privacy warning, terminal next commands, a next-run success target, next-run checklist, feedback handoff, and follow-up command templates.
-- [ ] `codex-observe report --db .artifacts/demo/codex_observe_demo.sqlite --format json --out .artifacts/demo/run-report.json` creates the matching aggregate-only JSON report with `schema_version`, summary `usage_snapshots`, persisted `ingest_scope` when available, structured next-run checklist, copy-pasteable next-run brief, structured review path, structured feedback handoff, structured follow-up commands, structured next-action and success-target evidence; report JSON failure paths return schema-versioned recovery payloads.
-- [ ] `codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --out .artifacts/demo/run-comparison.md` creates an aggregate-only comparison report and terminal confirmation with usage-snapshot deltas, quick-read, top-level recommended action, triage-risk, opportunity-change, percent-delta, persisted ingest-scope and sampled-coverage evidence when available, structured recommendation, structured review path, structured feedback handoff, terminal privacy warning, next validation command, and follow-up command evidence, and `codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --format json --out .artifacts/demo/run-comparison.json` creates matching machine-readable comparison evidence with `schema_version`, `ingest_scope`, `review_path`, and `feedback_handoff` evidence; comparison JSON failure paths return schema-versioned recovery payloads.
-- [ ] `python scripts/visual_qa.py` passes against the generated synthetic demo database, and `python scripts/visual_qa.py --verify-manifest .artifacts/visual/visual-qa-manifest.json` validates the saved schema-v2 manifest evidence with exact byte-size and SHA-256 screenshot integrity, missing/empty database onboarding states, answer-first operator-briefing visibility, complete initial-viewport tab navigation, checklist -> brief -> native copy prompt -> comparison -> metric ordering, nearest-follow-up comparison selection and chronological comparison direction, sidebar risk labels, sidebar Risk filter, exercised sidebar Focus filter with narrowed-result, valid-selection, and restored-state evidence, bounded sidebar history page evidence for 50-item Previous/Next navigation and stable selection, sidebar session search, sidebar focus, duration, and snapshot-count evidence, expected high-risk default metric card values, report sampled-ingest warning evidence when present, comparison quick-read, sampled-ingest warning evidence when present, review-path, metric delta cards including usage snapshots, safe feedback handoff, and next validation command cards plus report and comparison download controls, operator briefing, risk distribution, portfolio briefing, next-review path, next-run checklist, next-run brief, safe feedback handoff, dashboard success target, and referenced screenshot files.
-- [ ] `codex-observe evidence-bundle --out .artifacts/public-evidence` creates a reviewer-facing synthetic bundle whose terminal output and reviewer README both surface an ordered action plan, key findings, a review checklist with comparison review-path guidance, reproduce-local commands, next-run validation commands, structured `feedback_handoff` metadata, `LIMITATIONS.md`, `PUBLIC_TOUR_FEEDBACK.md`, `.github/ISSUE_TEMPLATE/public_tour_feedback.yml`, report, comparison, audit, visual QA artifacts, and `codex-observe.evidence-bundle.v1` manifest evidence. This bundle is optional/reviewer-facing and still local-only by default.
-- [ ] `python scripts/clean_install_smoke.py --extra dev` succeeds in a clean environment. The clean-install smoke gate runs `python -m pip install -e ".[dev]"` inside the temporary virtual environment, verifies `codex-observe self-check --json`, verifies `codex-observe self-check --visual --json` for visual/dev extras, verifies the skipped-visual evidence bundle README/manifest/limitations/feedback-template contract, runs audit against that generated bundle with `--public-evidence-dir`, and verifies Playwright plus Pillow imports for visual QA.
-- [ ] `LICENSE`, `CHANGELOG.md`, and package metadata in `pyproject.toml` are present and accurate.
-- [ ] Report and dashboard diagnostics use the same shared analysis helpers.
-- [ ] Desktop and narrow screenshots pass automated nonblank/viewport quality checks and are reviewed for obvious layout problems, text overlap, and Streamlit exceptions.
-- [ ] Visual QA covers Overview, Agent detail thread brief, Timeline quick read, Tools quick read, Duplication quick read, Raw tables data inventory, the Agent detail selector, structured quick-read evidence, and validated schema-v2 manifest evidence with exact byte-size and SHA-256 integrity for desktop/narrow screenshots, missing/empty database onboarding states, answer-first operator-briefing visibility, complete initial-viewport tab navigation, checklist -> brief -> native copy prompt -> comparison -> metric ordering, nearest-follow-up comparison selection and chronological comparison direction, sidebar risk labels, sidebar Risk filter, exercised sidebar Focus filter with narrowed-result, valid-selection, and restored-state evidence, bounded sidebar history page evidence for 50-item Previous/Next navigation and stable selection, sidebar session search, sidebar focus, duration, and snapshot-count evidence, expected high-risk default metric cards including selected-run focus and duration, answer-first operator-briefing visibility, complete initial-viewport tab navigation, checklist -> brief -> native copy prompt -> comparison -> metric ordering, nearest-follow-up comparison selection and chronological comparison direction, operator briefing, risk distribution, portfolio briefing, next-review path, next-run checklist, next-run brief, safe feedback handoff, dashboard success target, and layout review.
-- [ ] README install, demo, ingestion, serve, validation commands, and dashboard empty-state next actions are accurate.
-- [ ] `CONTRIBUTING.md` verification and privacy guidance matches this checklist.
-- [ ] `docs/AMAZING.md` reflects the current product bar and active fresh backlog drafts.
-- [ ] `docs/CURRENT.md` reflects the current product state, quality gates, visual evidence contract, tracking snapshot, and private real-log checkpoint.
-- [ ] `docs/LIMITATIONS.md` reflects current limitations, approval-gated non-goals, the real-log privacy gate, and next planned work sources, and `docs/PUBLIC_TOUR_FEEDBACK.md` plus `.github/ISSUE_TEMPLATE/public_tour_feedback.yml` keep public-tour feedback privacy-safe.
-- [ ] `docs/TRACKING.md` records the current GitHub issue snapshot, local draft scaffold command, local draft state, explicit approval requirement for `gh issue create`, and commit/push traceability cadence; open GitHub issues are either closed, deferred, or represented in active fresh backlog drafts.
-- [ ] PR template verification, Markdown/JSON aggregate report artifacts with review-path and feedback-handoff evidence, comparison artifact with review-path and feedback-handoff evidence, audit-verified public evidence bundle README/manifest/limitations doc, visual screenshots, path-safe schema-v2 visual QA manifest with exact byte-size and SHA-256 screenshot integrity, missing/empty database onboarding states, answer-first operator-briefing visibility, complete initial-viewport tab navigation, checklist -> brief -> native copy prompt -> comparison -> metric ordering, nearest-follow-up comparison selection and chronological comparison direction, sidebar risk labels, sidebar Risk filter, exercised sidebar Focus filter with narrowed-result, valid-selection, and restored-state evidence, bounded sidebar history page evidence for 50-item Previous/Next navigation and stable selection, sidebar session search, sidebar focus, duration, and snapshot-count evidence, and expected high-risk metric card evidence, report sampled-ingest warning evidence when present, comparison review-path, sampled-ingest warning evidence when present, and usage-snapshot metric delta evidence, report-and-comparison-download-control evidence, operator-briefing evidence, risk-distribution evidence, next-review path evidence, next-run-checklist evidence, next-run-brief evidence, safe-feedback-handoff evidence, success-target evidence, limitations review, and privacy sections are completed for the release PR.
-- [ ] Version in `pyproject.toml` and `codex_observe/__init__.py` is updated consistently.
-- [ ] Any generated screenshots or local databases are excluded from commits unless intentionally added as fixtures. Any fixture derived from local logs followed `docs/REAL_LOG_FEEDBACK.md`, was first generated with `python scripts/redact_fixtures.py`, reviewed with its manifest and automated `privacy_review` over generated JSONL rows and manifest metadata, used `--json` for machine-readable generation status and privacy-safe validation failures with error codes when needed, optionally rechecked with `python scripts/redact_fixtures.py .artifacts/redacted-fixtures --verify-only`, protected by the script rule that validates the selected input path before touching output and refuses to overwrite arbitrary existing directories, and checked for private text, tool output, commands, local paths, manifest source/output paths, and source-derived candidate filenames.
+Install the development dependencies and browser:
 
-## Release notes checklist
+```bash
+python -m pip install -e ".[dev]"
+python -m playwright install --with-deps chromium
+```
 
-- [ ] Summarize user-visible dashboard changes.
-- [ ] Summarize parser/log shape changes.
-- [ ] Call out migration or re-ingestion recommendations, including whether users should start large private histories with `--newest-files <n>` before a full scan.
-- [ ] Mention visual QA screenshots, manifest, and tested database source.
-- [ ] Mention known limitations and next planned slices from `docs/LIMITATIONS.md`.
+The development extra must provide Ruff, pytest, Playwright plus Pillow.
 
-## Distribution decision
+## Automated Gate
 
-Current supported distribution: source checkout with editable install. See `docs/DISTRIBUTION.md` for the authoritative install path, Python support policy, versioning rules, private artifact policy, and explicit non-goals. See `docs/LIMITATIONS.md` for known limitations, approval-gated work, and next planned work sources.
+Run from the repository root:
 
-PyPI publishing, binary installers, hosted mode, telemetry, package-index credentials, and publishing automation remain blocked until explicitly approved.
+```bash
+ruff check
+ruff format --check
+pytest -q
+codex-observe self-check --json
+codex-observe self-check --visual --json
+codex-observe paths --json
+python scripts/clean_install_smoke.py --extra dev
+
+codex-observe demo
+codex-observe demo --sessions .artifacts/demo/sessions --keep-sessions --json
+codex-observe ingest .artifacts/demo/sessions --db .artifacts/demo/ingest-contract.sqlite --json
+codex-observe doctor --db .artifacts/demo/codex_observe_demo.sqlite --json
+codex-observe sessions --db .artifacts/demo/codex_observe_demo.sqlite --json
+codex-observe report --db .artifacts/demo/codex_observe_demo.sqlite --out .artifacts/demo/run-report.md
+codex-observe report --db .artifacts/demo/codex_observe_demo.sqlite --format json --out .artifacts/demo/run-report.json
+codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --out .artifacts/demo/run-comparison.md
+codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --format json --out .artifacts/demo/run-comparison.json
+
+python scripts/visual_qa.py
+python scripts/visual_qa.py --verify-manifest .artifacts/visual/visual-qa-manifest.json
+codex-observe evidence-bundle --out .artifacts/public-evidence
+codex-observe audit --json
+```
+
+The final audit is a fast contract check, not a substitute for Ruff, pytest, clean-install smoke, or browser QA.
+
+## Manual Review
+
+- Open the desktop and narrow screenshots referenced by the visual QA manifest. Confirm the dashboard is nonblank, readable, free of overlap, and shows useful first-viewport guidance.
+- Exercise Overview, Agent detail, Timeline, Tools, Duplication, and Raw tables against the synthetic database.
+- Confirm empty and missing database states offer working next actions.
+- When locally owned sessions are available, run `python scripts/visual_qa.py --profile real` and inspect the ignored evidence.
+- Treat reports, comparisons, screenshots, and logs as potentially sensitive. Perform a human review before sharing any generated artifact.
+- Confirm README install, demo, private validation, and dashboard commands still work.
+
+## Privacy
+
+- Normal product paths are local-only and do not intentionally upload session content.
+- Keep `.artifacts/`, SQLite databases, raw JSONL, and unreviewed exports out of commits.
+- Any fixture derived from real logs must follow `docs/REAL_LOG_FEEDBACK.md` and use `python scripts/redact_fixtures.py` plus its verification workflow.
+- Confirm no new external network writes, telemetry, credentials, or hosted behavior were introduced.
+
+## GitHub Release
+
+- [ ] `pyproject.toml` and `codex_observe/__init__.py` contain the same version.
+- [ ] `CHANGELOG.md` has a dated entry and accurate user-visible notes.
+- [ ] `README.md`, `docs/CURRENT.md`, `docs/DISTRIBUTION.md`, and `docs/LIMITATIONS.md` describe the shipped state.
+- [ ] `git status --short --branch` is clean and synchronized after the release branch is pushed to `origin`.
+- [ ] GitHub Actions reports green Core quality jobs for every supported Python version.
+- [ ] GitHub Actions reports a green Visual and release evidence job with uploaded reports, screenshots, manifest, and evidence bundle.
+- [ ] The repository description and topics are current.
+- [ ] Create and publish the `v0.3.0` GitHub release from the verified commit.
+- [ ] Close the tracking issue with links to the commit, CI run, and release.
+
+## Release Notes
+
+Call out the local-first workflow, supported Python versions, synthetic quick start, bounded real-session validation, visual QA, privacy boundary, source-only distribution, and limitations. Do not claim PyPI or hosted availability.
+
+See `CONTRIBUTING.md` for development practice and `docs/TRACKING.md` for issue and push traceability.
