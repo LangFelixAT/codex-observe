@@ -12,6 +12,15 @@ def read(path: str) -> str:
 def test_ci_workflow_runs_supported_quality_gate_commands() -> None:
     workflow = read(".github/workflows/ci.yml")
 
+    assert "permissions:\n  contents: read" in workflow
+    assert "Core quality" in workflow
+    assert "Visual and release evidence" in workflow
+    assert 'python-version: ["3.10", "3.11", "3.12"]' in workflow
+    assert "timeout-minutes: 30" in workflow
+    assert "actions/checkout@v7" in workflow
+    assert "actions/setup-python@v7" in workflow
+    assert "actions/upload-artifact@v7" in workflow
+
     assert 'python -m pip install -e ".[dev]"' in workflow
     assert "python scripts/clean_install_smoke.py --extra dev" in workflow
     assert "python -m playwright install --with-deps chromium" in workflow
@@ -50,7 +59,6 @@ def test_ci_workflow_runs_supported_quality_gate_commands() -> None:
     assert "visual-qa-evidence" in workflow
     assert ".artifacts/visual/*.png" in workflow
     assert ".artifacts/visual/visual-qa-manifest.json" in workflow
-    assert "actions/upload-artifact@v4" in workflow
 
 
 def test_pr_template_requires_issue_verification_visual_evidence_and_privacy_review() -> (
