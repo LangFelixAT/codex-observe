@@ -135,6 +135,7 @@ def test_backlog_records_published_slice_retirement_and_external_write_guard() -
 def test_current_state_handoff_is_concise_and_release_focused() -> None:
     current = read("docs/CURRENT.md")
     readme = read("README.md")
+    amazing = read("docs/AMAZING.md")
 
     for required in [
         "# Current Project State",
@@ -158,6 +159,19 @@ def test_current_state_handoff_is_concise_and_release_focused() -> None:
     ]:
         assert required in current
     assert len(current.splitlines()) <= 120
+
+    for required in [
+        "# Making Codex Observe Amazing",
+        "Status: achieved for Version 0.3.0",
+        "## Product Bar",
+        "## Quality Bar",
+        "## Maintenance Mode",
+        "terminal sharing warnings",
+        "No feature work",
+    ]:
+        assert required in amazing
+    assert len(amazing.splitlines()) <= 100
+
     assert "docs/CURRENT.md" in readme
     assert "docs/LIMITATIONS.md" in readme
 
@@ -217,48 +231,44 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
     ci = read(".github/workflows/ci.yml")
 
     for required in [
+        "# Contributing",
         'python -m pip install -e ".[dev]"',
-        "codex-observe audit",
-        "python scripts/clean_install_smoke.py --extra dev",
-        "ruff check",
-        "ruff format --check",
-        "pytest -q",
-        "python scripts/visual_qa.py",
-        "bounded sidebar history page evidence",
-        "SHA-256",
-        "## Traceability cadence",
+        "python -m playwright install --with-deps chromium",
+        "Python 3.10",
+        "Python 3.11",
+        "Python 3.12",
+        "## Planning and traceability",
+        "docs/TRACKING.md",
         "small, reviewable checkpoints",
         "git status --short --branch",
         "push the branch",
-        "codex-observe sessions --db .artifacts/demo/codex_observe_demo.sqlite --json",
-        "aggregate triage risk",
-        "aggregate triage risk",
-        "codex-observe doctor --db .artifacts/demo/codex_observe_demo.sqlite --json",
-        "codex-observe report --db .artifacts/demo/codex_observe_demo.sqlite --out .artifacts/demo/run-report.md",
-        "codex-observe report --db .artifacts/demo/codex_observe_demo.sqlite --format json --out .artifacts/demo/run-report.json",
-        "codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --out .artifacts/demo/run-comparison.md",
-        "codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --format json --out .artifacts/demo/run-comparison.json",
-        "python scripts/backlog_publish_plan.py",
-        "python scripts/backlog_publish_plan.py --new-draft",
-        "python scripts/backlog_publish_plan.py --json",
-        "docs/PUBLIC_TOUR_FEEDBACK.md",
-        ".github/ISSUE_TEMPLATE/public_tour_feedback.yml",
-        "docs/TRACKING.md",
-        "codex-observe evidence-bundle --out .artifacts/public-evidence",
+        "## Quality gates",
+        "ruff check",
+        "ruff format --check",
+        "pytest -q",
         "codex-observe self-check --json",
-        "codex-observe self-check --visual --json",
-        "codex-observe paths --json",
-        "guided `private-validate --newest-files 25 --json` command",
-        "codex-observe audit --json",
-        "events.payload_json",
-        "explicit approval",
+        "python scripts/clean_install_smoke.py --extra dev",
+        "## Visual changes",
+        "python scripts/visual_qa.py",
+        "python scripts/visual_qa.py --verify-manifest",
+        "## Privacy and parser changes",
         "synthetic fixtures",
+        "events.payload_json",
         "python scripts/redact_fixtures.py",
         "--verify-only",
         "privacy_review",
+        "docs/REAL_LOG_FEEDBACK.md",
+        "## Release changes",
+        "docs/RELEASE.md",
     ]:
         assert required in contributing
-
+    assert len(contributing.splitlines()) <= 140
+    for stale_contract_dump in [
+        "bounded sidebar history page evidence",
+        "metric card evidence",
+        "machine-readable generation status",
+    ]:
+        assert stale_contract_dump not in contributing
     for required_readme_item in [
         "# Codex Observe",
         "actions/workflows/ci.yml/badge.svg",

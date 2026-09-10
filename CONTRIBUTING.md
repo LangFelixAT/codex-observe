@@ -1,109 +1,91 @@
 # Contributing
 
-Codex Observe is an offline observability tool for local Codex session logs. Contributions should preserve the same default posture: local-first, privacy-aware, deterministic, and verifiable.
+Codex Observe is a local-first observability tool for Codex session logs. Contributions should remain focused, deterministic, privacy-aware, and easy to verify.
 
 ## Development setup
 
 ```bash
 python -m pip install -e ".[dev]"
-python scripts/clean_install_smoke.py --extra dev
-python -m playwright install chromium
+python -m playwright install --with-deps chromium
+codex-observe self-check --visual --json
 ```
 
-Use Python 3.10, 3.11, or 3.12. The supported source-install distribution policy is documented in `docs/DISTRIBUTION.md`.
+Supported runtimes are Python 3.10, Python 3.11, and Python 3.12. See `docs/DISTRIBUTION.md` for the source-install policy.
 
-## Planning workflow
+## Planning and traceability
 
-- Work from a fresh vertical slice in docs or a published GitHub issue; `docs/TRACKING.md` records the current issue snapshot and `docs/BACKLOG.md` is now a completed closeout record.
-- Keep slices demoable on their own.
-- Scaffold fresh local issue drafts with `python scripts/backlog_publish_plan.py --new-draft "Short demoable title" --label "type: slice" --label "area: dashboard"` so tests, visual QA, privacy review, and blocked-by sections are present from the start.
-- Run `python scripts/backlog_publish_plan.py` before publishing fresh local issue drafts; use `python scripts/backlog_publish_plan.py --json` for machine-readable review metadata.
-- Do not publish fresh local issue drafts to GitHub without explicit approval; check `docs/TRACKING.md` before opening or retiring issues.
-- Use `.github/PULL_REQUEST_TEMPLATE.md` for verification and privacy evidence.
-- Use `.github/ISSUE_TEMPLATE/public_tour_feedback.yml` and `docs/PUBLIC_TOUR_FEEDBACK.md` for privacy-safe public-tour or reviewer-bundle observations before turning feedback into implementation issues.
+- Start from a GitHub issue or a fresh local draft. `docs/TRACKING.md` is the authoritative issue snapshot.
+- Keep changes as small, reviewable checkpoints with one clear user or maintenance outcome.
+- Use `python scripts/backlog_publish_plan.py --new-draft "Short title"` when a local draft is useful.
+- Run `python scripts/backlog_publish_plan.py --json` before publishing a draft.
+- Commit each coherent slice after its relevant gates pass, then push the branch.
+- Before handoff, run `git status --short --branch` and explain any remaining changes.
 
-## Traceability cadence
+Do not combine unrelated cleanup, feature, parser, and UI work in one commit.
 
-Keep implementation work in small, reviewable checkpoints. After each coherent slice passes its relevant gates, commit it with a message that names the user-visible or workflow outcome, then push the branch so `origin` has the same trace as the local workspace.
+## Quality gates
 
-Use this cadence for dashboard/UI polish, parser changes, CLI/report behavior, release docs, and evidence tooling. `codex-observe paths --json` should keep the guided `private-validate --newest-files 25 --json` command discoverable before lower-level manual follow-ups. Do not batch unrelated slices into one large commit unless they were already completed together and have passed the full quality gate; in that case, make one checkpoint commit before starting the next slice.
-
-Before handing off or starting a new slice, run `git status --short --branch` and confirm the working tree is clean or explain the remaining local changes.
-
-## Privacy rules
-
-- Do not commit real Codex session logs, private prompts, raw tool output, local file paths from private machines, or non-synthetic SQLite databases.
-- Use synthetic fixtures and `codex-observe demo` for tests, screenshots, docs, reports, and CI artifacts.
-- Treat screenshots, raw dashboard tables, report excerpts, and issue text as potentially sensitive unless they are generated from synthetic data.
-- New telemetry, hosted mode, publishing credentials, external report uploads, or package-index automation require explicit approval before implementation.
-
-## Local verification
-
-Run the final aggregate-only release audit after visual evidence and `.artifacts/public-evidence` exist. Failed audit runs print a `Failed checks` section, and `codex-observe audit --json` includes `failed_checks` for automation:
-
-```bash
-codex-observe evidence-bundle --out .artifacts/public-evidence
-codex-observe audit --json
-```
-
-Run lint, formatting, and the regression suite:
+Every change must pass:
 
 ```bash
 ruff check
 ruff format --check
-codex-observe self-check --json
-codex-observe paths --json
 pytest -q
-```
-
-For CLI/report/privacy-facing changes, also exercise the privacy-safe path handoff and demo commands:
-
-```bash
 codex-observe self-check --json
-codex-observe paths --json
-codex-observe demo
-codex-observe demo --sessions .artifacts/demo/sessions --keep-sessions --json
-codex-observe ingest .artifacts/demo/sessions --db .artifacts/demo/ingest-contract.sqlite --json
-codex-observe sessions --db .artifacts/demo/codex_observe_demo.sqlite --json
-codex-observe sessions --db .artifacts/demo/codex_observe_demo.sqlite --risk high --focus thread --json
-codex-observe doctor --db .artifacts/demo/codex_observe_demo.sqlite --json
-codex-observe report --db .artifacts/demo/codex_observe_demo.sqlite --out .artifacts/demo/run-report.md
-codex-observe report --db .artifacts/demo/codex_observe_demo.sqlite --format json --out .artifacts/demo/run-report.json
-codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --out .artifacts/demo/run-comparison.md
-codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --format json --out .artifacts/demo/run-comparison.json
 ```
 
-The session listing is aggregate-only and includes aggregate triage risk, stable Focus values and distributions, composable `--risk`/`--focus` filters, and a structured `recommended_session` drawn from the matching scope so reviewers and automation can choose a run without reading prompts, tool output, or parsing the human `next` string.
-
-For UI-facing changes, run visual QA:
+Changes to packaging, dependencies, installation, or release workflows must also pass:
 
 ```bash
-python scripts/visual_qa.py
+python scripts/clean_install_smoke.py --extra dev
+codex-observe audit --json
 ```
 
-`codex-observe self-check --visual --json` verifies Pillow and Playwright imports before the browser check. The visual QA script starts Streamlit, clicks Overview, Agent detail, Timeline & jumps, Tools, Duplication, and Raw tables, exercises the Agent detail selector, and writes desktop/narrow screenshots and a validated path-safe visual QA manifest with tab coverage, selector exercise, screenshot metadata with exact byte size and SHA-256, layout review, sidebar risk labels, exercised Risk and Focus filters with narrowed-result, valid-selection, and restored-state evidence, bounded sidebar history page evidence for 50-item Previous/Next navigation and stable selection, expected high-risk default metric card evidence, operator-briefing evidence, complete initial-viewport tab navigation, checklist -> brief -> native copy prompt -> comparison -> metric ordering, nearest-follow-up comparison selection and chronological comparison direction, and success-target evidence to `.artifacts/visual/`. Recheck saved evidence and referenced screenshot files with `python scripts/visual_qa.py --verify-manifest .artifacts/visual/visual-qa-manifest.json`. For ignored private validation artifacts, use `codex-observe private-validate ~/.codex/sessions --visual --json` to run the bounded private loop plus real-profile browser QA in one command, or rerun only the browser check with `python scripts/visual_qa.py --profile real --db .artifacts/private/real-sessions.sqlite --out .artifacts/private/visual-real`; do not commit those screenshots or manifests.
+The full release sequence is maintained in `docs/RELEASE.md`; do not duplicate it in pull-request prose.
 
-## Parser changes
+## Visual changes
 
-- Add synthetic or redacted fixtures for every new log shape. Use `python scripts/redact_fixtures.py <sessions-or-jsonl> --out .artifacts/redacted-fixtures` for local-log-derived fixture candidates, then review `manifest.json` and its automated `privacy_review`, which scans generated JSONL rows and manifest metadata, before committing anything; generated manifest source/output paths and source-derived candidate filenames are redacted, and use `--json` for machine-readable generation status and privacy-safe validation failures with error codes. The script validates the selected input path before touching output and refuses to overwrite arbitrary existing directories; use an empty output directory or a prior redacted candidate directory. Re-run candidate verification with `python scripts/redact_fixtures.py .artifacts/redacted-fixtures --verify-only`, and follow `docs/REAL_LOG_FEEDBACK.md` for the full human review loop.
-- Preserve unknown payloads in `events.payload_json`.
+Dashboard-facing changes require browser evidence:
+
+```bash
+codex-observe demo
+python scripts/visual_qa.py
+python scripts/visual_qa.py --verify-manifest .artifacts/visual/visual-qa-manifest.json
+```
+
+Inspect the referenced desktop and narrow screenshots. Confirm that the dashboard is nonblank, the first viewport is useful, tabs and controls work, and text does not overlap or clip. Generated visual evidence stays under ignored `.artifacts/` paths unless a reviewed synthetic image is intentionally added to documentation.
+
+Use `python scripts/visual_qa.py --profile real` only for locally owned session data. Never commit its output.
+
+## Privacy and parser changes
+
+- Do not commit real sessions, private prompts, tool output, local machine paths, private SQLite databases, or unreviewed exports.
+- Prefer synthetic fixtures for tests, screenshots, reports, and CI.
+- Preserve unsupported event data in `events.payload_json` so parser changes do not destroy evidence.
 - Keep re-import behavior deterministic.
-- Update README supported log-shape documentation when support changes.
+- Update supported-shape documentation when parser behavior changes.
+
+When a real log exposes a parser gap, create a candidate only through the redaction workflow:
+
+```bash
+python scripts/redact_fixtures.py <sessions-or-jsonl> --out .artifacts/redacted-fixtures
+python scripts/redact_fixtures.py .artifacts/redacted-fixtures --verify-only
+```
+
+Review the generated rows, manifest metadata, and `privacy_review` result before moving any candidate into `tests/fixtures/redacted/`. Use `--json` when structured status or error codes are needed. Follow `docs/REAL_LOG_FEEDBACK.md` for the complete process.
+
+New telemetry, hosted behavior, package publishing, credentials, or external uploads require explicit project approval.
+
+## Pull requests
+
+- Link the issue and describe the behavior change.
+- List the exact gates run and their result.
+- Attach only synthetic or reviewed-redacted evidence.
+- For visual work, identify the tested database profile, viewports, screenshots, and manifest.
+- Call out limitations or follow-up work rather than hiding it in implementation detail.
+
+Use `.github/PULL_REQUEST_TEMPLATE.md` as the final checklist.
 
 ## Release changes
 
-Release readiness is tracked in `docs/RELEASE.md`. Before calling a release candidate ready, verify:
-
-- `python scripts/clean_install_smoke.py --extra dev`
-- `ruff check`
-- `ruff format --check`
-- `pytest -q`
-- `codex-observe self-check --json`
-- `codex-observe paths --json`
-- `python scripts/visual_qa.py`
-- `python scripts/visual_qa.py --verify-manifest .artifacts/visual/visual-qa-manifest.json`
-- `codex-observe evidence-bundle --out .artifacts/public-evidence`
-- `codex-observe audit --json`
-
-Generated `.artifacts/` outputs are local evidence and are ignored by default. Public-tour feedback should reference synthetic or reviewed-redacted artifacts only, following `docs/PUBLIC_TOUR_FEEDBACK.md`. For report-facing work, keep `.artifacts/demo/run-report.md`, `.artifacts/demo/run-report.json`, `.artifacts/demo/run-comparison.md`, and `.artifacts/demo/run-comparison.json` together so reviewers can inspect the same aggregate evidence as CI. Compare commands that write `--out` also print the aggregate verdict and triage-risk movement for quick terminal review.
-
+Release changes must update version metadata, `CHANGELOG.md`, `docs/CURRENT.md`, and any affected limitations or distribution guidance. Run every command in `docs/RELEASE.md`, push the verified commit, wait for GitHub Actions, and create the release from that exact commit.
