@@ -4,16 +4,17 @@ This file records the current issue-tracking state and the expected workflow for
 
 ## Current GitHub issue state
 
-Checked: 2026-08-19 with:
+Checked: 2026-09-10 with:
 
 ```powershell
 gh issue list --limit 20 --state all --json number,title,state,labels,updatedAt,url
 ```
 
-All current GitHub issues are closed:
+Current implementation issue:
 
 | Issue | State | Title |
 | --- | --- | --- |
+| #20 | Open | Polish the repository for a presentable v0.3.0 release |
 | #19 | Closed | Protect saved visual QA evidence from test mutation |
 | #18 | Closed | Bound dashboard history rendering for large session sets |
 | #17 | Closed | Make Focus a first-class session-history filter |
@@ -33,7 +34,7 @@ All current GitHub issues are closed:
 | #2 | Closed | Fix Streamlit host and port CLI flags |
 | #1 | Closed | Track Codex Observe hardening pass |
 
-Issue #19 is closed after test-generated visual fixtures were isolated from saved evidence, manifest schema v2 bound every referenced screenshot to exact byte size plus SHA-256, and evidence-bundle synchronization was corrected to copy all manifest-referenced onboarding captures. Commit `af886ce` passed 296 tests, clean-install smoke, synthetic visual QA, manifest verification, evidence-bundle audit, and GitHub CI run `32300632202`. Draft `011` was completed and retired from the local publishable backlog. There is no current publishable local issue draft.
+Issue #20 is the active final cleanup slice. It is limited to repository presentation, release documentation, CI reliability, reviewed synthetic visual assets, and the GitHub `v0.3.0` release; dashboard, parser, report, and CLI feature work is out of scope. Issue #19 remains closed after visual-fixture isolation and manifest-v2 integrity shipped. There is no current publishable local issue draft.
 
 ## New work workflow
 

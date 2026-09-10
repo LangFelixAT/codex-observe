@@ -610,11 +610,11 @@ def test_tracking_snapshot_records_current_issue_state_and_publish_guard() -> No
     config = read(".github/ISSUE_TEMPLATE/config.yml")
 
     for required in [
-        "Checked: 2026-08-19",
+        "Checked: 2026-09-10",
         "gh issue list --limit 20 --state all --json number,title,state,labels,updatedAt,url",
-        "All current GitHub issues are closed",
-        "Issue #19 is closed",
-        "Draft `011` was completed",
+        "Current implementation issue",
+        "Issue #20 is the active final cleanup slice",
+        "feature work is out of scope",
         "no current publishable local issue draft",
         "python scripts/backlog_publish_plan.py --new-draft",
         "python scripts/backlog_publish_plan.py --json",
@@ -634,5 +634,6 @@ def test_tracking_snapshot_records_current_issue_state_and_publish_guard() -> No
     assert "#17" in tracking
     assert "#18" in tracking
     assert "#19" in tracking
+    assert "#20" in tracking
     assert "docs/TRACKING.md" in current
     assert "docs/TRACKING.md" in config
