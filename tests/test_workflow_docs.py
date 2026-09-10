@@ -199,7 +199,6 @@ def test_current_state_handoff_covers_gates_evidence_and_real_log_checkpoint() -
         assert required in current
     assert "docs/CURRENT.md" in readme
     assert "docs/LIMITATIONS.md" in readme
-    assert "docs/TRACKING.md" in readme
 
 
 def test_issue_templates_cover_main_work_types() -> None:
@@ -297,93 +296,34 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
     ]:
         assert required in contributing
 
-    assert "## Public Tour" in readme
-    for tour_item in [
-        "codex-observe tour",
-        "codex-observe tour --reviewer",
-        "codex-observe demo --serve --host 127.0.0.1 --port 8501",
-        "initial-viewport operator briefing",
-        "portfolio and risk context",
-        "native copy-ready next-run prompt",
-        "comparison -> metric ordering",
-        "safe feedback handoff",
-        "explicit chronological Before/After context",
-        "codex-observe doctor --db .artifacts/demo/codex_observe_demo.sqlite --json",
-        "codex-observe sessions --db .artifacts/demo/codex_observe_demo.sqlite --json",
-        "structured `next_commands` for baseline report export, next-run report export, and comparison automation",
-        "aggregate triage risk",
-        "aggregate triage risk",
-        "codex-observe report --db .artifacts/demo/codex_observe_demo.sqlite --out .artifacts/demo/run-report.md",
-        "codex-observe report --db .artifacts/demo/codex_observe_demo.sqlite --format json --out .artifacts/demo/run-report.json",
-        "codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --out .artifacts/demo/run-comparison.md",
-        "quick-read headline",
-        "top-level recommended action",
-        "follow-up command templates",
-        "next validation command",
-        "success-target preview",
-        "aggregate triage assessment",
-        "aggregate triage assessment",
-        "largest-change summary",
-        "triage-risk movement",
-        "diagnostic-change summary",
-        "python scripts/visual_qa.py",
-        "layout overflow/clipping checks",
-        "50 conversations per page",
-        "bounded sidebar history page evidence",
-        "schema-v2",
-        "SHA-256",
-        "metric card evidence",
-        "Agent detail thread brief",
-        "Timeline quick read",
-        "Tools quick read",
-        "Duplication quick read",
-        "Raw tables data inventory",
-        "nearest-follow-up comparison selection",
-        "chronological comparison direction",
-        "aggregate triage assessment",
+    for required_readme_item in [
+        "# Codex Observe",
+        "actions/workflows/ci.yml/badge.svg",
+        "![Codex Observe dashboard](docs/assets/dashboard-overview.png)",
+        "## Quick start",
+        "### Synthetic demo",
+        "### Your Codex sessions",
+        "python -m pip install -e .",
+        "codex-observe demo --serve",
+        "codex-observe paths",
+        "codex-observe private-validate",
+        "## What it helps you answer",
+        "## Privacy",
+        "## Development",
+        "CONTRIBUTING.md",
+        "docs/LIMITATIONS.md",
+        "docs/DISTRIBUTION.md",
+        "docs/CURRENT.md",
+    ]:
+        assert required_readme_item in readme
+    assert len(readme.splitlines()) <= 180
+    for internal_contract_term in [
         "required_commands",
-        "paths handoff evidence",
-        ".artifacts/visual/visual-qa-manifest.json",
-        "codex-observe evidence-bundle --out .artifacts/public-evidence",
-        "reviewer README",
-        "codex-observe.evidence-bundle.v1",
-        "docs/PUBLIC_TOUR_FEEDBACK.md",
-        ".github/ISSUE_TEMPLATE/public_tour_feedback.yml",
-        "do not commit private logs, private SQLite databases, or unreviewed local artifacts",
+        "failed_checks",
+        "manifest metadata",
+        "machine-readable generation status",
     ]:
-        assert tour_item in readme
-    assert "CONTRIBUTING.md" in readme
-    assert "python scripts/redact_fixtures.py" in readme
-    assert "docs/REAL_LOG_FEEDBACK.md" in readme
-    assert "codex-observe --version" in readme
-    assert "codex-observe sessions --db <db>" in readme
-    assert "structured `next_commands`" in readme
-    assert "copy-pasteable" in readme
-    assert "synthetic demo data, local ingestion, and database health checks" in readme
-    assert "same `--db` path" in readme
-    assert "diagnostic priority" in readme
-    assert "valid but empty" in readme
-    assert "next ingest or demo command" in readme
-    assert "--newest-files 25 --json" in readme
-    assert "risk_distribution" in readme
-    for required_readme_gate in [
-        "Ruff lint",
-        "Ruff format checks",
-        "regression suite",
-        "clean-install smoke gate",
-        "aggregate release audit",
-        "nearest-follow-up comparison selection",
-        "chronological comparison direction",
-        "synthetic demo generation",
-        "aggregate-only session listing",
-        "database doctor",
-        "aggregate report export",
-        "run-report.json",
-        "visual QA",
-        "evidence-bundle contract check",
-        "workflow artifacts",
-    ]:
-        assert required_readme_gate in readme
+        assert internal_contract_term not in readme
     assert "CONTRIBUTING.md" in release
     distribution = read("docs/DISTRIBUTION.md")
     changelog = read("CHANGELOG.md")
@@ -457,27 +397,21 @@ def test_contributing_guide_matches_quality_and_privacy_bar() -> None:
     ]:
         assert required_distribution_item in distribution
     for required_changelog_item in [
-        "codex-observe tour --json",
-        "privacy-safe feedback loop",
-        "generated public evidence bundle artifact validation",
-        "dashboard comparison quick-read, review-path, metric delta, safe feedback handoff, and next validation command cards plus Markdown/JSON report and comparison downloads",
-        "codex-observe evidence-bundle --out .artifacts/public-evidence --skip-visual --json",
-        "run-comparison.json",
-        "ingest private-sharing review warnings",
-        "report and comparison terminal privacy warnings",
-        "private aggregate artifacts are reviewed before sharing",
-        "release audit validation",
-        "PR checklist guidance",
-        "session-listing next-run target previews",
-        "codex-observe paths --json",
-        "guided `private-validate --newest-files 25 --json` command",
-        "codex-observe self-check",
-        "self-check --visual",
-        "private-validate",
-        "first `codex-observe paths` next command",
-        "real-profile visual QA handoff",
+        "## [Unreleased]",
+        "## [0.3.0] - 2026-09-10",
+        "### Highlights",
+        "### Analysis and workflow",
+        "### Reliability and privacy",
+        "### Validation",
+        "local-first",
+        "visual QA",
+        "manifest schema v2",
+        "evidence bundle",
+        "Python 3.10",
+        "296 tests",
     ]:
         assert required_changelog_item in changelog
+    assert len(changelog.splitlines()) <= 100
     assert "\\n" not in contributing
     assert "\\n" not in distribution
     for required_ci_item in [

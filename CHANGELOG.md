@@ -1,210 +1,41 @@
 # Changelog
 
-All notable changes to Codex Observe will be documented here.
+All notable changes to Codex Observe are documented here. The project follows semantic versioning for repository releases.
 
-The project follows semantic versioning once release distribution is decided.
+## [Unreleased]
 
-## Unreleased
-- Protected saved visual QA evidence from test-fixture mutation and upgraded the manifest to schema v2 with exact screenshot byte-size and SHA-256 verification for primary and onboarding captures.
-- Bounded dashboard history to 50 conversations per page with range-aware Previous/Next navigation, filter-reset semantics, stable selected reports, and synthetic plus ignored real-profile desktop/narrow evidence.
-- Made Focus a first-class session-history filter with stable CLI values and distributions, composable Risk + Focus filtering, counted dashboard options, and synthetic plus ignored real-profile desktop/narrow interaction evidence.
-- Moved run comparison directly after the copy-ready next-run prompt and before supporting metrics, with synthetic and real-profile desktop/narrow ordering evidence.
-- Defaulted dashboard comparisons to the nearest chronological follow-up, or nearest predecessor when no follow-up exists, with explicit Next run/Previous run labels and desktop/narrow synthetic plus real-profile visual evidence.
-- Ordered dashboard comparisons chronologically with explicit Before/After aggregate context, so the synthetic older high-risk run to newer low-risk follow-up correctly reports improvement instead of a reversed regression.
-- Moved dashboard navigation and the next-run action plan before supporting metrics, added a native copy control for the aggregate-only prompt, and extended desktop/narrow synthetic and real-profile visual QA to enforce the hierarchy.
-- Split `codex-observe tour` into a concise default user journey and explicit `--reviewer` mode while preserving the exhaustive JSON automation contract.
-- Put the product answer first across help, tour, path discovery, session selection, and the dashboard; recommendation tie-breaks are explicit and visual QA now proves the operator briefing precedes metrics within the initial desktop and narrow viewports.
-- Aligned dashboard operator guidance, proof targets, review paths, checklists, and next-run briefs on one authoritative report while keeping the selected-run risk signal explicitly scoped.
-- Made the Ruff lint policy explicit so clean CI installs remain stable across Ruff 0.16's expanded default rule set.
-- Clarified private validation summaries by separating portfolio-wide patterns from the recommended-run focus when sampled real histories point at different habits.
-- Prioritized very large tool outputs in the shared opportunity stack and terminal next-action summary so real-session reports align with the dashboard Focus signal when bulky command output is the top workflow issue.
-- Surfaced session Focus in the dashboard sidebar, selected-run metric grid, sidebar search, and visual QA evidence.
-- Added per-session Focus labels to session listings and JSON so large high-risk histories show the dominant reason to inspect each run.
-- Made session-listing durations compact for short real runs and pluralized run-report role counts for cleaner terminal and Markdown output.
-- Added root thread counts to run report summaries and selected-run dashboard metrics so thread-role totals are explicit.
-- Added a Guardian share column to plain-text session listings so real histories expose approval overhead while scanning runs.
-- Added guardian input share to sessions recommendation details so JSON handoffs explain approval overhead alongside duration, thread, replay, uncached input, and tool-output drivers.
-- Added secondary watch items to next-run briefs so reports and dashboards carry the next ranked real drivers into the copy-pasteable run plan.
-- Added volume-calibrated guardian input share to report triage reasons so large approval-context replay is visible in the risk summary without overclassifying small focused runs.
-- Added guardian input share to report Quick Read headlines so large approval-context replay appears in the first summary line of real run reports.
-- Kept guardian approval overhead in the default next-run playbook so real multi-driver reports include the approval-context habit alongside duration, dominant-thread, context-jump, tool-output, and replay habits.
-- Promoted guardian approval overhead into session summaries, portfolio patterns, ranked opportunity stacks, and next-run success targets so real histories surface large approval-context replay as an actionable workflow cost.
-- Made next-run brief guardrails specific to the selected success metric, so multi-day real sessions now recommend checkpointing before one day instead of generic driver-dominance wording.
-- Made the sessions portfolio briefing ignore single-thread tautologies for largest-thread concentration, so real histories do not treat every one-thread run as a cross-session dominant-thread pattern.
-- Bounded percentage-of-total metrics at 100% in reports, sessions summaries, and dashboard calculations so real-history replay-token outliers do not produce impossible percentage displays.
-- Added sampled/full-history scope guidance to codex-observe private-validate review summaries so users know whether the recommendation reflects a newest-file sample or complete local history.
-- Added `codex-observe private-validate --all` and a sampled-run full-history follow-up command so users can graduate from newest-file validation to complete real-history validation without guessing the command.
-- Added a compact private review summary to `codex-observe private-validate` so real-session validation immediately names the dominant portfolio pattern, recommended focus, report artifact, and dashboard command.
-- Added dominant-driver evidence to the sessions portfolio briefing so broad high-risk histories show the recurring workflow pattern across runs.
-- Added a sessions portfolio briefing in CLI JSON/text and the dashboard Overview so all-high-risk real histories are treated as workflow patterns, not isolated runs.
-- Surfaced selected-run duration in the dashboard sidebar and Overview metric grid with visual QA evidence.
-- Added session-duration metadata to `codex-observe sessions` text/JSON output so multi-day runs recommend checkpointing and restarting before report export.
-- Added a multi-day session diagnostic, opportunity, playbook habit, and success target so real long-running Codex sessions recommend checkpointing and restarting instead of only reporting a dominant thread.
-- Added a sidebar Find session search box in the dashboard so large real-history databases can be narrowed by session fragment, preview label, date, or risk while preserving the risk filter.
-- Made `codex-observe private-validate` rebuild its ignored private SQLite database from scratch so bounded real-log samples do not inherit stale full-history rows.
-- Added a dashboard sidebar Risk filter so large histories can be narrowed visually by aggregate triage band while preserving the Overview context.
-- Added `codex-observe sessions --risk high|medium|low|unknown` so large histories can be narrowed by aggregate triage band while preserving full risk-distribution context.
-- Hardened `python scripts/visual_qa.py` port handling so default local runs avoid stale Streamlit servers and explicit port conflicts fail clearly.
-- Strengthened `codex-observe audit` coverage for private visual validation by checking the default real-profile handoff status and `private-validate --visual` help discoverability.
-- Added `codex-observe private-validate --visual` so the bounded private validation loop can run real-profile browser QA into ignored private evidence without a second copied command.
-- Hardened visual QA Streamlit cleanup so real-profile dashboard checks terminate the launched process tree instead of leaving child processes behind.
-- Added guided `private-validate --newest-files 25 --json` command as the first `codex-observe paths` next command so path discovery leads to the safer real-session validation loop.
-- Added real-profile visual QA handoff metadata to `codex-observe private-validate` so private validation output points directly at ignored browser evidence generation.
-- Added `python scripts/visual_qa.py --profile real` for ignored private real-session dashboard checks, and capped large raw dashboard tables so private histories do not exceed Streamlit websocket limits.
+No unreleased changes.
 
-- Added `codex-observe self-check --visual --json` for no-scan visual dependency verification before browser visual QA.
-- Added `codex-observe self-check` for no-scan source-install verification and wired it into release audit plus clean-install smoke coverage.
-- Added release-audit coverage for the synthetic `private-validate` handoff so bounded real-session validation stays schema-versioned, privacy-safe, and dashboard-ready.
-- Added `codex-observe private-validate` to run the bounded real-session validation loop into ignored private artifacts with privacy-safe terminal and JSON status, plus `--serve` for opening the validated private dashboard in one command.
-- Added a validated local backlog draft scaffold command so fresh demoable GitHub issue candidates start with tests, visual QA, privacy review, and approval-gate metadata.
-- Surfaced the aggregate next-run brief in the dashboard Overview and visual QA manifest so the copy-pasteable plan is verified before release.
-- Added an aggregate-only next-run brief to report JSON/Markdown so private real-session validation has a copy-pasteable plan for the next Codex run.
-- Preserved sampled-ingest coverage metadata in comparison confirmations.
-- Added terminal sample-coverage and expansion-command guidance for bounded ingests.
-- Added an actionable dashboard sample-coverage card for bounded real-history ingests.
-- Quoted shell-sensitive database paths in report-module follow-up commands and review paths.
-- Quoted shell-sensitive database paths in sessions, report, and comparison recovery payload commands.
-- Quoted shell-sensitive database paths in `codex-observe doctor` handoff commands so recovery and review commands remain copy-pasteable.
-- Aligned release documentation with the audit gate that verifies public-tour baseline-to-next-run validation-loop evidence.
-- Strengthened release-audit public-tour evidence so it verifies the baseline, next-run validation, and comparison command sequence.
-- Refreshed the current-state private real-log checkpoint so local validation uses the resolved real sessions path while private counts and artifacts stay out of tracked files.
-- Strengthened release-audit session-listing evidence so it names verified baseline, next-run validation, and comparison next commands.
-- Aligned public-tour sessions wording with the executable baseline, next-run validation, and comparison command sequence.
-- Extended session recommendation next commands to include next-run report export and comparison commands, making the baseline-to-validation loop copy-pasteable from `codex-observe sessions`.
-- Quoted shell-sensitive paths in `codex-observe paths` handoff commands so private real-session validation remains copy-pasteable from directories with spaces or metacharacters.
-- Added public-tour evidence checks for dashboard report and comparison sampled-ingest warning cards so bounded-scope review evidence is named in the guided tour.
-- Broadened sampled-ingest warning text so downstream dashboard views and comparisons are explicitly labeled as sampled evidence.
-- Surfaced sampled-ingest warnings in the dashboard report area and visual manifest evidence so bounded private reports are labeled before download.
-- Surfaced sampled-ingest warnings in the dashboard comparison preview and visual manifest evidence so bounded private comparisons are labeled before download.
-- Carried ingest-scope metadata into comparison JSON, Markdown, terminal confirmations, and release-audit checks so sampled report deltas remain labeled.
-- Carried persisted ingest-scope metadata into report JSON, Markdown, and terminal confirmations so sampled evidence remains labeled after export.
-- Added persisted ingest-scope metadata so doctor and sessions warn when a database was built from a bounded newest-file sample.
-- Fixed session-listing target previews so private real-session recommendations skip already-satisfied drivers, rank actionable targets by impact, and stay aligned with report recommendations.
-- Added session-listing next-run target previews in text and JSON so users see the measurable next-run goal before exporting a report.
-- Added release-audit coverage and release-gate documentation for `codex-observe paths --json`, verifying no-scan privacy metadata, sampled private-validation commands, and structured review-path evidence.
-- Added report and comparison terminal privacy warnings so private aggregate artifacts are reviewed before sharing.
-- Added ingest private-sharing review warnings to plain output, JSON privacy metadata, release audit validation, and PR checklist guidance.
-- Aligned the PR visual QA checklist with usage-snapshot comparison delta evidence.
-- Kept usage-snapshot comparison deltas visible in dashboard comparison cards and visual QA evidence.
-- Added neutral usage-snapshot deltas to aggregate report comparisons.
-- Added usage snapshot counts to aggregate report summaries, headlines, and Markdown exports.
-- Added dashboard sidebar usage-snapshot context with visual QA and release audit evidence.
-- Added aggregate usage snapshot counts to session listings and JSON so long real-history scans show how many observations drove token totals.
-- Clarified largest-tool-output report evidence when command text is intentionally omitted by the privacy boundary.
-- Added a dashboard Overview risk distribution card with visual QA and release audit evidence.
-- Added aggregate risk distribution to `codex-observe sessions` text/JSON output and release audit checks so large histories show fleet-level triage context before a single recommended report.
-- Added `codex-observe ingest --newest-files <n>` and matching `scan-and-serve` support so large real-history directories can be sampled quickly with aggregate matched/processed/deferred counts.
-- Added a structured next-run checklist to run reports and the dashboard Overview, with visual QA and release audit evidence.
-- Aligned real-log checkpoint documentation and release audit wording so future work is framed as reviewed-redacted fixture promotion, not a blocked parser loop.
-- Bounded session listing output by default, added truncation metadata, and optimized aggregate summary queries for large real histories.
-- Added a dashboard safe feedback handoff card plus visual QA and release audit evidence for its privacy boundary.
-- Added structured feedback handoff metadata to aggregate report and comparison Markdown/JSON artifacts plus release audit validation.
-- Added structured comparison review paths so comparison outputs guide verdict review, next-run validation, repeat comparison, and safe feedback.
-- Added structured report review paths so exported run reports guide next-run validation and comparison.
-- Added structured demo review paths so synthetic first-run output guides users through health checks, session selection, report export, and dashboard review.
-- Added structured ingest review paths so fresh imports guide users through health checks, session selection, report export, and dashboard review.
-- Added structured doctor review paths so database health checks guide users toward recovery, session selection, dashboard inspection, and report export.
-- Added terminal next-command guidance to doctor output and release audit coverage.
-- Added terminal next-command guidance to session listings and release audit coverage.
-- Added terminal next-command guidance to demo and ingest success output plus release audit coverage.
-- Added plain terminal handoff commands to the public tour and release audit coverage.
-- Added terminal next-command blocks to report and comparison write confirmations plus release audit coverage.
-- Aligned the public-tour feedback template with the plain terminal handoff flow.
-- Added a terminal next-command footer to plain public tour output and release audit coverage.
-- Aligned the public tour audit step on `codex-observe audit --json` and documented it in the README tour.
-- Added a public-tour `feedback_handoff` contract for the safe feedback runbook, issue template, and evidence rules.
-- Expanded the public-tour feedback template to capture tour JSON, audit JSON, visual QA generation, and JSON report/comparison review steps.
-- Expanded plain public-tour feedback handoff text with safe feedback sources and do-not-collect guidance.
-- Added structured feedback handoff metadata to reviewer evidence bundles and audit validation.
-- Bundled the public-tour feedback issue template in reviewer evidence bundles.
-- Extended the clean-install smoke gate to verify the bundled feedback issue template.
-- Added a top-level public-tour review path so text and JSON tour output expose the end-to-end evaluation checklist.
-- Added a structured session review path to sessions JSON and plain-text listings so terminal users can move from diagnosis to report, comparison, next-run validation, and safe feedback.
-- Added a dashboard next-review path card with visual QA evidence so users can move from diagnosis to validation without leaving the Overview.
-- Added an ordered reviewer action plan to public evidence bundles so handoffs start with clear next review steps.
-- Added per-step success checks to the public tour JSON/text contract so reviewers can verify each synthetic evaluation step without guessing.
-- Added ordered display labels to session recommendation driver summaries.
-- Added an aggregate Tool out column to plain-text session listings.
-- Added largest-tool-output evidence to structured session recommendation drivers.
-- Added largest-tool-output evidence to session summaries and the recommended-action driver list.
-- Added structured next-run validation commands to the public evidence bundle manifest, README, CLI output, and audit validation.
-- Added dashboard comparison quick-read, review-path, metric delta, safe feedback handoff, and next validation command cards plus Markdown/JSON report and comparison downloads for the selected Overview session and visual/audit evidence that the controls render.
-- Added an Agent detail thread brief that surfaces the selected thread's cost share, uncached input, tool count, and first inspection action.
-- Added a Tools quick read that highlights the noisiest captured output and the first command to tighten.
-- Added a Duplication quick read that turns replayed prompt-block estimates into a first cleanup action.
-- Added a Timeline quick read that points reviewers to the largest context jump or compaction boundary first.
-- Added a Raw tables data inventory that summarizes parsed table counts before showing row-level evidence.
-- Updated the public tour to point reviewers at the dashboard quick-read surfaces now covered by visual QA.
-- Strengthened visual QA manifests and release audit checks to require structured dashboard quick-read evidence.
-- Strengthened release audit checks for public tour dashboard quick-read guidance.
-- Added dashboard comparison review-path and metric delta cards and visual/audit evidence that they render.
-- Updated the public tour to point reviewers at dashboard comparison review-path and metric delta cards.
-- Updated the evidence bundle review checklist to include comparison review-path guidance.
-- Added review checklist guidance to evidence bundle terminal output so README-free handoffs retain the review path.
-- Strengthened release audit checks to verify the evidence bundle terminal handoff checklist.
-- Added reproduce-local commands to the reviewer evidence bundle README and release audit validation.
-- Added follow-up command templates to aggregate comparison Markdown/JSON exports.
-- Added the comparison next validation command to the dashboard Overview quick-read card and visual/audit evidence.
-- Added a structured reviewer checklist to the public evidence bundle manifest, README, and audit validation.
-- Added reviewer key findings to the public evidence bundle manifest, README, and audit validation.
-- Added reviewer key findings to the public evidence bundle text output.
-- Updated the public tour and audit contract to require evidence bundle key-findings guidance.
-- Bundled the privacy-safe public-tour feedback runbook in reviewer evidence bundles.
-- Moved evidence bundle terminal key findings before artifact paths.
-- Hardened redacted fixture verification against raw identifier-field leaks.
-- Extended release audit redaction checks to require raw ID verify-only rejection.
-- Added top-level recommended-action sections to report and comparison Markdown exports.
-- Added a recommended-action block to plain-text session listings.
-- Added success-target feedback to report write confirmations.
-- Added next-validation command feedback to comparison write confirmations.
-- Updated the public tour to point at recommended-action and terminal validation evidence.
+## [0.3.0] - 2026-09-10
 
-### Added
+### Highlights
 
-- Synthetic demo database workflow through `codex-observe demo`, including `--serve` for a one-command first run and `--json` for schema-versioned creation status, structured next commands, and a structured review path.
-- Privacy-safe database health checks through `codex-observe doctor` with text output, JSON `schema_version` metadata, structured `next_commands`, structured `review_path`, and copy-pasteable recovery hints that preserve the selected `--db` path.
-- Privacy-safe session listing through `codex-observe sessions` for choosing reportable conversations without printing prompts or tool output, including `schema_version` and `status` metadata, a machine-readable `recommended_session`, structured `recommendation_detail`, structured `next_commands`, and machine-readable missing-database JSON output.
-- Privacy-safe Markdown/JSON run reports through `codex-observe report`, including `schema_version` metadata, a quick-read headline, cost profile percentages, a ranked aggregate opportunity stack, aggregate diagnostics, structured next-action metadata, structured review paths, schema-versioned JSON failure payloads, and an impact-targeted next-run playbook; comparison inputs with missing or unsupported report schema versions are rejected with a regeneration hint.
-- Fast release-readiness audit through `codex-observe audit`, covering demo data, doctor/session/report flows, Markdown/JSON report artifacts with cost-profile and `schema_version` evidence, comparison quick-read, opportunity-change, percent-delta, command-help product concepts, `schema_version`, JSON evidence, demo creation JSON contract evidence, public tour JSON contract evidence including privacy-safe feedback guidance, generated public evidence bundle artifact validation, full visual manifest contract evidence with referenced screenshots and layout review, release metadata, dev tooling metadata, CI reviewer evidence-bundle generation/upload, issue template evidence/privacy requirements, redaction validation privacy, planning backlog closeout, audit JSON `schema_version`, machine-readable `required_commands`, and actionable `failed_checks` failure summaries.
-- Polished dashboard header, empty states, cost-share overview metrics, an aggregate opportunity stack, diagnostics cards, actionable overview guidance, and next-run playbook.
-- Tab-covering visual QA with screenshot quality checks for desktop and narrow viewports plus uploaded manifest evidence, metric card evidence, and success-target evidence.
-- GitHub issue templates, PR template, planning backlog closeout, release checklist, source-install distribution docs, privacy-safe public-tour feedback runbook/template, and CI workflow.
-- `visual` and `dev` optional dependency groups for screenshot QA and full contributor verification, including explicit Playwright and Pillow dependencies.
-- Public README tour for evaluating the synthetic demo, aggregate report quick read, opportunity stack, opportunity-change comparison workflow, visual QA evidence, reviewer evidence bundle, final audit, and privacy-safe feedback loop before using private logs, plus schema-versioned `codex-observe tour --json` output with evidence bullets for automation.
-- Responsive dashboard metric cards, narrow tab wrapping, verify-only validated manifest evidence and referenced screenshot files in path-safe visual QA manifests, and visual QA layout overflow/clipping review for release-candidate UX evidence.
-- Redacted fixture privacy review verifier and `--verify-only` mode for the real-log parser feedback loop, including generated JSONL row and manifest metadata checks.
-- Redacted fixture generation supports `--json` for machine-readable generation status and privacy-safe validation failures with error codes, validates the selected input path before touching output, redacts manifest source/output paths and source-derived candidate filenames, and refuses to overwrite arbitrary existing directories; use an empty output directory or a prior redacted candidate directory. `codex-observe ingest --json` now emits aggregate-only `codex-observe.ingest.v1` counts, skipped categories, privacy metadata, next commands, and structured review paths for automation.
+- Delivered a local-first workbench that explains what made a Codex run expensive, recommends one concrete next-run habit, and defines a measurable proof target.
+- Added a two-run synthetic demo, an answer-first Streamlit dashboard, aggregate Markdown/JSON reports, and run-to-run comparison.
+- Added a bounded real-session validation path that resolves the local Codex sessions directory, samples the newest files first, and keeps generated evidence ignored.
 
-### Changed
+### Analysis and workflow
 
-- Dashboard tables use current Streamlit `width="stretch"` behavior.
-- README first-run path now uses synthetic data instead of any local private sample database.
-- Report and dashboard diagnostics share non-UI analysis helpers, keeping CLI exports independent from Streamlit; reports and comparisons now include aggregate-only quick-read summaries, opportunity/change summaries, structured review paths, plus structured next-step recommendations and schema-versioned comparison failure payloads that preserve diagnostic priority for persisted issues.
-- CLI doctor, report, sessions, and compare paths now print privacy-safe next commands for healthy databases, successful session listings, missing databases, unknown sessions, and incomplete comparison inputs.
-- CI now runs Ruff lint, Ruff format check, pytest, audit, demo generation, demo JSON contract verification, synthetic ingest JSON contract verification, session listing, database doctor, report export, visual QA, reviewer evidence-bundle generation, and artifact uploads; release audit verifies those report and visual evidence artifact paths.
-- GitHub issue and PR templates now require synthetic/redacted visual evidence instead of private local sample databases.
+- Ranked session risk and primary Focus across duration, dominant threads, guardian overhead, prompt replay, uncached input, tool output, and total tokens.
+- Added portfolio briefings, opportunity stacks, next-run checklists, copy-ready run briefs, and success targets shared by terminal reports and the dashboard.
+- Added chronological comparison with explicit Before/After context, triage movement, metric deltas, opportunity change, and next validation commands.
+- Bounded dashboard history to 50 conversations per page with stable selection, search, Risk and Focus filters, and range-aware Previous/Next navigation.
+- Added agent detail, token-jump timeline, tool usage, large tool-output, prompt duplication, and raw aggregate table views.
 
-### Parser
+### Reliability and privacy
 
-- Token usage normalization now supports Codex `total_token_usage` and OpenAI-style `usage` payloads, including cached/reasoning token details and model context windows.
-- Unknown payloads remain retained in `events.payload_json` for raw inspection after ingestion.
-- Re-import and duplicate-file behavior remain deterministic.
+- Added defensive parsing for known Codex and OpenAI-style usage payloads while retaining unknown events for local inspection.
+- Made imports deterministic across re-imports, duplicate files, malformed rows, empty files, and missing session metadata.
+- Added privacy-safe `paths`, `private-validate`, `doctor`, `sessions`, `report`, `compare`, and redacted-fixture workflows that avoid raw content in normal terminal output.
+- Added a synthetic evidence bundle and release audit covering package health, CLI contracts, reports, comparisons, documentation, and reviewer artifacts.
+- Isolated test fixtures from saved screenshots and upgraded visual evidence to manifest schema v2 with exact byte-size and SHA-256 integrity for primary and onboarding captures.
 
-### Verification
+### Validation
 
-- `ruff check`
-- `ruff format --check`
-- `pytest -q`
-- `codex-observe audit --json`
-- `codex-observe tour --json`
-- `codex-observe demo`
-- `codex-observe demo --sessions .artifacts/demo/sessions --keep-sessions --json`
-- `codex-observe ingest .artifacts/demo/sessions --db .artifacts/demo/ingest-contract.sqlite --json`
-- `codex-observe sessions --db .artifacts/demo/codex_observe_demo.sqlite --json`
-- `codex-observe doctor --db .artifacts/demo/codex_observe_demo.sqlite --json`
-- `codex-observe report --db .artifacts/demo/codex_observe_demo.sqlite --out .artifacts/demo/run-report.md`
-- `codex-observe report --db .artifacts/demo/codex_observe_demo.sqlite --format json --out .artifacts/demo/run-report.json`
-- `codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --out .artifacts/demo/run-comparison.md`
-- `codex-observe compare --before-report .artifacts/demo/run-report.json --after-report .artifacts/demo/run-report.json --format json --out .artifacts/demo/run-comparison.json`
-- `codex-observe evidence-bundle --out .artifacts/public-evidence --skip-visual --json`
-- `python scripts/visual_qa.py`
+- 296 tests cover ingestion, analysis, reports, CLI behavior, dashboard helpers, evidence generation, privacy boundaries, packaging, and workflow documentation.
+- CI runs the regression suite on Python 3.10, 3.11, and 3.12, with an independent browser and release-evidence lane.
+- Automated visual QA exercises desktop and narrow layouts, every dashboard tab, empty states, filters, pagination, comparisons, downloads, and layout-overflow checks.
+- Clean-install smoke verifies the source install, console entry point, synthetic demo, evidence bundle, release audit, Playwright, and Pillow in a fresh environment.
+
+[Unreleased]: https://github.com/LangFelixAT/codex-observe/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/LangFelixAT/codex-observe/releases/tag/v0.3.0
